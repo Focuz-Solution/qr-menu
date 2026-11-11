@@ -1,0 +1,1106 @@
+[
+  {
+    "slug": "sample-gluelessLashes",
+    "name": "ឈុតរោមភ្នែកត មិនបាច់ប្រើកាវ",
+    "sortOrder": 0,
+    "products": [
+      {
+        "slug": "sample-kakura-pre-glued-lashes",
+        "name": "រោមភ្នែកបិត មានកាវស្រាប់(កញ្ជ្រោង)",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី15-18ម៉ោង\n✅ រោមភ្នែកផលិតពី ( ផ្លាស្ទិចសំយោគ លាយកប្បាស)\n💵 1ប្រអប់ 5$\n💵 យក 3ប្រអប់ឡើង ហ្វ្រីដឹក\n💵 យក 5ប្រអប់ ថែម1 + ហ្វ្រីដឹក",
+        "priceCents": 500,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_1/IMG_5450.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_1/IMG_5451.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_1/IMG_5452.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_1/IMG_5453.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_1/IMG_5454.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_1/IMG_5455.jpg",
+              "sortOrder": 5
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-showbeauty-pre-glued-lashes",
+        "name": "រោមភ្នែកបិត មានកាវស្រាប់",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី15-18ម៉ោង\n✅ រោមភ្នែកផលិតពី ( ផ្លាស្ទិចសំយោគ លាយកប្បាស)\n💵 1ប្រអប់ 3.5$\n💵 យក 5ប្រអប់ឡើង ហ្វ្រីដឹក",
+        "priceCents": 350,
+        "isAvailable": true,
+        "sortOrder": 1,
+        "variants": [
+          {
+            "label": "983 · 8-12mm",
+            "image": "/products/product_2/photo_1_2026-09-22_14-55-10.jpg"
+          },
+          {
+            "label": "945 · 10-13mm",
+            "image": "/products/product_2/photo_2_2026-09-22_14-55-10.jpg"
+          },
+          {
+            "label": "986 · 9-12mm",
+            "image": "/products/product_2/photo_3_2026-09-22_14-55-10.jpg"
+          },
+          {
+            "label": "988",
+            "image": "/products/product_2/photo_2026-10-26_13-54-39.jpg"
+          }
+        ],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_2/photo_1_2026-09-22_14-55-10.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-cute-pre-glued-lashes",
+        "name": "រោមភ្នែកបិត មានកាវស្រាប់",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី10-15ម៉ោង\n✅ រោមភ្នែកផលិតពី ( ផ្លាស្ទិចសំយោគ)\n💵 1ប្រអប់ 2.5$\n💵 យក 5ប្រអប់ឡើង ហ្វ្រីដឹក\n💵 យក 10ប្រអប់ ថែម1 + ហ្វ្រីដឹក",
+        "priceCents": 250,
+        "isAvailable": true,
+        "sortOrder": 2,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_3/photo_1_2026-09-23_15-21-11.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_3/photo_2_2026-09-23_15-21-11.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_3/photo_3_2026-09-23_15-21-11.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_3/photo_4_2026-09-23_15-21-11.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_3/photo_5_2026-09-23_15-21-11.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_3/photo_6_2026-09-23_15-21-11.jpg",
+              "sortOrder": 5
+            },
+            {
+              "url": "/products/product_3/photo_7_2026-09-23_15-21-11.jpg",
+              "sortOrder": 6
+            },
+            {
+              "url": "/products/product_3/photo_8_2026-09-23_15-21-11.jpg",
+              "sortOrder": 7
+            },
+            {
+              "url": "/products/product_3/photo_9_2026-09-23_15-21-11.jpg",
+              "sortOrder": 8
+            },
+            {
+              "url": "/products/product_3/photo_10_2026-09-23_15-21-11.jpg",
+              "sortOrder": 9
+            },
+            {
+              "url": "/products/product_3/photo_1_2026-11-04_08-05-58.jpg",
+              "sortOrder": 10
+            },
+            {
+              "url": "/products/product_3/photo_2_2026-11-04_08-05-58.jpg",
+              "sortOrder": 11
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-xmj27-pre-glued-lashes",
+        "name": "រោមភ្នែកបិត មានកាវស្រាប់",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី10-15ម៉ោង\n✅ រោមភ្នែកផលិតពី ( ផ្លាស្ទិចសំយោគ)\n💵 1ប្រអប់ 2.5$\n💵 យក 5ប្រអប់ឡើង ហ្វ្រីដឹក\n💵 យក 10ប្រអប់ ថែម1 + ហ្វ្រីដឹក",
+        "priceCents": 250,
+        "isAvailable": true,
+        "sortOrder": 3,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_4/XMJ02.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_4/XMJ04.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_4/XMJ05.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_4/XMJ07.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_4/XMJ08.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_4/XMJ09.jpg",
+              "sortOrder": 5
+            },
+            {
+              "url": "/products/product_4/XMJ10.jpg",
+              "sortOrder": 6
+            },
+            {
+              "url": "/products/product_4/XMJ011.jpg",
+              "sortOrder": 7
+            },
+            {
+              "url": "/products/product_4/XMJ012.jpg",
+              "sortOrder": 8
+            },
+            {
+              "url": "/products/product_4/XMJ013.jpg",
+              "sortOrder": 9
+            },
+            {
+              "url": "/products/product_4/XMJ014.jpg",
+              "sortOrder": 10
+            },
+            {
+              "url": "/products/product_4/XMJ015.jpg",
+              "sortOrder": 11
+            },
+            {
+              "url": "/products/product_4/XMJ019.jpg",
+              "sortOrder": 12
+            },
+            {
+              "url": "/products/product_4/XMJ021.jpg",
+              "sortOrder": 13
+            },
+            {
+              "url": "/products/product_4/XMJ022.jpg",
+              "sortOrder": 14
+            },
+            {
+              "url": "/products/product_4/XMJ023.jpg",
+              "sortOrder": 15
+            },
+            {
+              "url": "/products/product_4/XMJ024.jpg",
+              "sortOrder": 16
+            },
+            {
+              "url": "/products/product_4/XMJ025.jpg",
+              "sortOrder": 17
+            },
+            {
+              "url": "/products/product_4/XMJ026.jpg",
+              "sortOrder": 18
+            },
+            {
+              "url": "/products/product_4/XMJ027.jpg",
+              "sortOrder": 19
+            },
+            {
+              "url": "/products/product_4/XMJ028.jpg",
+              "sortOrder": 20
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-dandelion-pre-glued-lashes",
+        "name": "Mlen diary រោមភ្នែកបិត មានកាវស្រាប់",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី24-48ម៉ោង\n✅ រោមភ្នែកផលិតពី (Real Mink Fur)\n✅ មានសារធាតុ Anti-bacterial ប្រឆាំងមេរោគ 99%\n✅ ណែនាំសម្រាប់អ្នកមាន សុខភាពភ្នែកខ្សោយឆាប់ប្រតិកម្ម\n💵 1ឈុត 9.5$ (free ដង្កៀប + ហ្វ្រីដឹក)",
+        "priceCents": 950,
+        "isAvailable": true,
+        "sortOrder": 4,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_7/photo_1_2026-09-22_15-38-04.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_7/photo_2_2026-09-22_15-38-04.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_7/photo_3_2026-09-22_15-38-04.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_7/photo_4_2026-09-22_15-38-04.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_7/photo_5_2026-09-22_15-38-04.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_7/photo_6_2026-09-22_15-38-04.jpg",
+              "sortOrder": 5
+            },
+            {
+              "url": "/products/product_7/photo_7_2026-09-22_15-38-04.jpg",
+              "sortOrder": 6
+            },
+            {
+              "url": "/products/product_7/photo_8_2026-09-22_15-38-04.jpg",
+              "sortOrder": 7
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-siren-eyes-pre-glued-lashes",
+        "name": "Mlen diary រោមភ្នែកបិត មានកាវស្រាប់",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី24-48ម៉ោង\n✅ រោមភ្នែកផលិតពី (Real Mink Fur)\n✅ មានសារធាតុ Anti-bacterial ប្រឆាំងមេរោគ 99%\n✅ ណែនាំសម្រាប់អ្នកមាន សុខភាពភ្នែកខ្សោយឆាប់ប្រតិកម្ម\n💵 1ឈុត 9.5$ (free ដង្កៀប + ហ្វ្រីដឹក)",
+        "priceCents": 950,
+        "isAvailable": true,
+        "sortOrder": 5,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_8/photo_1_2026-09-22_15-39-24.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_8/photo_2_2026-09-22_15-39-24.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_8/photo_3_2026-09-22_15-39-24.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_8/photo_4_2026-09-22_15-39-24.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_8/photo_5_2026-09-22_15-39-24.jpg",
+              "sortOrder": 4
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-dawn-pre-glued-lashes",
+        "name": "Mlen diary រោមភ្នែកបិត មានកាវស្រាប់",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី24-48ម៉ោង\n✅ រោមភ្នែកផលិតពី (Real Mink Fur)\n✅ មានសារធាតុ Anti-bacterial ប្រឆាំងមេរោគ 99%\n✅ ណែនាំសម្រាប់អ្នកមាន សុខភាពភ្នែកខ្សោយឆាប់ប្រតិកម្ម\n💵 1ឈុត 8$ (free ដង្កៀប + ហ្វ្រីដឹក)",
+        "priceCents": 800,
+        "isAvailable": true,
+        "sortOrder": 6,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_9/photo_1_2026-09-22_15-50-40.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_9/photo_2_2026-09-22_15-50-40.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_9/photo_3_2026-09-22_15-50-40.jpg",
+              "sortOrder": 2
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-vs961-pre-glued-lashes",
+        "name": "រោមភ្នែកបិត មានកាវស្រាប់",
+        "description": "✅ កាវស្អិតល្អ ជាប់បានពី15-18ម៉ោង\n✅ រោមភ្នែកផលិតពី ( ផ្លាស្ទិចសំយោគ លាយកប្បាស)\n💵 1ប្រអប់ 5$\n💵 យក 3ប្រអប់ឡើង ហ្វ្រីដឹក\n💵 យក 5ប្រអប់ ថែម1 + ហ្វ្រីដឹក",
+        "priceCents": 500,
+        "isAvailable": true,
+        "sortOrder": 7,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_22/photo_4_2026-09-22_14-53-31.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_22/photo_5_2026-09-22_14-53-31.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_22/photo_6_2026-09-22_14-53-31.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_22/photo_7_2026-09-22_14-53-31.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_22/photo_8_2026-09-22_14-53-31.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_22/photo_2026-10-26_13-55-07.jpg",
+              "sortOrder": 5
+            },
+            {
+              "url": "/products/product_22/photo_2026-10-26_13-55-39.jpg",
+              "sortOrder": 6
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-lashExtensions",
+    "name": "ឈុតរោមភ្នែកឆក់",
+    "sortOrder": 1,
+    "products": [
+      {
+        "slug": "sample-mlen-diary-sweet-cat",
+        "name": "Sweet Cat",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_1_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-sunflower",
+        "name": "Sunflower",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 1,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_4_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-ballet-fairy",
+        "name": "Ballet Fairy",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 2,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_2_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-natural-beauty",
+        "name": "Natural Beauty",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 3,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_5_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-barbie-falsies",
+        "name": "Barbie Falsies",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 4,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_6_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-korean-falsies",
+        "name": "Korean Falsies",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 5,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_9_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-photogenic-falsies",
+        "name": "Photogenic Falsies",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 6,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_8_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-peach-blossom",
+        "name": "Peach Blossom",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 7,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_7_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-mermaid",
+        "name": "Mermaid",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 8,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_3_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-fairy-falsies",
+        "name": "Fairy Falsies",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 9,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_19/photo_10_2026-09-22_16-07-07.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-comic-doll",
+        "name": "Comic Doll",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 10,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_10_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-dazzling-fairy",
+        "name": "Dazzling Fairy",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 11,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_1_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-pure-moonlight",
+        "name": "Pure Moonlight",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 12,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_3_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-dreamy-idol",
+        "name": "Dreamy Idol",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 13,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_9_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-delicate-queen",
+        "name": "Delicate Queen",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 14,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_4_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-american-sweetheart",
+        "name": "American Sweetheart",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 15,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_6_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-limitless-girls",
+        "name": "Limitless Girls",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 16,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_5_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-comic-girl",
+        "name": "Comic Girl",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 17,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_7_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-queens-power",
+        "name": "Queen's Power",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 18,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_8_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-retro-goddess",
+        "name": "Retro Goddess",
+        "description": "• 22$ ប្រើបានលើសពី500ដង\n• រោមភ្នែកឆក់ 1គូ\n• ប្រអប់មានកញ្ចក់ 1\n• ដង្កៀប 1\n• កាបូបកាម្ញី ដាក់រោមភ្នែក 1\n• ហ្វ្រីសេរ៉ូមessence 1ដប\n• ហ្វ្រី ដឹកជញ្ជូន",
+        "priceCents": 2200,
+        "isAvailable": true,
+        "sortOrder": 19,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_20/photo_2_2026-09-22_16-08-00.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-falseLashes",
+    "name": "ឈុតរោមភ្នែកត",
+    "sortOrder": 2,
+    "products": [
+      {
+        "slug": "sample-mlen-diary-lash-set",
+        "name": "Mlen Diary ឈុត តរោមភ្នែក",
+        "description": "• តម្លៃ 18$ មាន\n• រោមភ្នែកប្រអប់ធំ 1\n• កាវ + remover : 1\n• ដង្កៀប: 1\n• Free delivery",
+        "priceCents": 1800,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_5/photo_1_2026-09-22_15-30-34.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_5/photo_2_2026-09-22_15-30-34.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_5/photo_3_2026-09-22_15-30-34.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_5/photo_4_2026-09-22_15-30-34.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_5/photo_5_2026-09-22_15-30-34.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_5/photo_6_2026-09-22_15-30-34.jpg",
+              "sortOrder": 5
+            },
+            {
+              "url": "/products/product_5/photo_7_2026-09-22_15-30-34.jpg",
+              "sortOrder": 6
+            },
+            {
+              "url": "/products/product_5/photo_8_2026-09-22_15-30-34.jpg",
+              "sortOrder": 7
+            },
+            {
+              "url": "/products/product_5/photo_9_2026-09-22_15-30-34.jpg",
+              "sortOrder": 8
+            },
+            {
+              "url": "/products/product_5/photo_10_2026-09-22_15-30-34.jpg",
+              "sortOrder": 9
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-i-dandelion-lash-set",
+        "name": "Mlen Diary ឈុត តរោមភ្នែក",
+        "description": "• តម្លៃ 18$ មាន\n• រោមភ្នែកប្រអប់ធំ 1\n• កាវ + remover : 1\n• ដង្កៀប: 1\n• Free delivery",
+        "priceCents": 1800,
+        "isAvailable": true,
+        "sortOrder": 1,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_6/photo_1_2026-09-22_15-33-20.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_6/photo_2_2026-09-22_15-33-20.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_6/photo_3_2026-09-22_15-33-20.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_6/photo_4_2026-09-22_15-33-20.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_6/photo_5_2026-09-22_15-33-20.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_6/photo_6_2026-09-22_15-33-20.jpg",
+              "sortOrder": 5
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-lash-glue-remover",
+        "name": "Mlen Diary កាវតរោមភ្នែក + ទឹកដោះ",
+        "description": "កាវតរោមភ្នែក + ទឹកដោះ (Lash Bond & Remover)",
+        "priceCents": 950,
+        "isAvailable": true,
+        "sortOrder": 2,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_12/photo_1_2026-09-22_15-54-20.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_12/photo_2_2026-09-22_15-54-20.jpg",
+              "sortOrder": 1
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-mlen-diary-liquid-eyelash-glue",
+        "name": "Mlen Diary កាវតរោមភ្នែក ប្រភេទទឹក",
+        "description": "កាវតរោមភ្នែក ប្រភេទទឹក (eyelash glue)",
+        "priceCents": 800,
+        "isAvailable": true,
+        "sortOrder": 3,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_17/photo_1_2026-09-22_16-03-48.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-lashLift",
+    "name": "ឈុតអ៊ុតរោមភ្នែក",
+    "sortOrder": 3,
+    "products": [
+      {
+        "slug": "sample-lash-lift-kit-large",
+        "name": "ឈុតអ៊ុតរោមភ្នែក ឈុតធំ",
+        "description": "• ឈុតធំ 18$ មាន\n• ឈុតអ៊ុតរោមភ្នែក 1ឈុត (អ៊ុតបាន 8-10ដង អ៊ុត1ដងជាប់បាន 2 ទៅ3ខែ)\n• ឈុតលាបឲ្យរោមភ្នែកខ្មៅ នឹងចិញ្ចើម 1ឈុត ( ជាប់ពណ៌បាន 2-3អាទិត្យ)",
+        "priceCents": 1800,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_13/photo_1_2026-09-22_15-55-30.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-lash-lift-kit-small",
+        "name": "ឈុតអ៊ុតរោមភ្នែក ឈុតតូច",
+        "description": "• ឈុតតូច 13$ មាន\n• ឈុតអ៊ុតរោមភ្នែក 1ឈុត (អ៊ុតបាន 8-10ដង អ៊ុត1ដងជាប់បាន 2 ទៅ3ខែ)",
+        "priceCents": 1300,
+        "isAvailable": true,
+        "sortOrder": 1,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_14/photo_1_2026-09-22_15-55-37.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sample-lash-lift-kit-special",
+        "name": "ឈុតអ៊ុតរោមភ្នែក ឈុតពិសេស",
+        "description": "• ឈុតពិសេស 20$ មាន\n• ឈុតអ៊ុតរោមភ្នែក 1ឈុត (អ៊ុតបាន 8-10ដង អ៊ុត1ដងជាប់បាន 2 ទៅ3ខែ)\n• ឈុតលាបឲ្យរោមភ្នែកខ្មៅ និង ត្នោត នឹងចិញ្ចើម 2ឈុត ( ជាប់ពណ៌បាន 2-3អាទិត្យ)",
+        "priceCents": 2000,
+        "isAvailable": true,
+        "sortOrder": 2,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_15/photo_1_2026-09-22_15-59-18.jpg",
+              "sortOrder": 0
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-eyeliner",
+    "name": "ខ្មៅដៃគូសភ្នែក",
+    "sortOrder": 5,
+    "products": [
+      {
+        "slug": "sample-mlen-diary-waterproof-eyeliner",
+        "name": "Mlen Diary Eyeliner (waterproof)",
+        "description": "✅ មុខជក់តូច ត្រឹមតែ1.5MM\n✅ ងាយស្រួលគូស\n✅ ជាប់យូរពេញមួយថ្ងៃ\n✅ មិនប្រតាក ទោះជាត្រូវទឹកឬញើស",
+        "priceCents": 400,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_10/photo_1_2026-09-22_15-51-46.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_10/photo_2_2026-09-22_15-51-46.jpg",
+              "sortOrder": 1
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-browPencil",
+    "name": "ខ្មៅដៃគូសចិញ្ចើម",
+    "sortOrder": 6,
+    "products": [
+      {
+        "slug": "sample-eyebrow-pencil-2in1",
+        "name": "Eyebrow pencil 2in1",
+        "description": "មាន3 ពណ៌",
+        "priceCents": 600,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_11/photo_1_2026-09-22_15-53-31.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_11/photo_2_2026-09-22_15-53-31.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_11/photo_3_2026-09-22_15-53-31.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_11/photo_4_2026-09-22_15-53-31.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_11/photo_5_2026-09-22_15-53-31.jpg",
+              "sortOrder": 4
+            },
+            {
+              "url": "/products/product_11/photo_6_2026-09-22_15-53-31.jpg",
+              "sortOrder": 5
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-browRazor",
+    "name": "ឡាមកោររោមចិញ្ចើម",
+    "sortOrder": 7,
+    "products": [
+      {
+        "slug": "sample-double-ended-brow-razor",
+        "name": "ឡាមកោររោមចិញ្ចើមមុខពីរ",
+        "description": "តម្លៃ 3$\n(មាន2ពណ៌)",
+        "priceCents": 300,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_16/photo_1_2026-09-22_15-59-58.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_16/photo_2_2026-09-22_15-59-58.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_16/photo_3_2026-09-22_15-59-58.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_16/photo_4_2026-09-22_15-59-58.jpg",
+              "sortOrder": 3
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-lashCurler",
+    "name": "ប្រដាប់ពត់រោមភ្នែក",
+    "sortOrder": 9,
+    "products": [
+      {
+        "slug": "sample-eyelash-curler",
+        "name": "ប្រដាប់ពត់រោមភ្នែក",
+        "description": "តម្លៃ 3.5$\nមាន2ម៉ូត",
+        "priceCents": 350,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_18/photo_1_2026-09-22_16-04-31.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_18/photo_2_2026-09-22_16-04-31.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_18/photo_3_2026-09-22_16-04-31.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_18/photo_4_2026-09-22_16-04-31.jpg",
+              "sortOrder": 3
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "slug": "sample-eyelidTape",
+    "name": "សំណាញ់បិតត្របកភ្នែកពីរជាន់",
+    "sortOrder": 10,
+    "products": [
+      {
+        "slug": "sample-mlen-diary-eyelid-tape-set",
+        "name": "ឈុត បិតត្របក ភ្នែក",
+        "description": "• 1ឈុត 9$ មាន\n• សំណាញ់បិត1ប្រអប់\n• ដង្កៀបដែក 1\n• ដបបាញ់ទឹក 1\n• សម ចាក់យកគន្លាក់ 1",
+        "priceCents": 900,
+        "isAvailable": true,
+        "sortOrder": 0,
+        "variants": [],
+        "images": {
+          "create": [
+            {
+              "url": "/products/product_21/photo_1.jpg",
+              "sortOrder": 0
+            },
+            {
+              "url": "/products/product_21/photo_2.jpg",
+              "sortOrder": 1
+            },
+            {
+              "url": "/products/product_21/photo_3.jpg",
+              "sortOrder": 2
+            },
+            {
+              "url": "/products/product_21/photo_4.jpg",
+              "sortOrder": 3
+            },
+            {
+              "url": "/products/product_21/photo_5.jpg",
+              "sortOrder": 4
+            }
+          ]
+        }
+      }
+    ]
+  }
+]
