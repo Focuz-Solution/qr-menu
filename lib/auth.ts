@@ -8,8 +8,11 @@ import type { Role } from "@/lib/generated/prisma/client";
 
 const COOKIE = "admin_session";
 const SESSION_DAYS = 7;
-export const MAX_FAILED_LOGINS = 5;
-export const LOCK_MINUTES = 15;
+
+/** visitor IP set by the host's edge (Railway and Vercel both send X-Real-IP); never X-Forwarded-For, which the visitor can fake */
+export async function clientIp() {
+  return (await headers()).get("x-real-ip")?.trim() || "unknown";
+}
 
 const sha256 = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -22,7 +25,7 @@ export async function createSession(userId: string) {
       id: sha256(token),
       userId,
       expiresAt,
-      ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+      ip: await clientIp(),
       userAgent: h.get("user-agent")?.slice(0, 300) || null,
     },
   });

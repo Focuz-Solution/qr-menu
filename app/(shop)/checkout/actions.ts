@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
+import { clientIp } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 import { cambodiaDay, feeFor, normalizePhone, orderNumber, zonesFor } from "@/lib/orders";
@@ -55,7 +56,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
   if (settings && !settings.orderingEnabled) return { ok: false, error: "orderingClosed" };
 
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = await clientIp();
   const ipHash = createHash("sha256").update(`order:${ip}`).digest("hex");
   const recent = await prisma.order.count({ where: { ipHash, createdAt: { gte: new Date(Date.now() - RATE.minutes * 60_000) } } });
   if (recent >= RATE.orders) return { ok: false, error: "tooManyOrders" };
