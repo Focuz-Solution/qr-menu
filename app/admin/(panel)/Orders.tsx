@@ -18,14 +18,14 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { OrderStatus } from "@/lib/generated/prisma/enums";
 import { ORDER_STATUSES } from "@/lib/order-status";
 import { localPhone, money, StatusPill } from "./order-ui";
-import type { AdminOrder, OrderStats } from "./order-types";
+import type { AdminOrderRow, OrderStats } from "./order-types";
 
 // ponytail: sort + paging in the browser (the page loads the newest 200 orders)
 const PAGE_SIZE = 20;
 const periods = ["all", "week", "month", "year"] as const;
 type Period = (typeof periods)[number];
 type SortKey = "orderNo" | "createdAt" | "customerName" | "totalCents" | "status";
-const compare: Record<SortKey, (a: AdminOrder, b: AdminOrder) => number> = {
+const compare: Record<SortKey, (a: AdminOrderRow, b: AdminOrderRow) => number> = {
   orderNo: (a, b) => a.orderNo.localeCompare(b.orderNo),
   createdAt: (a, b) => +a.createdAt - +b.createdAt,
   customerName: (a, b) => a.customerName.localeCompare(b.customerName),
@@ -34,11 +34,11 @@ const compare: Record<SortKey, (a: AdminOrder, b: AdminOrder) => number> = {
 };
 
 
-export function Orders({ orders, stats, periodStarts, canDelete }: { orders: AdminOrder[]; stats: OrderStats; periodStarts: Record<Period, number>; canDelete: boolean }) {
+export function Orders({ orders, stats, periodStarts, canDelete }: { orders: AdminOrderRow[]; stats: OrderStats; periodStarts: Record<Period, number>; canDelete: boolean }) {
   const t = useTranslations("admin");
   const format = useFormatter();
   const te = useTranslations("errors");
-  const [deleting, setDeleting] = useState<AdminOrder | null>(null);
+  const [deleting, setDeleting] = useState<AdminOrderRow | null>(null);
   const [deleteError, setDeleteError] = useState<ErrorCode>();
   const [pending, start] = useTransition();
   const [tab, setTab] = useState<OrderStatus | "all">("all");
@@ -70,7 +70,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
         order.customerName,
         localPhone(order.customerPhone),
         order.provinceName,
-        order.items.reduce((count, item) => count + item.quantity, 0),
+        order.itemCount,
         (order.totalCents / 100).toFixed(2),
         t(`status.${order.status}`),
         t(`orders.paymentMethods.${order.paymentMethod}`),
@@ -200,7 +200,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
                 <TableCell className="hidden text-muted-foreground tabular-nums lg:table-cell">{localPhone(o.customerPhone)}</TableCell>
                 <TableCell className="hidden text-muted-foreground md:table-cell">{o.provinceName}</TableCell>
                 <TableCell className="hidden text-right text-muted-foreground tabular-nums lg:table-cell">
-                  {t("orders.itemsCount", { count: o.items.reduce((n, i) => n + i.quantity, 0) })}
+                  {t("orders.itemsCount", { count: o.itemCount })}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">{money(o.totalCents)}</TableCell>
                 <TableCell><StatusPill status={o.status} /></TableCell>

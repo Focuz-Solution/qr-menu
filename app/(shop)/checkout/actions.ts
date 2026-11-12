@@ -2,9 +2,12 @@
 
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { getTranslations } from "next-intl/server";
+import { clientIp } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/lib/generated/prisma/client";
 import { cambodiaDay, feeFor, normalizePhone, orderNumber, zonesFor } from "@/lib/orders";
 import { isProvinceCode, PROVINCES } from "@/lib/provinces";
 import type { ErrorCode, Result } from "@/lib/result";
@@ -50,35 +53,37 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
     if (same) return { ok: true, data: same };
   }
 
-  // ---- shop rules ----
-  const settings = await prisma.shopSettings.findUnique({ where: { id: 1 } });
-  if (settings && !settings.orderingEnabled) return { ok: false, error: "orderingClosed" };
-
+  // ---- shop rules: settings, this device's recent orders, the products and the delivery zones in one round trip ----
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = await clientIp();
   const ipHash = createHash("sha256").update(`order:${ip}`).digest("hex");
-  const recent = await prisma.order.count({ where: { ipHash, createdAt: { gte: new Date(Date.now() - RATE.minutes * 60_000) } } });
+  const slugs = [...new Set(lines.map((l) => String(l.slug).slice(0, 100)))];
+  const [settings, recent, items, zones] = await Promise.all([
+    prisma.shopSettings.findUnique({ where: { id: 1 }, select: { orderingEnabled: true, minOrderCents: true, orderPrefix: true } }),
+    prisma.order.count({ where: { ipHash, createdAt: { gte: new Date(Date.now() - RATE.minutes * 60_000) } } }),
+    // products: shown, not deleted, in a shown category, in stock — at today's price
+    prisma.item.findMany({
+      where: { slug: { in: slugs }, deletedAt: null, isVisible: true, category: { isVisible: true } },
+      select: { id: true, slug: true, name: true, priceCents: true, isAvailable: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
+    }),
+    prisma.deliveryZone.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
+  ]);
+  if (settings && !settings.orderingEnabled) return { ok: false, error: "orderingClosed" };
   if (recent >= RATE.orders) return { ok: false, error: "tooManyOrders" };
 
-  // products: shown, not deleted, in a shown category, in stock — at today's price
-  const slugs = [...new Set(lines.map((l) => String(l.slug)))];
-  const items = await prisma.item.findMany({
-    where: { slug: { in: slugs }, deletedAt: null, isVisible: true, category: { isVisible: true } },
-    select: { id: true, slug: true, name: true, priceCents: true, isAvailable: true, images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } } },
-  });
   const bySlug = new Map(items.map((i) => [i.slug, i]));
   if (lines.some((l) => !bySlug.get(String(l.slug))?.isAvailable)) return { ok: false, error: "unavailable" };
 
   const orderLines = lines.map((l) => {
     const item = bySlug.get(String(l.slug))!;
-    // the photo the customer picked (a style) if it's one of ours, else the main photo
-    const image = typeof l.image === "string" && l.image.startsWith("/api/images/") ? l.image : (item.images[0]?.url ?? null);
+    // the photo the customer picked (a style) if it is one of this product's photos, else the main photo
+    const photos = item.images.map((i) => i.url);
+    const image = typeof l.image === "string" && photos.includes(l.image) ? l.image : (photos[0] ?? null);
     return { itemId: item.id, name: item.name, imageUrl: image, unitPriceCents: item.priceCents, quantity: l.qty, lineTotalCents: item.priceCents * l.qty };
   });
   const subtotalCents = orderLines.reduce((n, l) => n + l.lineTotalCents, 0);
   if (settings?.minOrderCents && subtotalCents < settings.minOrderCents) return { ok: false, error: "minOrder" };
 
-  const zones = await prisma.deliveryZone.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } });
   const options = zonesFor(zones, provinceCode);
   if (!options.length) return { ok: false, error: "invalid", fields: { province: "badProvince" } };
   const zone = options.find((option) => option.id === input.deliveryZoneId);
@@ -90,36 +95,48 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
   // ---- save: order number from the day's counter, in one transaction ----
   const now = new Date();
   const day = cambodiaDay(now);
-  const order = await prisma.$transaction(async (tx) => {
-    const { value } = await tx.orderCounter.upsert({ where: { day }, create: { day, value: 1 }, update: { value: { increment: 1 } } });
-    return tx.order.create({
-      data: {
-        orderNo: orderNumber(settings?.orderPrefix ?? "PB-", day, value),
-        customerName: name,
-        customerPhone: phone!,
-        customerPhoneRaw: phoneRaw,
-        provinceCode,
-        provinceName: province.km,
-        addressLine: address,
-        landmark: landmark || null,
-        mapUrl: mapUrl || null,
-        note: note || null,
-        deliveryZoneName: zone.name,
-        subtotalCents,
-        deliveryFeeCents,
-        totalCents,
-        paymentMethod: payment,
-        idempotencyKey: key || null,
-        ipHash,
-        userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
-        items: { create: orderLines },
-        events: { create: { type: "created" } },
-      },
-      select: { id: true, orderNo: true },
+  let order: { id: string; orderNo: string };
+  try {
+    order = await prisma.$transaction(async (tx) => {
+      const { value } = await tx.orderCounter.upsert({ where: { day }, create: { day, value: 1 }, update: { value: { increment: 1 } } });
+      return tx.order.create({
+        data: {
+          orderNo: orderNumber(settings?.orderPrefix ?? "PB-", day, value),
+          customerName: name,
+          customerPhone: phone!,
+          customerPhoneRaw: phoneRaw,
+          provinceCode,
+          provinceName: province.km,
+          addressLine: address,
+          landmark: landmark || null,
+          mapUrl: mapUrl || null,
+          note: note || null,
+          deliveryZoneName: zone.name,
+          subtotalCents,
+          deliveryFeeCents,
+          totalCents,
+          paymentMethod: payment,
+          idempotencyKey: key || null,
+          ipHash,
+          userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
+          items: { create: orderLines },
+          events: { create: { type: "created" } },
+        },
+        select: { id: true, orderNo: true },
+      });
     });
-  });
+  } catch (cause) {
+    // two taps at the same moment with the same key: the other one saved it → return that order
+    if (key && cause instanceof Prisma.PrismaClientKnownRequestError && cause.code === "P2002") {
+      const same = await prisma.order.findUnique({ where: { idempotencyKey: key }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true } });
+      if (same) return { ok: true, data: same };
+    }
+    throw cause;
+  }
 
-  await notifyTelegram(order.id, { ...order, name, phoneRaw, province: province.km, address, landmark, mapUrl, note, payment, lines: orderLines, deliveryZoneName: zone.name, subtotalCents, deliveryFeeCents, totalCents });
+  // Telegram after the answer is sent: the customer sees the receipt without waiting for Telegram
+  const saved = order;
+  after(() => notifyTelegram(saved.id, { ...saved, name, phoneRaw, province: province.km, address, landmark, mapUrl, note, payment, lines: orderLines, deliveryZoneName: zone.name, subtotalCents, deliveryFeeCents, totalCents }));
   return { ok: true, data: { orderNo: order.orderNo, totalCents, deliveryFeeCents, deliveryZoneName: zone.name } };
 }
 

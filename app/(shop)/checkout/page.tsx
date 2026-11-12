@@ -22,8 +22,10 @@ async function rules(): Promise<{ zones: Zone[]; minOrderCents: number; ordering
       prisma.shopSettings.findUnique({ where: { id: 1 }, select: { minOrderCents: true, orderingEnabled: true } }),
     ]);
     return { zones, minOrderCents: s?.minOrderCents ?? 0, orderingEnabled: s?.orderingEnabled ?? true };
-  } catch {
-    return { zones: [], minOrderCents: 0, orderingEnabled: true }; // ponytail: no database at build → server decides on send
+  } catch (cause) {
+    // no database at build → server decides on send; with one, throw so Next keeps the last good page (not "no delivery")
+    if (process.env.DATABASE_URL) throw cause;
+    return { zones: [], minOrderCents: 0, orderingEnabled: true };
   }
 }
 

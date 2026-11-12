@@ -265,7 +265,7 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
                       <Minus className="size-3.5" aria-hidden />
                     </Button>
                     <span className="min-w-6 text-center text-sm font-medium tabular-nums">{i.qty}</span>
-                    <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label={tc("more")} onClick={() => setQty(i.key, i.qty + 1)}>
+                    <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label={tc("more")} disabled={i.qty >= 99} onClick={() => setQty(i.key, i.qty + 1)}>
                       <Plus className="size-3.5" aria-hidden />
                     </Button>
                   </div>

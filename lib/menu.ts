@@ -47,8 +47,10 @@ export const getMenu = cache(async (): Promise<{ categories: ShopCategory[]; pro
       }),
     );
     return { categories: rows.map((c) => ({ slug: c.slug, name: c.name })), products };
-  } catch {
-    // ponytail: database not reachable (e.g. build without DATABASE_URL) → empty shop instead of a failed build
+  } catch (cause) {
+    // no database configured (build without DATABASE_URL) → empty shop instead of a failed build.
+    // With a database, a failed read throws: Next keeps serving the last good page instead of caching an empty shop.
+    if (process.env.DATABASE_URL) throw cause;
     return { categories: [], products: [] };
   }
 });

@@ -1,42 +1,46 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSession, LOCK_MINUTES, MAX_FAILED_LOGINS } from "@/lib/auth";
+import { clientIp, createSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { DUMMY_HASH, verifyPassword } from "@/lib/password";
 
 export type LoginState = { error: "badLogin" } | { error: "locked"; minutes: number } | undefined;
 
-// business rules 28–29: email + password, 5 wrong tries → locked 15 minutes, same answer for unknown email or wrong password
-export async function login(_: LoginState, form: FormData): Promise<LoginState> {
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
-  const password = String(form.get("password") ?? "");
-  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+// 5 wrong passwords from one computer (IP) → that computer waits 15 minutes. Counted per IP, not per email,
+// so a stranger guessing the owner's email can't lock the owner out.
+const MAX_FAILS = 5;
+const WAIT_MS = 15 * 60_000;
+const fails = new Map<string, { count: number; until: number }>();
 
-  if (user?.lockedUntil && user.lockedUntil > new Date()) {
-    return { error: "locked", minutes: Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000) };
-  }
+// same answer for unknown email or wrong password
+export async function login(_: LoginState, form: FormData): Promise<LoginState> {
+  const ip = await clientIp();
+  const now = Date.now();
+  const entry = fails.get(ip);
+  if (entry && entry.until <= now) fails.delete(ip);
+  else if (entry && entry.count >= MAX_FAILS) return { error: "locked", minutes: Math.ceil((entry.until - now) / 60_000) };
+
+  // length caps: nobody's email/password is longer, and huge inputs would only waste server time
+  const email = String(form.get("email") ?? "").trim().toLowerCase().slice(0, 254);
+  const password = String(form.get("password") ?? "").slice(0, 256);
+  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
 
   // always run the slow hash check, so an unknown email takes as long as a wrong password
   const passwordOk = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !user.isActive || !passwordOk) {
-    if (user) {
-      const fails = user.failedLogins + 1;
-      await prisma.user.update({
-        where: { id: user.id },
-        data:
-          fails >= MAX_FAILED_LOGINS
-            ? { failedLogins: 0, lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60_000) }
-            : { failedLogins: fails },
-      });
-    }
-    return { error: "badLogin" };
+    const count = (fails.get(ip)?.count ?? 0) + 1;
+    fails.set(ip, { count, until: now + WAIT_MS });
+    if (fails.size > 10_000) for (const [k, v] of fails) if (v.until <= now) fails.delete(k);
+    return count >= MAX_FAILS ? { error: "locked", minutes: WAIT_MS / 60_000 } : { error: "badLogin" };
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() },
-  });
+  fails.delete(ip);
+  await Promise.all([
+    prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() } }),
+    // housekeeping: expired sessions are never used again, so each login clears them out
+    prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
+  ]);
   await createSession(user.id);
   redirect("/admin/");
 }

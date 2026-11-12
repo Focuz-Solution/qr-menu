@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ORDER_STATUSES } from "@/lib/order-status";
-import { orderInclude, toAdminOrder } from "./order-data";
+import { orderListSelect, toAdminOrderRow } from "./order-data";
 import { Orders } from "./Orders";
-import type { AdminOrder, OrderStats } from "./order-types";
+import type { AdminOrderRow, OrderStats } from "./order-types";
 
 // Cambodia is UTC+7 all year (no daylight saving) → start of "today" there
 const KH_OFFSET = 7 * 60 * 60 * 1000;
@@ -31,14 +31,14 @@ export default async function AdminOrdersPage() {
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       take: LIMIT,
-      include: orderInclude,
+      select: orderListSelect,
     }),
     prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.order.count({ where: { createdAt: { gte: today } } }),
     prisma.order.aggregate({ where: { createdAt: { gte: today }, status: { not: "cancelled" } }, _sum: { totalCents: true } }),
   ]);
 
-  const orders: AdminOrder[] = rows.map(toAdminOrder);
+  const orders: AdminOrderRow[] = rows.map(toAdminOrderRow);
 
   const stats: OrderStats = {
     today: todayCount,

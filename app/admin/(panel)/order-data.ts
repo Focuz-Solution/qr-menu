@@ -1,6 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
-import type { AdminOrder } from "./order-types";
+import type { AdminOrder, AdminOrderRow } from "./order-types";
 
 // What the Orders list and the order page load for each order, and how it's sent to the browser.
 export const orderInclude = {
@@ -9,6 +9,25 @@ export const orderInclude = {
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
+
+/** the Orders list loads only these columns (no events, no address, just item quantities) */
+export const orderListSelect = {
+  id: true,
+  orderNo: true,
+  status: true,
+  createdAt: true,
+  customerName: true,
+  customerPhone: true,
+  provinceName: true,
+  totalCents: true,
+  paymentMethod: true,
+  items: { select: { quantity: true } },
+} satisfies Prisma.OrderSelect;
+
+export const toAdminOrderRow = ({ items, ...o }: Prisma.OrderGetPayload<{ select: typeof orderListSelect }>): AdminOrderRow => ({
+  ...o,
+  itemCount: items.reduce((n, i) => n + i.quantity, 0),
+});
 
 export const toAdminOrder = (o: OrderRow): AdminOrder => ({
     id: o.id,

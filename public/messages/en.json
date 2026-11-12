@@ -327,7 +327,7 @@
       "previewDashboard": "Open in dashboard",
       "title": "Telegram",
       "intro": "Send every new order to the shop's Telegram group so staff can pack it.",
-      "missingKey": "Add ENCRYPTION_KEY to .env first (make one: openssl rand -base64 32), then restart the server.",
+      "missingKey": "Add TELEGRAM_ENCRYPTION_KEY to .env first (make one: openssl rand -base64 32), then restart the server.",
       "step1": "Connect the bot",
       "step2": "Choose the group",
       "step3": "Test and turn on",
@@ -471,7 +471,7 @@
     "fallbackExists": "This service already has an active fallback rate.",
     "badToken": "That token isn't valid. Copy it again from @BotFather.",
     "telegramFailed": "Telegram didn't answer or refused. Check and try again.",
-    "missingKey": "ENCRYPTION_KEY is missing on the server.",
+    "missingKey": "TELEGRAM_ENCRYPTION_KEY is missing on the server.",
     "noChat": "Connect the bot and choose a group first.",
     "badUrl": "The link must start with https://"
   },

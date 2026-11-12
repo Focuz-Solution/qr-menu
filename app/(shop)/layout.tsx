@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { MenuProvider } from "@/components/MenuProvider";
 import { brandStyles } from "@/lib/brand-colors";
 import { shop } from "@/lib/shop";
@@ -32,6 +32,8 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
   const { language: locale, brandColor, brandText } = await shopSettings();
   setRequestLocale(locale);
   const { products } = await getMenu();
+  // customers' browsers get the shop texts only, not the admin panel's (a third of the file)
+  const messages = Object.fromEntries(Object.entries(await getMessages()).filter(([namespace]) => namespace !== "admin"));
   // brand colour from Settings → Appearance replaces the theme's main colour (buttons, chips, prices, focus ring)
   // and tints the soft surfaces; no colour saved → the default black theme from globals.css
   const brand = brandStyles(brandColor, brandText);
@@ -39,7 +41,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} className={`${fontVariables} h-full antialiased`} style={brand}>
       <body className="min-h-full">
-        <NextIntlClientProvider>
+        <NextIntlClientProvider messages={messages}>
           <MenuProvider products={products}>
             <div className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-4">
               <main className="flex-1">{children}</main>
