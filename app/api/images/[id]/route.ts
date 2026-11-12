@@ -1,5 +1,5 @@
 import { GetObjectCommand, NoSuchKey } from "@aws-sdk/client-s3";
-import { imageStorage } from "@/lib/r2";
+import { imageObjectKey, imageStorage } from "@/lib/r2";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { client, bucket } = imageStorage();
     const get = (key: string) => client.send(new GetObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: AbortSignal.timeout(15_000) });
     // photos uploaded before thumbs existed have none → their thumb address serves the full photo
-    const object = await get(`images/${id}`).catch((e) => (m[2] && e instanceof NoSuchKey ? get(`images/${m[1]}.webp`) : Promise.reject(e)));
+    const object = await get(imageObjectKey(id)).catch((e) => (m[2] && e instanceof NoSuchKey ? get(imageObjectKey(`${m[1]}.webp`)) : Promise.reject(e)));
     if (!object.Body) return new Response(null, { status: 404 });
     return new Response(object.Body.transformToWebStream(), {
       headers: {

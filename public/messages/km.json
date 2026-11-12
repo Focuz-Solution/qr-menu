@@ -327,7 +327,7 @@
       "previewDashboard": "បើកក្នុងផ្ទាំងគ្រប់គ្រង",
       "title": "Telegram",
       "intro": "ផ្ញើការកុម្ម៉ង់ថ្មីនីមួយៗទៅក្រុម Telegram របស់ហាង ដើម្បីឲ្យបុគ្គលិកវេចខ្ចប់។",
-      "missingKey": "ត្រូវការ ENCRYPTION_KEY ក្នុង .env ជាមុនសិន (បង្កើតដោយ៖ openssl rand -base64 32) រួចចាប់ផ្ដើម server ម្ដងទៀត។",
+      "missingKey": "ត្រូវការ TELEGRAM_ENCRYPTION_KEY ក្នុង .env ជាមុនសិន (បង្កើតដោយ៖ openssl rand -base64 32) រួចចាប់ផ្ដើម server ម្ដងទៀត។",
       "step1": "ភ្ជាប់ bot",
       "step2": "ជ្រើសក្រុម",
       "step3": "សាកល្បង និងបើកប្រើ",
@@ -471,7 +471,7 @@
     "fallbackExists": "សេវានេះមានតម្លៃដឹកសម្រាប់ខេត្តផ្សេងទៀតរួចហើយ។",
     "badToken": "Token មិនត្រឹមត្រូវ។ សូមចម្លងម្ដងទៀតពី @BotFather។",
     "telegramFailed": "Telegram មិនបានឆ្លើយតប ឬបដិសេធ។ សូមពិនិត្យ ហើយព្យាយាមម្ដងទៀត។",
-    "missingKey": "ខ្វះ ENCRYPTION_KEY នៅលើ server។",
+    "missingKey": "ខ្វះ TELEGRAM_ENCRYPTION_KEY នៅលើ server។",
     "noChat": "សូមភ្ជាប់ bot និងជ្រើសក្រុមជាមុនសិន។",
     "badUrl": "តំណត្រូវចាប់ផ្ដើមដោយ https://"
   },

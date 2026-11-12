@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { getCurrentUser } from "@/lib/auth";
-import { imageStorage } from "@/lib/r2";
+import { imageObjectKey, imageStorage } from "@/lib/r2";
 
 // Upload one photo (product photo or shop logo) — signed-in owner/staff only. Lives under /admin because the
 // session cookie is limited to /admin (lib/auth.ts); photos are served publicly by /api/images/<id>.webp. Same flow as castlykh + plan rules 30–34:
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     const id = randomUUID();
     const put = (key: string, body: Buffer) =>
       client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: "image/webp" }), { abortSignal: AbortSignal.timeout(30_000) });
-    await Promise.all([put(`images/${id}.webp`, full), put(`images/${id}-thumb.webp`, thumb)]);
+    await Promise.all([put(imageObjectKey(`${id}.webp`), full), put(imageObjectKey(`${id}-thumb.webp`), thumb)]);
     return Response.json({ url: `/api/images/${id}.webp` });
   } catch (cause) {
     // the admin sees a short message; the real reason (missing settings, wrong key, no bucket) goes to the server log
