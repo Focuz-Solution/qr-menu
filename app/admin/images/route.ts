@@ -46,9 +46,10 @@ export async function POST(request: Request) {
     const source = sharp(Buffer.concat(chunks), { limitInputPixels: 100_000_000 });
     const { format } = await source.metadata();
     if (!format || !["jpeg", "png", "webp"].includes(format)) return error("badImage", 400);
-    const upright = source.rotate();
-    const size = (px: number) => upright.clone().resize(px, px, { fit: "inside", withoutEnlargement: true });
-    [full, thumb] = await Promise.all([size(1600).webp({ quality: 82 }).toBuffer(), size(480).webp({ quality: 75 }).toBuffer()]);
+    const fit = { fit: "inside", withoutEnlargement: true } as const;
+    // decode the (possibly large) original once; the thumb is made from the small 1600 px result
+    full = await source.rotate().resize(1600, 1600, fit).webp({ quality: 82 }).toBuffer();
+    thumb = await sharp(full).resize(480, 480, fit).webp({ quality: 75 }).toBuffer();
   } catch {
     return error("badImage", 400);
   }

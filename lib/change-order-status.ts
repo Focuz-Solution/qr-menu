@@ -8,6 +8,7 @@ import { NEXT_STATUS, STATUS_TIME } from "@/lib/order-status";
 import type { Result } from "@/lib/result";
 
 export async function changeOrderStatus(actorId: string, id: string, to: string, reason?: string): Promise<Result> {
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) return { ok: false, error: "notFound" };
   if (!Object.hasOwn(OrderStatus, to)) return { ok: false, error: "invalid" };
   const next = to as OrderStatus;
   const cancelReason = reason?.trim().slice(0, 300);

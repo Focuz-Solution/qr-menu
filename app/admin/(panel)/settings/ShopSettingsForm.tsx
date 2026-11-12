@@ -166,7 +166,7 @@ function Appearance({ logo, color, error, children }: { logo: string; color: str
           ref={fileInput}
           id="logo"
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           className="sr-only"
           onChange={(e) => {
             const file = e.target.files?.[0];

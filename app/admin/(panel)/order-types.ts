@@ -36,6 +36,12 @@ export type AdminOrder = {
   events: { id: string; type: string; toStatus: OrderStatus | null; createdAt: Date; actor: string | null }[];
 };
 
+/** one row of the Orders list: only what the table, search, sort and CSV report use (the order page loads the rest) */
+export type AdminOrderRow = Pick<
+  AdminOrder,
+  "id" | "orderNo" | "status" | "createdAt" | "customerName" | "customerPhone" | "provinceName" | "totalCents" | "paymentMethod"
+> & { itemCount: number };
+
 export type OrderStats = {
   /** orders placed today (Cambodia time) */
   today: number;

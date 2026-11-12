@@ -21,8 +21,9 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   if (entry && entry.until <= now) fails.delete(ip);
   else if (entry && entry.count >= MAX_FAILS) return { error: "locked", minutes: Math.ceil((entry.until - now) / 60_000) };
 
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
-  const password = String(form.get("password") ?? "");
+  // length caps: nobody's email/password is longer, and huge inputs would only waste server time
+  const email = String(form.get("email") ?? "").trim().toLowerCase().slice(0, 254);
+  const password = String(form.get("password") ?? "").slice(0, 256);
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
 
   // always run the slow hash check, so an unknown email takes as long as a wrong password
@@ -35,10 +36,11 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   }
 
   fails.delete(ip);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() },
-  });
+  await Promise.all([
+    prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() } }),
+    // housekeeping: expired sessions are never used again, so each login clears them out
+    prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
+  ]);
   await createSession(user.id);
   redirect("/admin/");
 }

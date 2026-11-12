@@ -104,23 +104,29 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   const images = [...new Set(input.images.map((u) => u.trim()).filter(Boolean))];
 
   if (!name || name.length > 200) fields.name = "required";
-  const current = id ? await prisma.item.findFirst({
-    where: { id, deletedAt: null },
-    select: { categoryId: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
-  }) : null;
+  // the product being edited and the chosen category, in one round trip
+  const [current, category] = await Promise.all([
+    id ? prisma.item.findFirst({
+      where: { id, deletedAt: null },
+      select: { categoryId: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
+    }) : null,
+    // not a uuid (e.g. no category picked) → "required", not a database error
+    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(input.categoryId)
+      ? prisma.category.findUnique({ where: { id: input.categoryId }, select: { id: true } })
+      : null,
+  ]);
   if (id && !current) return { ok: false, error: "notFound" };
   const oldImages = current?.images.map((i) => i.url) ?? [];
   if (images.some((u) => !oldImages.includes(u) && !imageKey(u))) fields.images = "badImage";
   if (originalCents === null || Number.isNaN(originalCents)) fields.price = "badPrice";
   if (Number.isNaN(discountCents)) fields.discount = "badPrice";
   else if (discountCents !== null && originalCents !== null && discountCents >= originalCents) fields.discount = "discountTooHigh";
-  const category = await prisma.category.findUnique({ where: { id: input.categoryId }, select: { id: true } });
   if (!category) fields.categoryId = "required";
   if (Object.keys(fields).length) return { ok: false, error: "invalid", fields };
 
   const data = {
     name,
-    brand: input.brand.trim() || null,
+    brand: input.brand.trim().slice(0, 80) || null,
     categoryId: input.categoryId,
     // on sale: the customer pays the discount, the original shows crossed out (rule 6)
     priceCents: discountCents ?? originalCents!,
@@ -128,7 +134,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
     badge,
     isAvailable: input.isAvailable,
     isVisible: input.isVisible,
-    description: input.description.trim(),
+    description: input.description.trim().slice(0, 5000),
   };
   const nextSort = async () =>
     ((await prisma.item.aggregate({ where: { categoryId: input.categoryId }, _max: { sortOrder: true } }))._max.sortOrder ?? -1) + 1;

@@ -24,8 +24,10 @@ export const shopSettings = cache(async (): Promise<ShopLook> => {
       brandColor: row?.brandColor ?? null,
       brandText: row?.brandText ?? null,
     };
-  } catch {
-    // ponytail: database not reachable (e.g. build without DATABASE_URL) → default Khmer shop
+  } catch (cause) {
+    // no database configured (build without DATABASE_URL) → default Khmer shop; with one, a failed read throws
+    // so Next keeps the last good page instead of caching the defaults
+    if (process.env.DATABASE_URL) throw cause;
     return { language: "km", notice: "", name: shop.name, logo: shop.logo, brandColor: null, brandText: null };
   }
 });

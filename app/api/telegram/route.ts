@@ -26,8 +26,10 @@ export async function POST(request: Request) {
   const t = await getTranslations({ locale: "km", namespace: "admin.telegram" });
   const token = decrypt(settings.botTokenEnc);
   const answer = (text: string) => telegram(token, "answerCallbackQuery", { callback_query_id: callback.id, text }).catch(() => {});
-  const user = await prisma.user.findUnique({ where: { telegramUserId: BigInt(callback.from.id) }, select: { id: true, name: true, isActive: true } });
-  const order = await prisma.order.findUnique({ where: { id: match[1] }, select: { telegramMessageId: true, status: true } });
+  const [user, order] = await Promise.all([
+    prisma.user.findUnique({ where: { telegramUserId: BigInt(callback.from.id) }, select: { id: true, name: true, isActive: true } }),
+    prisma.order.findUnique({ where: { id: match[1] }, select: { telegramMessageId: true, status: true } }),
+  ]);
   if (!settings.isEnabled || !user?.isActive || order?.telegramMessageId !== BigInt(message.message_id)) {
     await answer(t("callbackDenied"));
     return new Response(null, { status: 200 });
