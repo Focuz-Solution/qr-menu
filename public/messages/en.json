@@ -114,7 +114,8 @@
       "account": "Account",
       "delivery": "Delivery",
       "settings": "Settings",
-      "users": "Users"
+      "users": "Users",
+      "roles": "Roles"
     },
     "status": {
       "all": "All",
@@ -207,7 +208,8 @@
           "orders": "Orders this year",
           "revenue": "Revenue this year"
         }
-      }
+      },
+      "noStatusPermission": "Your role can't change order status."
     },
     "menu": {
       "title": "Menu",
@@ -312,7 +314,11 @@
       "deleteTitle": "Delete {name}?",
       "deleteText": "They'll be removed from this shop and signed out. Past orders stay as they are.",
       "deleteOwnerText": "This owner account will be deleted and can't open any shop again. Past orders stay as they are.",
-      "disableTitle": "Disable {name}?"
+      "disableTitle": "Disable {name}?",
+      "shops": "Shops",
+      "shopsTitle": "Shops for {name}",
+      "shopsHint": "Tick the shops this person works in and pick their role in each. They switch shop from their user menu.",
+      "notHere": "Not in this shop"
     },
     "delivery": {
       "coverageTitle": "Where do you deliver?",
@@ -474,6 +480,64 @@
       "slugPlaceholder": "sunset-coffee",
       "current": "Current shop",
       "switching": "Opening {name}…"
+    },
+    "rolesPage": {
+      "title": "Roles",
+      "intro": "What each role may do. Roles are shared by every shop; give people a role on the Users page.",
+      "add": "Add role",
+      "newRoleName": "New role",
+      "ownerHint": "The app owner can do everything, in every shop. It isn't a role and can't be changed here.",
+      "name": "Role name",
+      "people": "{count, plural, =0 {Nobody has this role} one {# person} other {# people}}",
+      "permissions": "Can do",
+      "save": "Save",
+      "saved": "Saved",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "deleteTitle": "Delete the role {name}?",
+      "deleteText": "Only a role nobody has can be deleted. Move its people to another role first.",
+      "perm": {
+        "orders": {
+          "status": "Change order status",
+          "delete": "Delete orders"
+        },
+        "menu": {
+          "edit": "Edit the menu"
+        },
+        "delivery": {
+          "manage": "Delivery"
+        },
+        "telegram": {
+          "manage": "Telegram"
+        },
+        "users": {
+          "manage": "Manage people"
+        },
+        "settings": {
+          "edit": "Edit shop settings"
+        }
+      },
+      "permHint": {
+        "orders": {
+          "status": "Confirm, pack, ship, deliver or cancel — also the Telegram Confirm button",
+          "delete": "Remove an order for good"
+        },
+        "menu": {
+          "edit": "Categories, products and photos"
+        },
+        "delivery": {
+          "manage": "Delivery zones and fees"
+        },
+        "telegram": {
+          "manage": "The shop's bot, group and buttons"
+        },
+        "users": {
+          "manage": "Add people, give roles no stronger than their own, reset passwords"
+        },
+        "settings": {
+          "edit": "Shop details, appearance, links and logo"
+        }
+      }
     }
   },
   "lang": {
@@ -563,7 +627,9 @@
     "slugTaken": "Another shop already uses this address",
     "slugIsLink": "Type only the shop part, e.g. sunset-coffee — not the whole link",
     "slugLocked": "Can't be changed: this shop already has orders",
-    "badMapUrl": "Paste a link from Google Maps (e.g. https://maps.app.goo.gl/…)"
+    "badMapUrl": "Paste a link from Google Maps (e.g. https://maps.app.goo.gl/…)",
+    "shopsRequired": "Pick at least one shop and a role for each.",
+    "roleInUse": "Some people still have this role. Move them to another role first."
   },
   "form": {
     "optional": "optional"

@@ -38,8 +38,8 @@ export const platform = { name: "Focuz Solution", logo: "/logo.png", logoWidth: 
 
 export const shop = {
   name: "Pipi Beauty",
-  /** "" = no logo uploaded yet → the header shows a placeholder */
-  logo: "",
+  /** no logo uploaded yet → public/logo.png */
+  logo: "/logo.png",
   address: {
     km: "ផ្លូវ ២៧១ ភ្នំពេញ",
     en: "Street 271, Phnom Penh",

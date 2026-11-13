@@ -1,8 +1,5 @@
 import { existsSync } from "node:fs";
 import { hashPassword } from "../lib/password";
-import sampleCatalogue from "./sample-catalogue.json";
-
-const SAMPLE_SHOP = { slug: "pipi-beauty", name: "Pipi Beauty" };
 
 const OWNER = {
   email: "hello@focuzsolution.com",
@@ -16,32 +13,6 @@ async function main() {
 
   const { prisma } = await import("../lib/db");
   try {
-    if (process.env.SEED_SAMPLE_DATA === "1") {
-      await prisma.$transaction(async (db) => {
-        const { id: shopId } = await db.shop.upsert({
-          where: { slug: SAMPLE_SHOP.slug },
-          create: { slug: SAMPLE_SHOP.slug, settings: { create: { name: SAMPLE_SHOP.name } } },
-          update: {},
-        });
-        for (const { products, ...category } of sampleCatalogue) {
-          const { id } = await db.category.upsert({
-            where: { shopId_slug: { shopId, slug: category.slug } },
-            create: { ...category, shopId },
-            update: {},
-          });
-          for (const product of products) {
-            await db.item.upsert({
-              where: { shopId_slug: { shopId, slug: product.slug } },
-              create: { ...product, shopId, categoryId: id },
-              update: {},
-            });
-          }
-        }
-      }, { timeout: 30_000 });
-      console.log(`Sample catalogue seeded into shop "${SAMPLE_SHOP.slug}".`);
-      return;
-    }
-
     const email = OWNER.email.toLowerCase();
     if (await prisma.user.findUnique({ where: { email } })) {
       console.log(`Owner ${email} already exists — nothing changed.`);

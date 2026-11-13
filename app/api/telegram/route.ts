@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { changeOrderStatus } from "@/lib/change-order-status";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
+import { membershipPermissions } from "@/lib/staff-roles";
 import { escapeHtml, telegram, telegramOrderUrl } from "@/lib/telegram";
 
 export async function POST(request: Request) {
@@ -29,14 +30,16 @@ export async function POST(request: Request) {
     prisma.telegramSettings.findUnique({ where: { shopId: order.shopId } }),
     prisma.user.findUnique({
       where: { telegramUserId: BigInt(callback.from.id) },
-      select: { id: true, name: true, isActive: true, isOwner: true, memberships: { where: { shopId: order.shopId }, select: { role: true } } },
+      select: { id: true, name: true, isActive: true, isOwner: true, memberships: { where: { shopId: order.shopId }, select: { role: true, staffRole: { select: { permissions: true } } } } },
     }),
   ]);
   if (!settings?.botTokenEnc || settings.chatId !== BigInt(message.chat.id) || settings.chatId !== BigInt(match[2])) return new Response(null, { status: 200 });
   const t = await getTranslations({ locale: "km", namespace: "admin.telegram" });
   const token = decrypt(settings.botTokenEnc);
   const answer = (text: string) => telegram(token, "answerCallbackQuery", { callback_query_id: callback.id, text }).catch(() => {});
-  const inShop = !!user && (user.isOwner || user.memberships.length > 0);
+  // the tapper must work in that shop with a role that may change order status (or be the owner)
+  const member = user?.memberships[0];
+  const inShop = !!user && (user.isOwner || (!!member && membershipPermissions(member).includes("orders.status")));
   if (!settings.isEnabled || !user?.isActive || !inShop || order.telegramMessageId !== BigInt(message.message_id)) {
     await answer(t("callbackDenied"));
     return new Response(null, { status: 200 });

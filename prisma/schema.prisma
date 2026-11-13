@@ -89,12 +89,33 @@ model Membership {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   shopId    String   @map("shop_id") @db.Uuid
   shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  /// old fixed role — only used until the person gets a role from the Roles page (roleId); see lib/permissions.ts
   role      Role     @default(staff)
+  /// the person's role in this shop (Admin → Roles); its permissions decide what they can do here
+  roleId    String?    @map("role_id") @db.Uuid
+  staffRole StaffRole? @relation(fields: [roleId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now()) @map("created_at")
 
   @@id([userId, shopId])
+  @@index([roleId])
   @@index([shopId])
   @@map("memberships")
+}
+
+/// A role people get in a shop (Manager, Cashier, Packer…): made by the owner on Admin → Roles, shared by every shop.
+/// `permissions` = keys from lib/permissions.ts. The owner (User.isOwner) has every permission and needs no role.
+model StaffRole {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  /// the three built-in roles made from the old fixed ones ("admin" | "staff" | "packer"); null = made by the owner
+  key         String?      @unique
+  name        String
+  permissions String[]     @default([])
+  sortOrder   Int          @default(0) @map("sort_order")
+  memberships Membership[]
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@map("staff_roles")
 }
 
 /// wrong-password counter per computer (IP), shared by every server instance (admin login rate limit)

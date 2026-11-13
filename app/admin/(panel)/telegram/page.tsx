@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { TelegramSetup } from "../settings/TelegramSetup";
 
 export default async function TelegramPage() {
-  const me = await requireUser(["owner"]);
+  const me = await requireUser("telegram.manage");
   const t = await getTranslations("admin.telegram");
   const preview = await getTranslations({ locale: "km", namespace: "admin.telegram" });
   const tg = await prisma.telegramSettings.findUnique({ where: { shopId: me.shop.id } });

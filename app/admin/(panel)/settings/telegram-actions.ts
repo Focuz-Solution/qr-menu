@@ -19,7 +19,7 @@ async function botToken(shopId: string) {
 
 /** 1. paste the token from @BotFather → checked with Telegram (getMe) → saved encrypted */
 export async function saveBotToken(token: string): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("telegram.manage");
   if (!hasEncryptionKey()) return { ok: false, error: "missingKey" };
   const value = token.trim();
   if (!/^\d{5,}:[A-Za-z0-9_-]{30,}$/.test(value)) return { ok: false, error: "invalid", fields: { token: "badToken" } };
@@ -40,7 +40,7 @@ export async function saveBotToken(token: string): Promise<Result> {
 
 /** 2a. groups the bot has seen recently (owner adds the bot to the group and sends any message there first) */
 export async function detectChats(): Promise<Result<{ id: string; title: string; isForum: boolean }[]>> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("telegram.manage");
   const token = await botToken(shop.id);
   if (!token) return { ok: false, error: "notFound" };
 
@@ -61,7 +61,7 @@ export async function detectChats(): Promise<Result<{ id: string; title: string;
 
 /** 2b. use this group (picked from the list, or typed by hand); topic id only for groups with Topics */
 export async function saveChat(input: { chatId: string; chatTitle: string; threadId: string }): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("telegram.manage");
   const chatId = input.chatId.trim();
   const threadId = input.threadId.trim();
   if (!/^-?\d{5,20}$/.test(chatId)) return { ok: false, error: "invalid", fields: { chatId: "invalid" } };
@@ -83,7 +83,7 @@ export async function saveChat(input: { chatId: string; chatTitle: string; threa
 
 /** 3. send a test message to the group; the result is shown on the page (last test / last error) */
 export async function sendTest(): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("telegram.manage");
   const row = await prisma.telegramSettings.findUnique({ where: { shopId: shop.id } });
   if (!row?.botTokenEnc || row.chatId === null) return { ok: false, error: "noChat" };
   const t = await getTranslations({ locale: "km", namespace: "admin.telegram" });
@@ -109,7 +109,7 @@ export async function sendTest(): Promise<Result> {
 
 /** send new orders to the group: on / off (needs bot + group) */
 export async function setTelegramEnabled(isEnabled: boolean): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("telegram.manage");
   const { count } = await prisma.telegramSettings.updateMany({
     where: { shopId: shop.id, ...(isEnabled && { botTokenEnc: { not: null }, chatId: { not: null } }) },
     data: { isEnabled },
@@ -121,14 +121,14 @@ export async function setTelegramEnabled(isEnabled: boolean): Promise<Result> {
 
 /** forget the bot and the group */
 export async function disconnectTelegram(): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("telegram.manage");
   await prisma.telegramSettings.deleteMany({ where: { shopId: shop.id } });
   done();
   return { ok: true };
 }
 
 export async function linkTelegramUser(userId: string, telegramId: string): Promise<Result> {
-  const me = await requireUser(["owner"]);
+  const me = await requireUser("telegram.manage");
   if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(userId)) return { ok: false, error: "invalid" };
   const id = telegramId.trim();
   if (id && !/^[1-9][0-9]{0,15}$/.test(id)) return { ok: false, error: "invalid" };
@@ -146,7 +146,7 @@ export async function linkTelegramUser(userId: string, telegramId: string): Prom
 }
 
 export async function enableTelegramButtons(): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("telegram.manage");
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
   const base = appUrl();
   if (!base || !secret || !/^[A-Za-z0-9_-]{32,256}$/.test(secret)) return { ok: false, error: "invalid" };

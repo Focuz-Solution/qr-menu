@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { getTranslations } from "next-intl/server";
 import { DUMMY_HASH, verifyPassword } from "@/lib/password";
 import { createFirstShop } from "@/lib/shops";
+import { ensureBuiltInRoles } from "@/lib/staff-roles";
 
 export type LoginState = { error: "badLogin" } | { error: "locked"; minutes: number } | undefined;
 
@@ -43,11 +44,13 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
 
   // one shop → straight into its dashboard; several → pick one on "Your shops";
   // the owner with no shop yet gets a first one made and lands on its Settings (name, logo)
-  const [, , , shops] = await Promise.all([
+  const [, , , , shops] = await Promise.all([
     prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() } }),
     // housekeeping: expired sessions are never used again, so each login clears them out
     prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
     // this computer's count is cleared; other computers' old counts (past their 15 minutes) go too
+    // first sign-in after the roles update: built-in roles made + people moved onto them (one count once done)
+    ensureBuiltInRoles(),
     prisma.loginThrottle.deleteMany({ where: { OR: [{ key }, { until: { lt: now } }] } }),
     prisma.shop.findMany({
       where: user.isOwner ? {} : { memberships: { some: { userId: user.id } } },

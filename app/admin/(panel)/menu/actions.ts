@@ -11,7 +11,6 @@ import { deleteImageIfUnused, imageKey } from "@/lib/r2";
 import type { ItemInput } from "./types";
 
 // Menu admin (plan/api.md → Menu, plan/business-rules.md 1–11). Owner/admin + staff only; every query is limited to the current shop.
-const EDITORS = ["owner", "staff"] as const;
 
 // refreshes the admin list and every shop page (they read the menu from the database)
 const changed = () => revalidatePath("/", "layout");
@@ -41,7 +40,7 @@ async function uniqueSlug(name: string, fallback: string, taken: (slug: string) 
 
 /** New category named "ប្រភេទថ្មី" / "New category" (admin's language); the admin renames it afterwards. Hidden until shown (rule 2). */
 export async function createCategory(): Promise<Result<{ id: string }>> {
-  const { shop } = await requireUser([...EDITORS]);
+  const { shop } = await requireUser("menu.edit");
   const name = (await getTranslations("admin.menu"))("newCategoryName");
   const slug = await uniqueSlug(name, "cat", (s) => prisma.category.findUnique({ where: { shopId_slug: { shopId: shop.id, slug: s } } }));
   const last = await prisma.category.aggregate({ where: { shopId: shop.id }, _max: { sortOrder: true } });
@@ -53,7 +52,7 @@ export async function createCategory(): Promise<Result<{ id: string }>> {
 }
 
 export async function updateCategory(id: string, patch: { name?: string; isVisible?: boolean }): Promise<Result> {
-  const { shop } = await requireUser([...EDITORS]);
+  const { shop } = await requireUser("menu.edit");
   const name = patch.name?.trim();
   if (name !== undefined && (!name || name.length > 80)) return { ok: false, error: "invalid", fields: { name: "required" } };
 
@@ -68,7 +67,7 @@ export async function updateCategory(id: string, patch: { name?: string; isVisib
 
 /** full new order of all categories (rule 1) */
 export async function reorderCategories(ids: string[]): Promise<Result> {
-  const { shop } = await requireUser([...EDITORS]);
+  const { shop } = await requireUser("menu.edit");
   // every id must be one of this shop's categories (so the updates below can't touch another shop)
   const all = await prisma.category.findMany({ where: { shopId: shop.id }, select: { id: true } });
   if (ids.length !== all.length || new Set(ids).size !== ids.length || !all.every((c) => ids.includes(c.id))) {
@@ -82,7 +81,7 @@ export async function reorderCategories(ids: string[]): Promise<Result> {
 /** only when it has no products (rule 3); deleted products still pointing at it are removed for good */
 /** deletes the category and all its products (rule 3); old orders keep their own copy of names/prices */
 export async function deleteCategory(id: string): Promise<Result> {
-  const { shop } = await requireUser([...EDITORS]);
+  const { shop } = await requireUser("menu.edit");
   const [, { count }] = await prisma.$transaction([
     prisma.item.deleteMany({ where: { categoryId: id, shopId: shop.id } }),
     prisma.category.deleteMany({ where: { id, shopId: shop.id } }),
@@ -96,7 +95,7 @@ export async function deleteCategory(id: string): Promise<Result> {
 
 /** create (id = null) or edit a product (rules 5–8) */
 export async function saveItem(id: string | null, input: ItemInput): Promise<Result<{ id: string }>> {
-  const { shop } = await requireUser([...EDITORS]);
+  const { shop } = await requireUser("menu.edit");
   const fields: Record<string, ErrorCode> = {};
   const name = input.name.trim();
   const originalCents = toCents(input.price);
@@ -171,7 +170,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
 
 /** quick switches on the card: in stock / visible on the shop */
 export async function setItemFlags(id: string, patch: { isAvailable?: boolean; isVisible?: boolean }): Promise<Result> {
-  const { shop } = await requireUser([...EDITORS]);
+  const { shop } = await requireUser("menu.edit");
   const { count } = await prisma.item.updateMany({
     where: { id, shopId: shop.id, deletedAt: null },
     data: { isAvailable: patch.isAvailable, isVisible: patch.isVisible },
@@ -183,7 +182,7 @@ export async function setItemFlags(id: string, patch: { isAvailable?: boolean; i
 
 /** soft delete: gone from the shop and admin, old orders keep their copy (rule 10) */
 export async function deleteItem(id: string): Promise<Result> {
-  const { shop } = await requireUser([...EDITORS]);
+  const { shop } = await requireUser("menu.edit");
   const { count } = await prisma.item.updateMany({ where: { id, shopId: shop.id, deletedAt: null }, data: { deletedAt: new Date() } });
   if (!count) return { ok: false, error: "notFound" };
   changed();

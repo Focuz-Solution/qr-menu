@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { redirect } from "next/navigation";
 import { enterShop, requireLogin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { shop } from "@/lib/shop";
 import { createFirstShop } from "@/lib/shops";
 import { cn } from "@/lib/utils";
 import { openShop } from "./actions";
@@ -70,7 +71,7 @@ export default async function ShopsPage() {
                       aria-label={t("open", { name })}
                       className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
                     >
-                      <ShopLogo src={s.settings?.logoUrl ?? ""} alt="" size={40} className="size-10" />
+                      <ShopLogo src={s.settings?.logoUrl ?? shop.logo} alt="" size={40} className="size-10" />
                       <span className="grid min-w-0 flex-1 leading-tight">
                         <span className="truncate font-medium">{name}</span>
                         <span className="truncate text-xs text-muted-foreground">/{s.slug}</span>

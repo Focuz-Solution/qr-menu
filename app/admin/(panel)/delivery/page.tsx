@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { DeliveryZones } from "./DeliveryZones";
 
 export default async function DeliveryPage() {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("delivery.manage");
   const zones = await prisma.deliveryZone.findMany({
     where: { shopId: shop.id },
     orderBy: { sortOrder: "asc" },

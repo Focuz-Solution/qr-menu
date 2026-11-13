@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { MenuEditor } from "./MenuEditor";
 
 export default async function AdminMenuPage() {
-  const { shop } = await requireUser(["owner", "staff"]);
+  const { shop } = await requireUser("menu.edit");
   const [categories, items] = await Promise.all([
     prisma.category.findMany({
       where: { shopId: shop.id },
