@@ -16,8 +16,9 @@ function parseKey(key: string, products: Product[]) {
   return product ? { product, image: image || product.image } : null;
 }
 
-// one cart per shop: "cart:<shop address>" (every cart call runs on a page inside app.com/<shop>/…)
-const storageKey = () => `cart:${location.pathname.split("/")[1] ?? ""}`;
+// one cart per shop: "cart:<shop address>". The shop layout writes the shop on <html data-shop>, so the default
+// shop opened at app.com/ and at app.com/<shop> share one cart.
+const storageKey = () => `cart:${document.documentElement.dataset.shop ?? location.pathname.split("/")[1] ?? ""}`;
 const EMPTY: Cart = {};
 const listeners = new Set<() => void>();
 let cache: { raw: string | null; cart: Cart } = { raw: null, cart: EMPTY };

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type { ErrorCode, Result } from "@/lib/result";
 import { isHex, textOn } from "@/lib/brand-colors";
-import { deleteImage, imageKey } from "@/lib/r2";
+import { deleteImageIfUnused, imageKey } from "@/lib/r2";
 import { isShopSlug } from "@/lib/shops";
 import type { ShopInput } from "./types";
 
@@ -133,8 +133,23 @@ export async function saveShopSettings(input: Partial<ShopInput>): Promise<Resul
     update: data,
   });
   // replaced/removed logo
-  if (logoUrl !== undefined && before?.logoUrl && before.logoUrl !== (logoUrl || null)) await deleteImage(before.logoUrl);
+  if (logoUrl !== undefined && before?.logoUrl && before.logoUrl !== (logoUrl || null)) await deleteImageIfUnused(before.logoUrl);
   // the shop reads language + header message from here → rebuild every page (both root layouts)
   revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Show this shop at the app's main address (app.com/, /products/…, /checkout) — super-admin only, since it is
+ * app-wide. At most one default shop: turning it on here turns it off for every other shop.
+ */
+export async function setDefaultShop(isDefault: boolean): Promise<Result> {
+  const me = await requireUser(["owner"]);
+  if (me.role !== "owner") return { ok: false, error: "notAllowed" }; // "owner" in the list also lets a shop's admin in
+  await prisma.$transaction([
+    prisma.shop.updateMany({ where: { isDefault: true, id: { not: me.shop.id } }, data: { isDefault: false } }),
+    prisma.shop.update({ where: { id: me.shop.id }, data: { isDefault: isDefault === true } }),
+  ]);
+  revalidatePath("/", "layout"); // every shop page: the main address now shows another shop (or none)
   return { ok: true };
 }

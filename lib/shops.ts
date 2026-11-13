@@ -35,6 +35,16 @@ export const shopBySlug = cache(async (slug: string): Promise<string | null> => 
   }
 });
 
+/** the shop shown at app.com/ itself (Settings → Main address, super-admin only), or null when none is picked */
+export const defaultShopSlug = cache(async (): Promise<string | null> => {
+  try {
+    return (await prisma.shop.findFirst({ where: { isDefault: true }, orderBy: { createdAt: "asc" }, select: { slug: true } }))?.slug ?? null;
+  } catch (cause) {
+    if (process.env.DATABASE_URL) throw cause; // same rule as shopBySlug
+    return null;
+  }
+});
+
 export async function firstShopSlug() {
   try {
     return (await prisma.shop.findFirst({ orderBy: { createdAt: "asc" }, select: { slug: true } }))?.slug ?? null;
