@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/lib/generated/prisma/client";
 import type { ErrorCode, Result } from "@/lib/result";
 import { isHex, textOn } from "@/lib/brand-colors";
 import { deleteImage, imageKey } from "@/lib/r2";
+import { isShopSlug } from "@/lib/shops";
 import type { ShopInput } from "./types";
 
-// Shop settings — owner only (spec §4.2 shops, §8.5 /admin/shop). One row, id = 1.
+// Shop settings — owner or the shop's admin (spec §4.2 shops, §8.5 /admin/shop). One row per shop.
 /** "" → null; https link → itself; anything else → undefined (invalid) */
 function link(value: string) {
   const v = value.trim();
@@ -20,45 +22,118 @@ function link(value: string) {
   }
 }
 
-export async function saveShopSettings(input: ShopInput): Promise<Result> {
-  await requireUser(["owner"]);
-  const fields: Record<string, ErrorCode> = {};
-  const name = input.name.trim();
-  const phone = input.contactPhone.trim();
-  const urls = { telegramUrl: link(input.telegramUrl), facebookUrl: link(input.facebookUrl), tiktokUrl: link(input.tiktokUrl) };
-  const orderPrefix = input.orderPrefix.trim().toUpperCase();
-  const text = (v: string) => v.trim().slice(0, 200);
-  const brandColor = input.brandColor.trim().toLowerCase();
-  const language = input.language;
-  const logoUrl = input.logoUrl.trim() || null;
+/** "" → null; a Google Maps https link (maps.app.goo.gl/…, google.com/maps/…, maps.google.com/…) → itself; else undefined */
+function mapLink(value: string) {
+  const v = value.trim();
+  if (!v) return null;
+  try {
+    const { protocol, hostname: h, pathname: p } = new URL(v);
+    // google.com, google.com.kh, google.co.uk, google.kh … — not google.com.evil.com
+    const maps =
+      h === "maps.app.goo.gl" ||
+      /^maps\.google\.(com|[a-z]{2})(\.[a-z]{2})?$/.test(h) ||
+      (/^(www\.)?google\.(com|[a-z]{2})(\.[a-z]{2})?$/.test(h) && p.startsWith("/maps")) ||
+      (h === "goo.gl" && p.startsWith("/maps"));
+    return protocol === "https:" && maps ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
-  if (language !== "km" && language !== "en") fields.language = "required";
-  if (!name || name.length > 80) fields.name = "required";
-  if (phone && !/^[+\d][\d\s-]{5,20}$/.test(phone)) fields.contactPhone = "invalid";
-  for (const [key, value] of Object.entries(urls)) if (value === undefined) fields[key] = "badUrl";
-  if (!/^[A-Z0-9-]{1,10}$/.test(orderPrefix)) fields.orderPrefix = "invalid";
-  if (brandColor && !isHex(brandColor)) fields.brandColor = "invalid";
-  if (logoUrl && !imageKey(logoUrl)) fields.logoUrl = "badImage";
+/**
+ * Saves one settings card (Appearance, Shop details or Social links): only the fields that were sent
+ * are checked and written, so the other cards' saved values stay as they are.
+ */
+export async function saveShopSettings(input: Partial<ShopInput>): Promise<Result> {
+  const { shop: current } = await requireUser(["owner"]);
+  const fields: Record<string, ErrorCode> = {};
+  const data: Prisma.ShopSettingsUpdateInput = {};
+  /** the field's text when it was sent, else undefined (not part of this card) */
+  const get = (k: keyof ShopInput) => (typeof input[k] === "string" ? input[k] : undefined);
+  const text = (v: string) => v.trim().slice(0, 200);
+
+  // link address: lives on the shop, not its settings row; locked once the shop has an order
+  const slug = get("slug")?.trim().toLowerCase();
+  if (slug !== undefined && slug !== current.slug) {
+    if (!isShopSlug(slug)) fields.slug = "badSlug";
+    else if (await prisma.order.count({ where: { shopId: current.id }, take: 1 })) fields.slug = "slugLocked";
+    else if (await prisma.shop.count({ where: { slug, id: { not: current.id } } })) fields.slug = "slugTaken";
+  }
+
+  const name = get("name")?.trim();
+  if (name !== undefined) {
+    if (!name || name.length > 80) fields.name = "required";
+    data.name = name;
+  }
+  const phone = get("contactPhone")?.trim();
+  if (phone !== undefined) {
+    if (phone && !/^[+\d][\d\s-]{5,20}$/.test(phone)) fields.contactPhone = "invalid";
+    data.contactPhone = phone || null;
+  }
+  const map = get("mapUrl");
+  if (map !== undefined) {
+    const url = mapLink(map);
+    if (url === undefined) fields.mapUrl = "badMapUrl";
+    data.mapUrl = url ?? null;
+  }
+  for (const key of ["telegramUrl", "facebookUrl", "tiktokUrl"] as const) {
+    const value = get(key);
+    if (value === undefined) continue;
+    const url = link(value);
+    if (url === undefined) fields[key] = "badUrl";
+    data[key] = url ?? null;
+  }
+  const address = get("address");
+  if (address !== undefined) data.address = text(address);
+  const orderPrefix = get("orderPrefix")?.trim().toUpperCase();
+  if (orderPrefix !== undefined) {
+    if (!/^[A-Z0-9-]{1,10}$/.test(orderPrefix)) fields.orderPrefix = "invalid";
+    data.orderPrefix = orderPrefix;
+  }
+  const brandColor = get("brandColor")?.trim().toLowerCase();
+  if (brandColor !== undefined) {
+    if (brandColor && !isHex(brandColor)) fields.brandColor = "invalid";
+    // "" = default theme (black buttons)
+    data.brandColor = brandColor || null;
+    data.brandText = brandColor ? textOn(brandColor) : null;
+  }
+  const language = get("language");
+  if (language !== undefined) {
+    if (language !== "km" && language !== "en") fields.language = "required";
+    data.language = language;
+  }
+  const layout = get("layout");
+  if (layout !== undefined) {
+    if (layout !== "scroll" && layout !== "filter") fields.layout = "required";
+    data.layout = layout;
+  }
+  const logoUrl = get("logoUrl")?.trim();
+  if (logoUrl !== undefined) {
+    if (logoUrl && !imageKey(logoUrl)) fields.logoUrl = "badImage";
+    data.logoUrl = logoUrl || null;
+  }
+  const notice = get("notice");
+  if (notice !== undefined) data.notice = text(notice);
   if (Object.keys(fields).length) return { ok: false, error: "invalid", fields };
 
-  const data = {
-    name,
-    contactPhone: phone || null,
-    telegramUrl: urls.telegramUrl ?? null,
-    facebookUrl: urls.facebookUrl ?? null,
-    tiktokUrl: urls.tiktokUrl ?? null,
-    address: text(input.address),
-    orderPrefix,
-    // "" = default theme (black buttons); the shop starts using these in P8
-    brandColor: brandColor || null,
-    brandText: brandColor ? textOn(brandColor) : null,
-    language,
-    logoUrl,
-    notice: text(input.notice),
-  };
-  const before = await prisma.shopSettings.findUnique({ where: { id: 1 }, select: { logoUrl: true } });
-  await prisma.shopSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
-  if (before?.logoUrl && before.logoUrl !== logoUrl) await deleteImage(before.logoUrl); // replaced/removed logo
+  if (slug !== undefined && slug !== current.slug) {
+    try {
+      await prisma.shop.update({ where: { id: current.id }, data: { slug } });
+    } catch (e) {
+      // taken a moment ago by another shop
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { ok: false, error: "invalid", fields: { slug: "slugTaken" } };
+      throw e;
+    }
+  }
+  const before = await prisma.shopSettings.findUnique({ where: { shopId: current.id }, select: { logoUrl: true } });
+  // the row is made with the shop ("New shop"); the create is only a safety net, named after the shop
+  await prisma.shopSettings.upsert({
+    where: { shopId: current.id },
+    create: { ...(data as Prisma.ShopSettingsUncheckedCreateInput), shopId: current.id, name: (data.name as string | undefined) ?? current.name },
+    update: data,
+  });
+  // replaced/removed logo
+  if (logoUrl !== undefined && before?.logoUrl && before.logoUrl !== (logoUrl || null)) await deleteImage(before.logoUrl);
   // the shop reads language + header message from here → rebuild every page (both root layouts)
   revalidatePath("/", "layout");
   return { ok: true };

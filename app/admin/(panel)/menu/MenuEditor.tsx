@@ -17,11 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { type DiscountType, salePrice, toCents } from "@/lib/money";
 import { formatPrice, thumbUrl } from "@/lib/shop";
 import type { ErrorCode, Result } from "@/lib/result";
 import { formatBytes } from "@/lib/compress-image";
 import { uploadImage } from "@/lib/upload-image";
-import { cn } from "@/lib/utils";
+import { cn, latinDigits } from "@/lib/utils";
 import {
   createCategory,
   deleteCategory,
@@ -340,14 +342,17 @@ export function MenuEditor({ categories, items }: { categories: AdminCategory[];
         </Card>
 
         {!cat && (
-          <section className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center">
-            <span className="grid size-12 place-items-center rounded-full bg-muted">
-              <FolderPlus className="size-6 text-muted-foreground" aria-hidden />
+          <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed bg-muted/30 p-8 text-center">
+            {/* brand-coloured folder (still — no animation) */}
+            <span className="grid size-14 place-items-center rounded-full bg-primary/10 text-primary" aria-hidden>
+              <FolderPlus className="size-7" />
             </span>
-            <h2 className="text-lg font-semibold">{t("emptyTitle")}</h2>
-            <p className="text-xs text-muted-foreground">{t("emptyText")}</p>
-            <Button className="mt-1 h-11 rounded-full px-5" disabled={pending} onClick={addCategory}>
-              <Plus aria-hidden />
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-semibold">{t("emptyTitle")}</h2>
+              <p className="max-w-sm text-xs text-balance text-muted-foreground">{t("emptyText")}</p>
+            </div>
+            <Button size="sm" className="rounded-full px-4" disabled={pending} onClick={addCategory}>
+              {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
               {t("addFirstCategory")}
             </Button>
           </section>
@@ -575,6 +580,15 @@ function ItemForm({
   const fileInput = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const dollars = (cents: number | null | undefined) => (cents == null ? "" : String(cents / 100));
+  // editing a product on sale: its discount as a whole % when it is one (10 %), else as $ off
+  const off = item?.compareAtCents ? item.compareAtCents - item.priceCents : 0;
+  const wholePct = off > 0 && (off * 100) % item!.compareAtCents! === 0;
+  const [price, setPrice] = useState(dollars(item?.compareAtCents ?? item?.priceCents));
+  const [discount, setDiscount] = useState(!off ? "" : wholePct ? String((off * 100) / item!.compareAtCents!) : dollars(off));
+  const [discountType, setDiscountType] = useState<DiscountType>(!off || wholePct ? "percent" : "amount");
+  // live "Customer pays $9.00" under the discount (the save action works it out again)
+  const priceCents = toCents(price);
+  const preview = priceCents && !Number.isNaN(priceCents) ? salePrice(priceCents, discountType, discount) : null;
   const err = (key: string) => fields[key] && <p className="text-xs text-destructive">{te(fields[key])}</p>;
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -587,6 +601,7 @@ function ItemForm({
       categoryId: str("categoryId"),
       price: str("price"),
       discount: str("discount"),
+      discountType,
       badge: str("badge"),
       isAvailable: f.get("isAvailable") === "on",
       isVisible: f.get("isVisible") === "on",
@@ -655,7 +670,7 @@ function ItemForm({
                 data-photo={url}
                 // no native image drag (it would cancel ours); no page scroll while dragging on phones
                 className={cn(
-                  "relative size-20 touch-none select-none [&_img]:pointer-events-none",
+                  "group relative size-20 touch-none select-none [&_img]:pointer-events-none",
                   photos.length > 1 && "cursor-grab",
                   drag?.url === url && "z-10 cursor-grabbing shadow-xl",
                 )}
@@ -719,11 +734,18 @@ function ItemForm({
                 >
                   <Img src={thumbUrl(url)} alt="" sizes="80px" className="size-full rounded-lg border" />
                 </button>
-                {i === 0 && (
-                  <span className="absolute bottom-1 left-1 rounded-full bg-foreground px-1.5 py-0.5 text-[10px] leading-none font-medium text-background">
-                    {t("mainPhoto")}
-                  </span>
-                )}
+                {/* main: "Main" badge; others: "Set as main" shows on hover / keyboard focus */}
+                <span
+                  className={cn(
+                    "pointer-events-none absolute bottom-1 left-1 rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium",
+                    i === 0
+                      ? "bg-foreground text-background"
+                      : "bg-background/90 text-foreground opacity-0 shadow-sm group-hover:opacity-100 group-has-focus-visible:opacity-100",
+                  )}
+                  aria-hidden
+                >
+                  {i === 0 ? t("mainPhoto") : t("setMain")}
+                </span>
                 <Button
                   type="button"
                   variant="secondary"
@@ -784,6 +806,7 @@ function ItemForm({
               </button>
             </li>
           </ul>
+          {/* also shown with 2+ photos: how to pick the main one */}
           {photos.length > 1 && <p className="text-xs text-muted-foreground">{t("photosOrderHint")}</p>}
           {photoError && <p role="alert" className="text-xs text-destructive">{te(photoError)}</p>}
           {saving && !photoError && <p className="text-xs text-muted-foreground tabular-nums">{saving}</p>}
@@ -816,17 +839,44 @@ function ItemForm({
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="price">{t("price")} <Req /></Label>
             {/* on sale: the saved price is the discount and compareAt keeps the original */}
-            <Input id="price" name="price" aria-required inputMode="decimal" placeholder={t("pricePlaceholder")} defaultValue={dollars(item?.compareAtCents ?? item?.priceCents)} aria-invalid={!!fields.price || undefined} className="h-11" />
+            <Input id="price" name="price" aria-required inputMode="decimal" placeholder={t("pricePlaceholder")} value={price} onChange={(e) => setPrice(latinDigits(e.target.value))} aria-invalid={!!fields.price || undefined} className="h-11" />
             {err("price")}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="discount">{t("discountPrice")} <Opt /></Label>
-            <Input id="discount" name="discount" inputMode="decimal" placeholder={t("discountPlaceholder")} defaultValue={item?.compareAtCents ? dollars(item.priceCents) : ""} aria-invalid={!!fields.discount || undefined} className="h-11" />
+            <Label htmlFor="discount">{t("discountLabel")} <Opt /></Label>
+            {/* the amount + its type: % off or $ off */}
+            <div className="flex gap-2">
+              <Input
+                id="discount"
+                name="discount"
+                inputMode="decimal"
+                placeholder={discountType === "percent" ? "10" : "1.50"}
+                value={discount}
+                onChange={(e) => setDiscount(latinDigits(e.target.value))}
+                aria-invalid={!!fields.discount || undefined}
+                className="h-11 min-w-0 flex-1"
+              />
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={discountType}
+                onValueChange={(v) => v && setDiscountType(v as DiscountType)}
+                aria-label={t("discountType")}
+                className="shrink-0"
+              >
+                <ToggleGroupItem value="percent" aria-label={t("percentOff")} className="h-11 w-12 data-[state=on]:bg-foreground data-[state=on]:text-background">%</ToggleGroupItem>
+                <ToggleGroupItem value="amount" aria-label={t("amountOff")} className="h-11 w-12 data-[state=on]:bg-foreground data-[state=on]:text-background">$</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            {typeof preview === "number" && !fields.discount && (
+              <p className="text-xs text-muted-foreground tabular-nums">{t("customerPays", { price: money(preview) })}</p>
+            )}
             {err("discount")}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="badge">{t("badge")} <Opt /></Label>
-            <Select name="badge" defaultValue={item?.badge ?? "none"}>
+            {/* no "Sale" choice: a discount shows its own "Sale" pill; an old "sale" badge opens as None and is cleared on save */}
+            <Select name="badge" defaultValue={!item?.badge || item.badge === "sale" ? "none" : item.badge}>
               <SelectTrigger id="badge" className="h-11! w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -834,7 +884,6 @@ function ItemForm({
                 <SelectItem value="none">{t("none")}</SelectItem>
                 <SelectItem value="new">{tp("new")}</SelectItem>
                 <SelectItem value="best_seller">{tp("best")}</SelectItem>
-                <SelectItem value="sale">{t("sale")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

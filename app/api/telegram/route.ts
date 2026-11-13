@@ -21,21 +21,28 @@ export async function POST(request: Request) {
     return new Response(null, { status: 200 });
   }
 
-  const settings = await prisma.telegramSettings.findUnique({ where: { id: 1 } });
+  // the order says which shop; that shop's bot + group must match, and the tapper must work in that shop
+  const order = await prisma.order.findUnique({ where: { id: match[1] }, select: { shopId: true, telegramMessageId: true, status: true } });
+  if (!order) return new Response(null, { status: 200 });
+  // that shop's bot + the tapper (with their role in that shop), looked up together
+  const [settings, user] = await Promise.all([
+    prisma.telegramSettings.findUnique({ where: { shopId: order.shopId } }),
+    prisma.user.findUnique({
+      where: { telegramUserId: BigInt(callback.from.id) },
+      select: { id: true, name: true, isActive: true, isOwner: true, memberships: { where: { shopId: order.shopId }, select: { role: true } } },
+    }),
+  ]);
   if (!settings?.botTokenEnc || settings.chatId !== BigInt(message.chat.id) || settings.chatId !== BigInt(match[2])) return new Response(null, { status: 200 });
   const t = await getTranslations({ locale: "km", namespace: "admin.telegram" });
   const token = decrypt(settings.botTokenEnc);
   const answer = (text: string) => telegram(token, "answerCallbackQuery", { callback_query_id: callback.id, text }).catch(() => {});
-  const [user, order] = await Promise.all([
-    prisma.user.findUnique({ where: { telegramUserId: BigInt(callback.from.id) }, select: { id: true, name: true, isActive: true } }),
-    prisma.order.findUnique({ where: { id: match[1] }, select: { telegramMessageId: true, status: true } }),
-  ]);
-  if (!settings.isEnabled || !user?.isActive || order?.telegramMessageId !== BigInt(message.message_id)) {
+  const inShop = !!user && (user.isOwner || user.memberships.length > 0);
+  if (!settings.isEnabled || !user?.isActive || !inShop || order.telegramMessageId !== BigInt(message.message_id)) {
     await answer(t("callbackDenied"));
     return new Response(null, { status: 200 });
   }
 
-  const result = order.status === "new" && await changeOrderStatus(user.id, match[1], "confirmed");
+  const result = order.status === "new" && await changeOrderStatus(user.id, order.shopId, match[1], "confirmed");
   if (!result || !result.ok) {
     await answer(t("callbackStale"));
     return new Response(null, { status: 200 });

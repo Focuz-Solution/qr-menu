@@ -12,7 +12,7 @@ export async function uploadImage(file: File): Promise<{ url: string; before: nu
   if (file.size > MAX_PICK) return { error: "imageTooLarge" };
   const body = await compressImage(file);
   try {
-    const res = await fetch("/admin/images/", { method: "POST", body, headers: { "Content-Type": body.type || file.type } });
+    const res = await fetch("/admin/images", { method: "POST", body, headers: { "Content-Type": body.type || file.type } });
     const data = await res.json();
     return res.ok ? { url: data.url, before: file.size, after: body.size } : { error: data.error ?? "uploadFailed" };
   } catch {

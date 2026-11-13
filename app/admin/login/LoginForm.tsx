@@ -1,20 +1,24 @@
 "use client";
 
-import Image from "next/image";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { ShopArt } from "@/components/ShopArt";
+import { platform } from "@/lib/shop";
 import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { login } from "./actions";
 import { Req } from "@/components/FieldMark";
 
-export function LoginForm({ shopName, logo }: { shopName: string; logo: string }) {
+export function LoginForm() {
   const t = useTranslations("admin.login");
   const [state, action, pending] = useActionState(login, undefined);
 
   const errors = useTranslations("errors");
+  const [showPassword, setShowPassword] = useState(false);
   const [invalid, setInvalid] = useState<{ email?: "required" | "badEmail"; password?: "required" }>({});
 
   return (
@@ -31,9 +35,9 @@ export function LoginForm({ shopName, logo }: { shopName: string; logo: string }
     }} className="p-6 md:flex md:flex-col md:justify-center md:p-8">
       <FieldGroup>
         <div className="flex flex-col items-center gap-2 text-center">
-          <Image src={logo} alt={shopName} width={64} height={64} className="size-16 rounded-full md:hidden" />
+          <ShopArt small text={t("tagline")} className="mb-2 md:hidden" />
           <h1 className="text-2xl font-bold">{t("title")}</h1>
-          <p className="text-balance text-muted-foreground">{t("subtitle", { shop: shopName })}</p>
+          <p className="text-balance text-muted-foreground">{t("subtitle", { shop: platform.name })}</p>
         </div>
         <Field>
           <FieldLabel htmlFor="email">{t("email")} <Req /></FieldLabel>
@@ -66,17 +70,31 @@ export function LoginForm({ shopName, logo }: { shopName: string; logo: string }
               </PopoverContent>
             </Popover>
           </div>
-          <Input
-            aria-describedby={invalid.password || (state && !invalid.email) ? "login-error" : undefined}
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            placeholder={t("passwordPlaceholder")}
-            required
-            aria-invalid={!!(invalid.password || state) || undefined}
-            className="h-11"
-          />
+          {/* password + eye button to show / hide what was typed */}
+          <InputGroup className="h-11">
+            <InputGroupInput
+              aria-describedby={invalid.password || (state && !invalid.email) ? "login-error" : undefined}
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder={t("passwordPlaceholder")}
+              required
+              aria-invalid={!!(invalid.password || state) || undefined}
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-sm"
+                aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+                aria-pressed={showPassword}
+                title={showPassword ? t("hidePassword") : t("showPassword")}
+                onClick={() => setShowPassword((v) => !v)}
+                className="rounded-full"
+              >
+                {showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
           {(invalid.password || (state && !invalid.email)) && (
             <FieldError id="login-error" role="alert">
               {invalid.password ? errors(invalid.password) : state?.error === "locked" ? t("errors.locked", { minutes: state.minutes }) : t("errors.badLogin")}
@@ -84,7 +102,9 @@ export function LoginForm({ shopName, logo }: { shopName: string; logo: string }
           )}
         </Field>
         <Field>
-          <Button type="submit" disabled={pending} className="h-11">
+          <Button type="submit" disabled={pending} aria-busy={pending} className="h-11">
+            {/* spinner while the password is being checked */}
+            {pending && <Loader2 className="animate-spin" aria-hidden />}
             {t("submit")}
           </Button>
         </Field>

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Search, Send, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Search, Send } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
@@ -73,12 +73,6 @@ export function TelegramSetup({ settings: s, keyReady, staff }: { settings: Sett
 
   return (
     <>
-      {!keyReady && (
-        <p role="alert" className="mb-4 flex gap-2 rounded-lg border border-destructive/30 px-3 py-2 text-sm text-destructive">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-          {t("missingKey")}
-        </p>
-      )}
       {error && !confirmingDisconnect && (
         <p role="alert" className="mb-4 rounded-lg border border-destructive/30 px-3 py-2 text-sm text-destructive">{te(error)}</p>
       )}

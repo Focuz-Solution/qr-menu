@@ -6,11 +6,13 @@ import { prisma } from "@/lib/db";
 import { TelegramSetup } from "../settings/TelegramSetup";
 
 export default async function TelegramPage() {
-  await requireUser(["owner"]);
+  const me = await requireUser(["owner"]);
   const t = await getTranslations("admin.telegram");
   const preview = await getTranslations({ locale: "km", namespace: "admin.telegram" });
-  const tg = await prisma.telegramSettings.findUnique({ where: { id: 1 } });
+  const tg = await prisma.telegramSettings.findUnique({ where: { shopId: me.shop.id } });
+  // people of this shop (and yourself) who can tap the order buttons
   const accounts = await prisma.user.findMany({
+    where: { OR: [{ id: me.id }, { memberships: { some: { shopId: me.shop.id } } }] },
     orderBy: { name: "asc" },
     select: { id: true, name: true, telegramUserId: true },
   });

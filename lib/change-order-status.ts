@@ -7,14 +7,15 @@ import { OrderStatus } from "@/lib/generated/prisma/enums";
 import { NEXT_STATUS, STATUS_TIME } from "@/lib/order-status";
 import type { Result } from "@/lib/result";
 
-export async function changeOrderStatus(actorId: string, id: string, to: string, reason?: string): Promise<Result> {
+/** moves one order of `shopId` to the next status (an order of another shop → notFound) */
+export async function changeOrderStatus(actorId: string, shopId: string, id: string, to: string, reason?: string): Promise<Result> {
   if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) return { ok: false, error: "notFound" };
   if (!Object.hasOwn(OrderStatus, to)) return { ok: false, error: "invalid" };
   const next = to as OrderStatus;
   const cancelReason = reason?.trim().slice(0, 300);
   if (next === "cancelled" && !cancelReason) return { ok: false, error: "invalid", fields: { reason: "required" } };
 
-  const order = await prisma.order.findUnique({ where: { id }, select: { status: true } });
+  const order = await prisma.order.findFirst({ where: { id, shopId }, select: { status: true } });
   if (!order) return { ok: false, error: "notFound" };
   if (!NEXT_STATUS[order.status].includes(next)) return { ok: false, error: "badTransition" };
 
@@ -23,7 +24,7 @@ export async function changeOrderStatus(actorId: string, id: string, to: string,
   const moved = await prisma.$transaction(async (tx) => {
     // only if it is still in the status we checked: two staff pressing at once → the second one gets badTransition
     const { count } = await tx.order.updateMany({
-      where: { id, status: order.status },
+      where: { id, shopId, status: order.status },
       data: { status: next, [timeField]: now, ...(next === "cancelled" && { cancelReason }) } as Prisma.OrderUpdateManyMutationInput,
     });
     if (!count) return false;
