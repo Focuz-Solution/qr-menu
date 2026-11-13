@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
-  trailingSlash: true,
+  // no "/" at the end of addresses (/admin/orders, /products/x); an old link with "/" redirects to it
+  trailingSlash: false,
   images: { unoptimized: true },
   // basic security headers on every page: no framing by other sites (clickjacking on /admin), no MIME guessing,
   // only the origin in the Referer sent to other sites, no camera/mic/location access
@@ -22,7 +23,11 @@ const nextConfig: NextConfig = {
   },
   // the cart page became part of checkout: old links / bookmarks still work
   async redirects() {
-    return [{ source: "/cart", destination: "/checkout/", permanent: true }];
+    return [
+      { source: "/:shop/cart", destination: "/:shop/checkout", permanent: true },
+      // staff moved out of Settings into its own page
+      { source: "/admin/settings/staff", destination: "/admin/users", permanent: true },
+    ];
   },
 };
 

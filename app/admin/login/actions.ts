@@ -3,7 +3,9 @@
 import { redirect } from "next/navigation";
 import { clientIp, createSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getTranslations } from "next-intl/server";
 import { DUMMY_HASH, verifyPassword } from "@/lib/password";
+import { createFirstShop } from "@/lib/shops";
 
 export type LoginState = { error: "badLogin" } | { error: "locked"; minutes: number } | undefined;
 
@@ -36,11 +38,20 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   }
 
   fails.delete(ip);
-  await Promise.all([
+  // one shop → straight into its dashboard; several → pick one on "Your shops";
+  // the owner with no shop yet gets a first one made and lands on its Settings (name, logo)
+  const [, , shops] = await Promise.all([
     prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() } }),
     // housekeeping: expired sessions are never used again, so each login clears them out
     prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
+    prisma.shop.findMany({
+      where: user.isOwner ? {} : { memberships: { some: { userId: user.id } } },
+      select: { id: true },
+      take: 2,
+    }),
   ]);
-  await createSession(user.id);
-  redirect("/admin/");
+  const first = !shops.length && user.isOwner ? await createFirstShop((await getTranslations("admin.shops"))("defaultName")) : null;
+  const only = first?.id ?? (shops.length === 1 ? shops[0].id : null);
+  await createSession(user.id, only);
+  redirect(first ? "/admin/settings" : only ? "/admin/orders" : "/admin/shops");
 }

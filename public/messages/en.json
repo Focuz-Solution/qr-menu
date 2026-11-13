@@ -6,6 +6,11 @@
     "emptyText": "New products are coming soon. Please check back later.",
     "clearFilters": "Clear filters",
     "allProducts": "All products",
+    "tab_all": "Show all",
+    "tab_category": "By category",
+    "tab_brand": "By brand",
+    "tab_sale": "Discount",
+    "productCount": "{count, plural, one {# product} other {# products}}",
     "clearSearch": "Clear search",
     "cart": "Cart"
   },
@@ -25,6 +30,7 @@
     "new": "New",
     "best": "Best seller",
     "sale": "Sale",
+    "saleOff": "{off}% off",
     "addToBag": "Add to cart",
     "checkoutNow": "Checkout now",
     "shareMore": "More...",
@@ -41,21 +47,31 @@
   "footer": {
     "address": "Address",
     "hours": "Opening hours",
-    "contact": "Contact"
+    "contact": "Contact",
+    "contactLabel": "Contact:",
+    "openMap": "Open in Google Maps"
   },
   "qr": {
-    "scanToOpen": "Scan to open on your phone",
-    "printTitle": "Shop QR code",
-    "print": "Print",
-    "home": "Home page",
+    "printTitle": "QR code",
     "scanCatalogue": "Scan to see our products",
     "download": "Download PNG",
-    "linkTo": "Link to",
-    "hint": "Print or post this image so customers can scan it to open the catalogue."
+    "styles": {
+      "classic": "Classic",
+      "soft": "Soft",
+      "ribbon": "Ribbon",
+      "dots": "Dots",
+      "arch": "Arch",
+      "minimal": "Minimal"
+    },
+    "link": "Shop link",
+    "copy": "Copy link",
+    "copied": "Copied"
   },
   "notFound": {
     "title": "Page not found",
-    "goHome": "Go to home page"
+    "goHome": "Go to home page",
+    "text": "The link may be wrong, or the page no longer exists. Open the shop's link or scan its QR code to visit it.",
+    "shopText": "This product or page isn't here anymore. Take a look at what's in the shop now."
   },
   "meta": {
     "description": "Cosmetics and beauty products — see prices, sizes and shades, and order easily."
@@ -81,17 +97,24 @@
       "passwordPlaceholder": "Enter your password",
       "forgot": "Forgot your password?",
       "forgotTitle": "Forgot your password?",
-      "forgotBody": "Please contact your administrator to reset your password."
+      "forgotBody": "Please contact your administrator to reset your password.",
+      "tagline": "Manage your shops, products and orders in one place",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
     },
     "nav": {
       "label": "Admin menu",
-      "groups": { "sales": "Sales", "setup": "Setup" },
+      "groups": {
+        "sales": "Sales",
+        "setup": "Setup"
+      },
       "orders": "Orders",
       "menu": "Menu",
       "signOut": "Sign out",
       "account": "Account",
       "delivery": "Delivery",
-      "settings": "Settings"
+      "settings": "Settings",
+      "users": "Users"
     },
     "status": {
       "all": "All",
@@ -111,7 +134,12 @@
     },
     "orders": {
       "reportPeriod": "Report period",
-      "period": {"all": "All dates", "week": "This week", "month": "This month", "year": "This year"},
+      "period": {
+        "all": "All dates",
+        "week": "This week",
+        "month": "This month",
+        "year": "This year"
+      },
       "delete": "Delete",
       "cancel": "Cancel",
       "deleteOrder": "Delete order {order}",
@@ -165,7 +193,21 @@
       "cancelReason": "Cancel reason",
       "cancelReasonHint": "e.g. customer asked to cancel",
       "confirmCancel": "Cancel order",
-      "back": "Back"
+      "back": "Back",
+      "cards": {
+        "week": {
+          "orders": "Orders this week",
+          "revenue": "Revenue this week"
+        },
+        "month": {
+          "orders": "Orders this month",
+          "revenue": "Revenue this month"
+        },
+        "year": {
+          "orders": "Orders this year",
+          "revenue": "Revenue this year"
+        }
+      }
     },
     "menu": {
       "title": "Menu",
@@ -185,18 +227,22 @@
       "photos": "Product photos",
       "mainPhoto": "Main",
       "makeMain": "Make main photo",
-      "photosOrderHint": "Drag photos to change the order. The first one is the main photo.",
+      "setMain": "Set as main",
+      "photosOrderHint": "Tap a photo to make it the main photo (shown on the product card). Drag photos to change the order.",
       "photoSize": "{before} → {after}",
       "name": "Product name",
       "namePlaceholder": "Enter product name",
       "brandPlaceholder": "Enter brand",
       "pricePlaceholder": "Enter price",
-      "discountPlaceholder": "Enter discount price",
       "descriptionPlaceholder": "Enter description",
       "brand": "Brand",
       "category": "Category",
       "price": "Price ($)",
-      "discountPrice": "Discount price ($)",
+      "discountLabel": "Discount",
+      "discountType": "Discount type",
+      "percentOff": "Percent off",
+      "amountOff": "Dollars off",
+      "customerPays": "Customer pays {price}",
       "badge": "Badge",
       "none": "None",
       "inStock": "In stock",
@@ -220,7 +266,7 @@
       "noProducts": "No products in this category yet",
       "noProductsHint": "Tap “Add product” to add the first one.",
       "emptyTitle": "Start your menu",
-      "emptyText": "Create a category first (e.g. Lashes, Lips), then add products to it.",
+      "emptyText": "Create a category first, then add products to it.",
       "addFirstCategory": "Add category",
       "newCategoryName": "New category",
       "sale": "Sale",
@@ -230,6 +276,7 @@
     },
     "roles": {
       "owner": "Owner",
+      "admin": "Shop admin",
       "staff": "Staff",
       "packer": "Packer"
     },
@@ -238,17 +285,16 @@
       "status": "Status",
       "active": "Active",
       "actions": "Actions",
-      "add": "Add staff",
+      "add": "Add user",
       "addHint": "They sign in with this email and password. Copy the password and send it to them.",
       "name": "Name",
       "email": "Email",
       "namePlaceholder": "Enter name",
-      "emailPlaceholder": "e.g. name@gmail.com",
+      "emailPlaceholder": "Enter email",
       "role": "Role",
       "password": "Password",
       "passwordHint": "At least 8 characters",
       "generate": "Generate",
-      "you": "(you)",
       "lastLogin": "Last login",
       "never": "Never",
       "inactive": "Disabled",
@@ -257,9 +303,16 @@
       "resetHint": "New password for {name}. They will be signed out on every device.",
       "deactivate": "Disable",
       "activate": "Enable",
-      "confirmDeactivate": "Disable {name}? They will be signed out right away.",
+      "confirmDeactivate": "They'll be signed out right away and can't sign in until you enable them again.",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "empty": "No users yet. Tap “Add user” to add the first one.",
+      "passwordPlaceholder": "Enter password or tap Generate",
+      "delete": "Delete",
+      "deleteTitle": "Delete {name}?",
+      "deleteText": "They'll be removed from this shop and signed out. Past orders stay as they are.",
+      "deleteOwnerText": "This owner account will be deleted and can't open any shop again. Past orders stay as they are.",
+      "disableTitle": "Disable {name}?"
     },
     "delivery": {
       "coverageTitle": "Where do you deliver?",
@@ -327,7 +380,6 @@
       "previewDashboard": "Open in dashboard",
       "title": "Telegram",
       "intro": "Send every new order to the shop's Telegram group so staff can pack it.",
-      "missingKey": "Add TELEGRAM_ENCRYPTION_KEY to .env first (make one: openssl rand -base64 32), then restart the server.",
       "step1": "Connect the bot",
       "step2": "Choose the group",
       "step3": "Test and turn on",
@@ -350,16 +402,9 @@
       "testMessage": "✅ Telegram is connected. This sample shows how new orders will appear in your packing group."
     },
     "settings": {
-      "title": "Settings",
-      "intro": "Your shop and the people who use the admin",
-      "ownerOnly": "Only the owner can change these settings and add staff.",
       "namePlaceholder": "Enter shop name",
       "addressPlaceholder": "Enter address",
-      "tabShop": "Shop",
-      "tabStaff": "Staff",
-      "shopTitle": "Shop management",
-      "staffTitle": "Staff management",
-      "shopIntro": "Look, contact details and order numbers",
+      "staffTitle": "User management",
       "staffIntro": "Accounts that can sign in to the admin",
       "sectionShop": "Shop details",
       "name": "Shop name",
@@ -382,20 +427,53 @@
       "removeLogo": "Remove logo",
       "brandColor": "Brand colour",
       "resetColor": "Default",
-      "preview": "Preview",
       "previewButton": "View shop",
       "language": "Shop language",
       "languageKm": "ខ្មែរ (Khmer)",
       "languageEn": "English",
+      "layout": "Page template",
+      "layoutScroll": "Template 1",
+      "layoutScrollHint": "Scroll to each category's section",
+      "layoutFilter": "Template 2",
+      "layoutFilterHint": "Show all, By category, By brand, Discount",
       "notice": "Header message",
       "noticePlaceholder": "Enter the running text for the shop header",
       "save": "Save",
-      "saved": "Saved"
+      "saved": "Saved",
+      "slug": "Link address",
+      "slugHint": "The shop link will look like this: {link}",
+      "slugLockedHint": "Locked: customers already order through this link — {link}",
+      "mapUrl": "Google Maps location link"
+    },
+    "shops": {
+      "title": "Your shops",
+      "intro": "Pick a shop to manage. Each shop has its own products, orders and settings.",
+      "newShop": "New shop",
+      "emptyTitle": "No shops yet",
+      "emptyMember": "You haven't been added to a shop yet. Ask the owner.",
+      "open": "Open {name}",
+      "active": "Active",
+      "orderingOff": "Ordering off",
+      "name": "Shop name",
+      "namePlaceholder": "Enter shop name",
+      "create": "Create shop",
+      "switch": "Switch shop",
+      "signOut": "Sign out",
+      "defaultName": "My shop",
+      "slug": "Link address",
+      "createTitle": "Create a shop",
+      "createIntro": "Add a new shop with its own products, orders and link.",
+      "slugHint": "The shop link will look like this: {link}",
+      "addShop": "Add new shop",
+      "slugPlaceholder": "sunset-coffee",
+      "current": "Current shop",
+      "switching": "Opening {name}…"
     }
   },
   "lang": {
     "switchTo": "ខ្មែរ",
-    "label": "Change language"
+    "label": "Change language",
+    "switching": "Changing language…"
   },
   "checkout": {
     "chooseDeliveryService": "Choose a delivery service",
@@ -455,7 +533,7 @@
     "badImage": "Choose a JPEG, PNG or WebP image",
     "imageTooLarge": "The image must be 30 MB or smaller",
     "uploadFailed": "Could not upload the image. Please try again.",
-    "discountTooHigh": "The discount price must be lower than the price",
+    "discountTooHigh": "The discount must be less than the price",
     "invalid": "Please check the highlighted fields",
     "required": "This field is required",
     "badEmail": "Enter a valid email",
@@ -466,6 +544,7 @@
     "server": "Something went wrong. Please try again.",
     "notEmpty": "This category still has products. Move them first.",
     "badPrice": "Enter a valid price (e.g. 13 or 13.50)",
+    "badPercent": "Enter a valid percent (e.g. 10)",
     "badTransition": "This status was already changed or can't be changed. Reload the page.",
     "provinceTaken": "This service already has a rate for some selected provinces.",
     "fallbackExists": "This service already has an active fallback rate.",
@@ -473,7 +552,12 @@
     "telegramFailed": "Telegram didn't answer or refused. Check and try again.",
     "missingKey": "TELEGRAM_ENCRYPTION_KEY is missing on the server.",
     "noChat": "Connect the bot and choose a group first.",
-    "badUrl": "The link must start with https://"
+    "badUrl": "The link must start with https://",
+    "badSlug": "Use 3–40 letters a–z, numbers or - (some words are reserved)",
+    "slugTaken": "Another shop already uses this address",
+    "slugIsLink": "Type only the shop part, e.g. sunset-coffee — not the whole link",
+    "slugLocked": "Can't be changed: this shop already has orders",
+    "badMapUrl": "Paste a link from Google Maps (e.g. https://maps.app.goo.gl/…)"
   },
   "form": {
     "optional": "optional"

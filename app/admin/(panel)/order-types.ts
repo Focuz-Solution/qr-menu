@@ -49,4 +49,8 @@ export type OrderStats = {
   revenueTodayCents: number;
   /** all-time count per status (tabs) */
   counts: Record<OrderStatus, number>;
+  /** the summary cards when the date filter is This week / month / year (counted in the database, not just the loaded rows) */
+  periods: Record<"week" | "month" | "year", PeriodStats>;
 };
+
+export type PeriodStats = { orders: number; revenueCents: number; toPack: number; shipping: number };

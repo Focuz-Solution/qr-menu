@@ -1,4 +1,5 @@
 import "server-only";
+import { appUrl } from "@/lib/app-url";
 
 // Telegram Bot API over plain fetch (no package). The token is only in the URL of the request — never logged.
 
@@ -34,10 +35,10 @@ export const escapeHtml = (text: string) => text.replace(/&/g, "&amp;").replace(
 export type TelegramChat = { id: number; title?: string; type: string; is_forum?: boolean };
 
 export function telegramOrderUrl(id: string) {
-  const base = process.env.APP_BASE_URL;
+  const base = appUrl();
   if (!base) return null;
   try {
-    const url = new URL(`/admin/orders/${id}/`, base);
+    const url = new URL(`/admin/orders/${id}`, base);
     return url.protocol === "https:" ? url.href : null;
   } catch {
     return null;

@@ -33,10 +33,13 @@ export type Product = {
 };
 
 /** defaults until the owner saves Admin → Settings (name, logo) + fixed site config (url, currency) */
+/** the app itself (multi-tenant: login page, "Your shops" page) — not a shop */
+export const platform = { name: "Focuz Solution", logo: "/logo.png", logoWidth: 250, logoHeight: 132 };
+
 export const shop = {
   name: "Pipi Beauty",
-  logo: "/image.png",
-  url: "https://pipi-beauty.vercel.app",
+  /** "" = no logo uploaded yet → the header shows a placeholder */
+  logo: "",
   address: {
     km: "ផ្លូវ ២៧១ ភ្នំពេញ",
     en: "Street 271, Phnom Penh",

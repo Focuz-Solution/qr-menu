@@ -7,8 +7,26 @@ datasource db {
   provider = "postgresql"
 }
 
+model Shop {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  slug        String            @unique
+  settings    ShopSettings?
+  telegram    TelegramSettings?
+  memberships Membership[]
+  sessions    Session[]
+  categories  Category[]
+  items       Item[]
+  zones       DeliveryZone[]
+  orders      Order[]
+  counters    OrderCounter[]
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  @@map("shops")
+}
+
 model ShopSettings {
-  id              Int      @id @default(1)
+  shopId          String   @id @map("shop_id") @db.Uuid
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
   name            String
   logoUrl         String?  @map("logo_url")
   brandColor      String?  @map("brand_color")
@@ -24,9 +42,12 @@ model ShopSettings {
   facebookUrl     String?  @map("facebook_url")
   tiktokUrl       String?  @map("tiktok_url")
   address         String   @default("")
+  /// the shop's location on Google Maps (https link), null = not set
+  mapUrl          String?  @map("map_url")
   hours           String   @default("")
   language        String   @default("km")
   notice          String   @default("")
+  layout          String   @default("scroll")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -35,6 +56,7 @@ model ShopSettings {
 
 enum Role {
   owner
+  admin
   staff
   packer
 }
@@ -44,7 +66,9 @@ model User {
   email          String       @unique
   passwordHash   String       @map("password_hash")
   name           String
-  role           Role         @default(staff)
+  /// super-admin: creates shops, sees and manages every shop
+  isOwner        Boolean      @default(false) @map("is_owner")
+  memberships    Membership[]
   isActive       Boolean      @default(true) @map("is_active")
   failedLogins   Int          @default(0) @map("failed_logins")
   lockedUntil    DateTime?    @map("locked_until")
@@ -58,10 +82,25 @@ model User {
   @@map("users")
 }
 
+model Membership {
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopId    String   @map("shop_id") @db.Uuid
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  role      Role     @default(staff)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([userId, shopId])
+  @@index([shopId])
+  @@map("memberships")
+}
+
 model Session {
   id        String   @id
   userId    String   @map("user_id") @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopId    String?  @map("shop_id") @db.Uuid
+  shop      Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
   expiresAt DateTime @map("expires_at")
   ip        String?
   userAgent String?  @map("user_agent")
@@ -73,7 +112,9 @@ model Session {
 
 model Category {
   id        String   @id @default(uuid(7)) @db.Uuid
-  slug      String   @unique
+  shopId    String   @map("shop_id") @db.Uuid
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  slug      String
   name      String
   sortOrder Int      @default(0) @map("sort_order")
   isVisible Boolean  @default(true) @map("is_visible")
@@ -81,6 +122,8 @@ model Category {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@unique([shopId, slug])
+  @@index([shopId, sortOrder])
   @@map("categories")
 }
 
@@ -92,7 +135,9 @@ enum Badge {
 
 model Item {
   id             String      @id @default(uuid(7)) @db.Uuid
-  slug           String      @unique
+  shopId         String      @map("shop_id") @db.Uuid
+  shop           Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  slug           String
   categoryId     String      @map("category_id") @db.Uuid
   category       Category    @relation(fields: [categoryId], references: [id])
   name           String
@@ -111,6 +156,7 @@ model Item {
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
+  @@unique([shopId, slug])
   @@index([categoryId, sortOrder])
   @@map("items")
 }
@@ -131,6 +177,8 @@ model ItemImage {
 
 model DeliveryZone {
   id            String   @id @default(uuid(7)) @db.Uuid
+  shopId        String   @map("shop_id") @db.Uuid
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
   name          String
   provinceCodes String[] @map("province_codes")
   feeCents      Int      @map("fee_cents")
@@ -141,6 +189,7 @@ model DeliveryZone {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  @@index([shopId, sortOrder])
   @@map("delivery_zones")
 }
 
@@ -166,7 +215,9 @@ enum PaymentStatus {
 
 model Order {
   id                String        @id @default(uuid(7)) @db.Uuid
-  orderNo           String        @unique @map("order_no")
+  shopId            String        @map("shop_id") @db.Uuid
+  shop              Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderNo           String        @map("order_no")
   status            OrderStatus   @default(new)
   customerName      String        @map("customer_name")
   customerPhone     String        @map("customer_phone")
@@ -205,9 +256,10 @@ model Order {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  @@index([status, createdAt(sort: Desc)])
-  @@index([createdAt(sort: Desc)])
-  @@index([customerPhone, createdAt(sort: Desc)])
+  @@unique([shopId, orderNo])
+  @@index([shopId, status, createdAt(sort: Desc)])
+  @@index([shopId, createdAt(sort: Desc)])
+  @@index([shopId, customerPhone, createdAt(sort: Desc)])
   @@map("orders")
 }
 
@@ -246,14 +298,19 @@ model OrderEvent {
 }
 
 model OrderCounter {
-  day   String @id
-  value Int    @default(0)
+  shopId String @map("shop_id") @db.Uuid
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  day    String
+  value  Int    @default(0)
 
+  @@id([shopId, day])
   @@map("order_counters")
 }
 
+/// one row per shop
 model TelegramSettings {
-  id              Int       @id @default(1)
+  shopId          String    @id @map("shop_id") @db.Uuid
+  shop            Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   botTokenEnc     String?   @map("bot_token_enc")
   botUsername     String?   @map("bot_username")
   chatId          BigInt?   @map("chat_id")

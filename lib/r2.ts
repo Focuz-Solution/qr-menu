@@ -36,7 +36,6 @@ export function imageKey(url: string | null | undefined) {
   return m ? imageObjectKey(m[1]) : null;
 }
 
-/** delete a photo we uploaded, full + thumb (ignores other addresses, e.g. the default /image.png); never throws */
 export async function deleteImage(url: string | null | undefined) {
   const key = imageKey(url);
   if (!key) return;
