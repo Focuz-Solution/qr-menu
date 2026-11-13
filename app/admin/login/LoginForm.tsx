@@ -19,18 +19,22 @@ export function LoginForm() {
 
   const errors = useTranslations("errors");
   const [showPassword, setShowPassword] = useState(false);
+  // React resets a form after its action runs; keeping the values in state means a wrong password
+  // leaves both fields filled in so the person can fix them
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [invalid, setInvalid] = useState<{ email?: "required" | "badEmail"; password?: "required" }>({});
 
   return (
     <form action={action} noValidate onSubmit={(event) => {
-      const email = event.currentTarget.elements.namedItem("email") as HTMLInputElement;
-      const password = event.currentTarget.elements.namedItem("password") as HTMLInputElement;
-      const emailError = email.validity.valueMissing ? "required" : email.validity.typeMismatch ? "badEmail" : undefined;
-      const passwordError = password.validity.valueMissing ? "required" : undefined;
+      const emailInput = event.currentTarget.elements.namedItem("email") as HTMLInputElement;
+      const passwordInput = event.currentTarget.elements.namedItem("password") as HTMLInputElement;
+      const emailError = emailInput.validity.valueMissing ? "required" : emailInput.validity.typeMismatch ? "badEmail" : undefined;
+      const passwordError = passwordInput.validity.valueMissing ? "required" : undefined;
       setInvalid({ email: emailError, password: passwordError });
       if (emailError || passwordError) {
         event.preventDefault();
-        (emailError ? email : password).focus();
+        (emailError ? emailInput : passwordInput).focus();
       }
     }} className="p-6 md:flex md:flex-col md:justify-center md:p-8">
       <FieldGroup>
@@ -47,6 +51,8 @@ export function LoginForm() {
             type="email"
             autoComplete="username"
             placeholder={t("emailPlaceholder")}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             required
             aria-invalid={!!(invalid.email || state) || undefined}
             aria-describedby={invalid.email ? "login-email-error" : undefined}
@@ -79,6 +85,8 @@ export function LoginForm() {
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               placeholder={t("passwordPlaceholder")}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               required
               aria-invalid={!!(invalid.password || state) || undefined}
             />

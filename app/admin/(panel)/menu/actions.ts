@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { toCents, type DiscountType, salePrice } from "@/lib/money";
 import { Badge } from "@/lib/generated/prisma/enums";
 import type { ErrorCode, Result } from "@/lib/result";
-import { deleteImage, imageKey } from "@/lib/r2";
+import { deleteImageIfUnused, imageKey } from "@/lib/r2";
 import type { ItemInput } from "./types";
 
 // Menu admin (plan/api.md → Menu, plan/business-rules.md 1–11). Owner/admin + staff only; every query is limited to the current shop.
@@ -163,10 +163,8 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
       ...(images.join() !== oldImages.join() && { images: { deleteMany: {}, create: images.map((url, i) => ({ url, sortOrder: i })) } }),
     },
   });
-  // removed photos: delete the files, unless an old order still shows one
-  for (const url of oldImages.filter((u) => !images.includes(u))) {
-    if (!(await prisma.orderItem.count({ where: { imageUrl: url } }))) await deleteImage(url);
-  }
+  // removed photos: delete the files, unless another product / logo (any shop) or an old order still shows one
+  await Promise.all(oldImages.filter((u) => !images.includes(u)).map(deleteImageIfUnused));
   changed();
   return { ok: true, data: { id } };
 }

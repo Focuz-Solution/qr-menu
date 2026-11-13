@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { appUrl } from "@/lib/app-url";
 import { publicHost } from "@/lib/shops";
+import { DefaultShop } from "./DefaultShop";
 import { QrSection } from "./QrSection";
 import { ShopSettingsForm } from "./ShopSettingsForm";
 
@@ -13,10 +14,14 @@ const script = Kaushan_Script({ weight: "400", subsets: ["latin"] });
 export default async function ShopSettingsPage() {
   const me = await requireUser();
   const owner = me.role === "owner" || me.role === "admin"; // may edit the shop's settings
-  const [row, orders] = await Promise.all([
+  const [row, orders, defaultShop] = await Promise.all([
     prisma.shopSettings.findUnique({ where: { shopId: me.shop.id } }),
     // the link address locks once customers have ordered (their links / printed QR codes use it)
     prisma.order.count({ where: { shopId: me.shop.id }, take: 1 }),
+    // super-admin: which shop the main address shows now (this one, another one, or none)
+    me.role === "owner"
+      ? prisma.shop.findFirst({ where: { isDefault: true }, select: { id: true, slug: true, settings: { select: { name: true } } } })
+      : null,
   ]);
 
   const values = {
@@ -46,6 +51,15 @@ export default async function ShopSettingsPage() {
       readOnly={!owner}
       slugLocked={orders > 0}
       host={publicHost()}
+      defaultShop={
+        me.role === "owner" && (
+          <DefaultShop
+            isDefault={defaultShop?.id === me.shop.id}
+            host={publicHost()}
+            other={defaultShop && defaultShop.id !== me.shop.id ? (defaultShop.settings?.name ?? defaultShop.slug) : null}
+          />
+        )
+      }
       qr={owner && <QrSection scriptFont={script.style.fontFamily} shopName={values.name || me.shop.name} shopUrl={`${base}/${me.shop.slug}`} />}
     />
   );
