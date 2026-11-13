@@ -25,6 +25,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/:shop/cart", destination: "/:shop/checkout", permanent: true },
+      // the default shop at the main address: app.com/cart → app.com/checkout
+      { source: "/cart", destination: "/checkout", permanent: true },
       // staff moved out of Settings into its own page
       { source: "/admin/settings/staff", destination: "/admin/users", permanent: true },
     ];

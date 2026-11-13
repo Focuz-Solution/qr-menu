@@ -443,7 +443,13 @@
       "slug": "Link address",
       "slugHint": "The shop link will look like this: {link}",
       "slugLockedHint": "Locked: customers already order through this link — {link}",
-      "mapUrl": "Google Maps location link"
+      "mapUrl": "Google Maps location link",
+      "defaultTitle": "Main address",
+      "defaultHint": "Only you (the app owner) see this. One shop can open at the main address, without its own name in the link.",
+      "defaultLabel": "Show this shop at {host}",
+      "defaultOn": "Customers who open {host} see this shop. Its own link still works too.",
+      "defaultOther": "{shop} opens at the main address now. Turning this on shows this shop there instead.",
+      "defaultNone": "No shop opens at the main address yet: it goes to the first shop's link."
     },
     "shops": {
       "title": "Your shops",

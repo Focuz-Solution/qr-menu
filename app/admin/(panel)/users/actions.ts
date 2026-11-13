@@ -22,7 +22,7 @@ const done = () => revalidatePath("/admin/users");
  * and (unless you're an owner) only people who work in this shop alone. null = not allowed / not found.
  */
 async function manageable(me: ShopUser, userId: string) {
-  if (userId === me.id) return null;
+  if (userId === me.id || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(userId)) return null;
   const owner = await prisma.user.findFirst({ where: { id: userId, isOwner: true }, select: { id: true } });
   if (owner) return me.role === "owner" ? { role: "owner" as Role } : null;
   const member = await prisma.membership.findUnique({

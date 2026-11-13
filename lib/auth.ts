@@ -99,6 +99,7 @@ export async function requireUser(roles?: Role[]) {
 /** sets the shop this login works in (after checking access); false = not allowed */
 export async function enterShop(shopId: string) {
   const user = await requireLogin();
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(shopId)) return false; // not a shop id → not allowed (no database error)
   const allowed = user.isOwner
     ? await prisma.shop.count({ where: { id: shopId } })
     : await prisma.membership.count({ where: { userId: user.id, shopId } });

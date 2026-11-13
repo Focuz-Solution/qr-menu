@@ -10,6 +10,8 @@ datasource db {
 model Shop {
   id          String            @id @default(uuid(7)) @db.Uuid
   slug        String            @unique
+  /// shown at the app's main address (app.com/, /products/…, /checkout) as well as at app.com/<slug>; at most one shop (set by the super-admin)
+  isDefault   Boolean           @default(false) @map("is_default")
   settings    ShopSettings?
   telegram    TelegramSettings?
   memberships Membership[]
@@ -93,6 +95,19 @@ model Membership {
   @@id([userId, shopId])
   @@index([shopId])
   @@map("memberships")
+}
+
+/// wrong-password counter per computer (IP), shared by every server instance (admin login rate limit)
+model LoginThrottle {
+  /// sha256 of the IP — the address itself isn't stored
+  key       String   @id
+  fails     Int      @default(0)
+  /// the count is forgotten after this; with 5+ fails, the computer waits until then
+  until     DateTime
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([until])
+  @@map("login_throttles")
 }
 
 model Session {

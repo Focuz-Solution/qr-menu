@@ -1,7 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useShopPath } from "@/lib/shop-path";
+import { useShopPath, useShopSlug } from "@/lib/shop-path";
 import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -71,7 +70,7 @@ export function Checkout({ zones, minOrderCents, orderingEnabled }: { zones: Zon
 
 function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrderCents: number; onDone: (r: Receipt) => void }) {
   const path = useShopPath();
-  const { shop: shopSlug } = useParams<{ shop: string }>(); // the order goes to the shop in the address
+  const shopSlug = useShopSlug(); // the order goes to this shop (also when opened at the main address)
   const t = useTranslations("checkout");
   const te = useTranslations("errors");
   const tc = useTranslations("cart");

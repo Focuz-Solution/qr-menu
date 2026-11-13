@@ -1,5 +1,6 @@
 import "server-only";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { prisma } from "@/lib/db";
 
 // Cloudflare R2 (S3 API), same setup as castlykh. The bucket stays private: photos are served by /api/images/<id>.webp.
 // One client per server instance, made on first use and reused by every request (it keeps its connections open).
@@ -46,4 +47,19 @@ export async function deleteImage(url: string | null | undefined) {
   } catch (cause) {
     console.error("[images] delete failed:", cause); // ponytail: an orphan file only costs storage
   }
+}
+
+/**
+ * Delete a photo that was just removed from a product or the logo, but only when nothing else shows it:
+ * no product photo and no logo in ANY shop (an admin could have pasted another shop's photo address),
+ * and no old order line. Photo addresses are public, so this check is what keeps one shop from deleting another's photos.
+ */
+export async function deleteImageIfUnused(url: string | null | undefined) {
+  if (!imageKey(url)) return;
+  const [photos, logos, orders] = await Promise.all([
+    prisma.itemImage.count({ where: { url: url! } }),
+    prisma.shopSettings.count({ where: { logoUrl: url! } }),
+    prisma.orderItem.count({ where: { imageUrl: url! } }),
+  ]);
+  if (!photos && !logos && !orders) await deleteImage(url);
 }

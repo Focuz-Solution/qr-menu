@@ -225,12 +225,15 @@ export function ShopSettingsForm({
   slugLocked,
   host,
   qr,
+  defaultShop,
 }: {
   values: ShopInput;
   readOnly: boolean;
   slugLocked: boolean;
   host: string;
   qr?: React.ReactNode;
+  /** super-admin only: the "Main address" switch, shown under Shop details */
+  defaultShop?: React.ReactNode;
 }) {
   const t = useTranslations("admin.settings");
   const te = useTranslations("errors");
@@ -296,6 +299,8 @@ export function ShopSettingsForm({
           </>
         )}
       </SectionForm>
+
+      {defaultShop}
 
       <SectionForm icon={Link2} title={t("sectionLinks")} hint={t("linksHint")} readOnly={readOnly}>
         {(errors) => (
