@@ -1,6 +1,8 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { firstShopSlug } from "@/lib/shops";
 
-// app.com/ has no page of its own (every shop lives at app.com/<shop>) → 404, shown by not-found.tsx
-export default function Home() {
-  notFound();
+export default async function Home() {
+  const slug = await firstShopSlug();
+  if (!slug) notFound();
+  redirect(`/${encodeURIComponent(slug)}`);
 }

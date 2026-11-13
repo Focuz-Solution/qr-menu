@@ -35,6 +35,15 @@ export const shopBySlug = cache(async (slug: string): Promise<string | null> => 
   }
 });
 
+export async function firstShopSlug() {
+  try {
+    return (await prisma.shop.findFirst({ orderBy: { createdAt: "asc" }, select: { slug: true } }))?.slug ?? null;
+  } catch (cause) {
+    if (process.env.DATABASE_URL) throw cause; // same rule as shopBySlug
+    return null;
+  }
+}
+
 /** every shop's address — pre-builds their pages; a shop made later renders on its first visit */
 export async function allShopSlugs() {
   try {
