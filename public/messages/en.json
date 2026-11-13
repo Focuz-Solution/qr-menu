@@ -98,7 +98,9 @@
       "forgot": "Forgot your password?",
       "forgotTitle": "Forgot your password?",
       "forgotBody": "Please contact your administrator to reset your password.",
-      "tagline": "Manage your shops, products and orders in one place"
+      "tagline": "Manage your shops, products and orders in one place",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
     },
     "nav": {
       "label": "Admin menu",

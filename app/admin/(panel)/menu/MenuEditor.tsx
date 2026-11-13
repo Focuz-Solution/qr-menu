@@ -23,7 +23,7 @@ import { formatPrice, thumbUrl } from "@/lib/shop";
 import type { ErrorCode, Result } from "@/lib/result";
 import { formatBytes } from "@/lib/compress-image";
 import { uploadImage } from "@/lib/upload-image";
-import { cn } from "@/lib/utils";
+import { cn, latinDigits } from "@/lib/utils";
 import {
   createCategory,
   deleteCategory,
@@ -839,7 +839,7 @@ function ItemForm({
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="price">{t("price")} <Req /></Label>
             {/* on sale: the saved price is the discount and compareAt keeps the original */}
-            <Input id="price" name="price" aria-required inputMode="decimal" placeholder={t("pricePlaceholder")} value={price} onChange={(e) => setPrice(e.target.value)} aria-invalid={!!fields.price || undefined} className="h-11" />
+            <Input id="price" name="price" aria-required inputMode="decimal" placeholder={t("pricePlaceholder")} value={price} onChange={(e) => setPrice(latinDigits(e.target.value))} aria-invalid={!!fields.price || undefined} className="h-11" />
             {err("price")}
           </div>
           <div className="flex flex-col gap-1.5">
@@ -852,7 +852,7 @@ function ItemForm({
                 inputMode="decimal"
                 placeholder={discountType === "percent" ? "10" : "1.50"}
                 value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
+                onChange={(e) => setDiscount(latinDigits(e.target.value))}
                 aria-invalid={!!fields.discount || undefined}
                 className="h-11 min-w-0 flex-1"
               />

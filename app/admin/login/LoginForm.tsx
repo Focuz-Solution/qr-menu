@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { ShopArt } from "@/components/ShopArt";
 import { platform } from "@/lib/shop";
 import { useTranslations } from "next-intl";
@@ -8,6 +8,7 @@ import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { login } from "./actions";
 import { Req } from "@/components/FieldMark";
@@ -17,6 +18,7 @@ export function LoginForm() {
   const [state, action, pending] = useActionState(login, undefined);
 
   const errors = useTranslations("errors");
+  const [showPassword, setShowPassword] = useState(false);
   const [invalid, setInvalid] = useState<{ email?: "required" | "badEmail"; password?: "required" }>({});
 
   return (
@@ -68,17 +70,31 @@ export function LoginForm() {
               </PopoverContent>
             </Popover>
           </div>
-          <Input
-            aria-describedby={invalid.password || (state && !invalid.email) ? "login-error" : undefined}
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            placeholder={t("passwordPlaceholder")}
-            required
-            aria-invalid={!!(invalid.password || state) || undefined}
-            className="h-11"
-          />
+          {/* password + eye button to show / hide what was typed */}
+          <InputGroup className="h-11">
+            <InputGroupInput
+              aria-describedby={invalid.password || (state && !invalid.email) ? "login-error" : undefined}
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder={t("passwordPlaceholder")}
+              required
+              aria-invalid={!!(invalid.password || state) || undefined}
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                size="icon-sm"
+                aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+                aria-pressed={showPassword}
+                title={showPassword ? t("hidePassword") : t("showPassword")}
+                onClick={() => setShowPassword((v) => !v)}
+                className="rounded-full"
+              >
+                {showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
           {(invalid.password || (state && !invalid.email)) && (
             <FieldError id="login-error" role="alert">
               {invalid.password ? errors(invalid.password) : state?.error === "locked" ? t("errors.locked", { minutes: state.minutes }) : t("errors.badLogin")}
