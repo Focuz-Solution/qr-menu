@@ -1,6 +1,8 @@
 "use client";
 
-import Image from "next/image";
+import { Loader2 } from "lucide-react";
+import { ShopArt } from "@/components/ShopArt";
+import { platform } from "@/lib/shop";
 import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { login } from "./actions";
 import { Req } from "@/components/FieldMark";
 
-export function LoginForm({ shopName, logo }: { shopName: string; logo: string }) {
+export function LoginForm() {
   const t = useTranslations("admin.login");
   const [state, action, pending] = useActionState(login, undefined);
 
@@ -31,9 +33,9 @@ export function LoginForm({ shopName, logo }: { shopName: string; logo: string }
     }} className="p-6 md:flex md:flex-col md:justify-center md:p-8">
       <FieldGroup>
         <div className="flex flex-col items-center gap-2 text-center">
-          <Image src={logo} alt={shopName} width={64} height={64} className="size-16 rounded-full md:hidden" />
+          <ShopArt small text={t("tagline")} className="mb-2 md:hidden" />
           <h1 className="text-2xl font-bold">{t("title")}</h1>
-          <p className="text-balance text-muted-foreground">{t("subtitle", { shop: shopName })}</p>
+          <p className="text-balance text-muted-foreground">{t("subtitle", { shop: platform.name })}</p>
         </div>
         <Field>
           <FieldLabel htmlFor="email">{t("email")} <Req /></FieldLabel>
@@ -84,7 +86,9 @@ export function LoginForm({ shopName, logo }: { shopName: string; logo: string }
           )}
         </Field>
         <Field>
-          <Button type="submit" disabled={pending} className="h-11">
+          <Button type="submit" disabled={pending} aria-busy={pending} className="h-11">
+            {/* spinner while the password is being checked */}
+            {pending && <Loader2 className="animate-spin" aria-hidden />}
             {t("submit")}
           </Button>
         </Field>

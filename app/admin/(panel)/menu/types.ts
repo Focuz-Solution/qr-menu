@@ -25,7 +25,10 @@ export type ItemInput = {
   brand: string;
   categoryId: string;
   price: string;
+  /** discount as typed: "10" (% off) or "1.50" ($ off), "" = no discount */
   discount: string;
+  /** "percent" | "amount" */
+  discountType: string;
   badge: string;
   isAvailable: boolean;
   isVisible: boolean;

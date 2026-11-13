@@ -1,16 +1,19 @@
+"use client";
+
+import { Tag } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-// Red rotated circle "20%" — product card and detail page
 export function DiscountBadge({ off, className }: { off: number; className?: string }) {
+  const t = useTranslations("product");
   if (off <= 0) return null;
   return (
-    <span
-      className={cn(
-        "grid size-12 shrink-0 -rotate-20 place-items-center rounded-full bg-destructive text-sm font-semibold text-primary-foreground",
-        className,
-      )}
+    <Badge
+      className={cn("h-6 shrink-0 gap-1 border-0 px-2.5 text-[11px] font-semibold tabular-nums shadow-sm [&>svg]:size-3!", className)}
     >
-      {off}%
-    </span>
+      <Tag aria-hidden />
+      {t("saleOff", { off })}
+    </Badge>
   );
 }

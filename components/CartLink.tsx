@@ -1,5 +1,6 @@
 "use client";
 
+import { useShopPath } from "@/lib/shop-path";
 import { ShoppingBag } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -8,11 +9,12 @@ import { cn } from "@/lib/utils";
 
 // Bag icon → /checkout/ (cart + order on one page), with the item count in a badge (home header + product detail top bar)
 export function CartLink({ className }: { className?: string }) {
+  const path = useShopPath();
   const t = useTranslations("home");
   const { count } = useCart();
   return (
     <Link
-      href="/checkout/"
+      href={path("/checkout")}
       aria-label={t("cart")}
       className={cn("relative grid size-11 shrink-0 place-items-center rounded-full text-foreground hover:bg-secondary", className)}
     >

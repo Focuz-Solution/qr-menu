@@ -95,11 +95,14 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
   };
   const total = ORDER_STATUSES.reduce((n, s) => n + stats.counts[s], 0);
 
+  // the summary cards follow the date filter: All dates → today + right now; a period → counted within it
+  const range = period === "all" ? null : period;
+  const p = range ? stats.periods[range] : null;
   const cards = [
-    [t("orders.today"), stats.today],
-    [t("orders.revenue"), money(stats.revenueTodayCents)],
-    [t("orders.toPack"), stats.counts.confirmed + stats.counts.packing],
-    [t("orders.shipping"), stats.counts.shipped],
+    [range ? t(`orders.cards.${range}.orders`) : t("orders.today"), p ? p.orders : stats.today],
+    [range ? t(`orders.cards.${range}.revenue`) : t("orders.revenue"), money(p ? p.revenueCents : stats.revenueTodayCents)],
+    [t("orders.toPack"), p ? p.toPack : stats.counts.confirmed + stats.counts.packing],
+    [t("orders.shipping"), p ? p.shipping : stats.counts.shipped],
   ] as const;
 
   return (
@@ -208,7 +211,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
                   <div className="flex justify-end">
                     <Button asChild variant="ghost" size="icon-sm" className="size-11 rounded-md">
                       <Link
-                        href={`/admin/orders/${o.id}/`}
+                        href={`/admin/orders/${o.id}`}
                         aria-label={t("orders.viewDetails", { order: o.orderNo })}
                       >
                         <Eye aria-hidden />

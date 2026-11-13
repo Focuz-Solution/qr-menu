@@ -16,7 +16,8 @@ function parseKey(key: string, products: Product[]) {
   return product ? { product, image: image || product.image } : null;
 }
 
-const KEY = "cart";
+// one cart per shop: "cart:<shop address>" (every cart call runs on a page inside app.com/<shop>/…)
+const storageKey = () => `cart:${location.pathname.split("/")[1] ?? ""}`;
 const EMPTY: Cart = {};
 const listeners = new Set<() => void>();
 let cache: { raw: string | null; cart: Cart } = { raw: null, cart: EMPTY };
@@ -24,7 +25,7 @@ let cache: { raw: string | null; cart: Cart } = { raw: null, cart: EMPTY };
 function read(): Cart {
   let raw: string | null = null;
   try {
-    raw = localStorage.getItem(KEY);
+    raw = localStorage.getItem(storageKey());
   } catch {}
   if (raw !== cache.raw) {
     let cart: Cart = EMPTY;
@@ -42,7 +43,7 @@ export function setQty(key: string, qty: number) {
   if (qty > 0) next[key] = qty;
   else delete next[key];
   try {
-    localStorage.setItem(KEY, JSON.stringify(next));
+    localStorage.setItem(storageKey(), JSON.stringify(next));
   } catch {}
   listeners.forEach((l) => l());
 }
@@ -50,7 +51,7 @@ export function setQty(key: string, qty: number) {
 /** after an order is sent */
 export function clearCart() {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(storageKey());
   } catch {}
   listeners.forEach((l) => l());
 }

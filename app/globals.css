@@ -155,3 +155,32 @@ html:lang(en) {
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee { animation: none; }
 }
+
+/* login: the shop icon pops up (little jump + squash) and rests, on a loop */
+@keyframes pop {
+  0%, 55%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-10px) scale(1.08); }
+  35% { transform: translateY(0) scale(0.96, 1.04); }
+  45% { transform: translateY(-3px) scale(1.02); }
+}
+.animate-pop {
+  animation: pop 2.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop { animation: none; }
+}
+
+/* a field that just got an error (aria-invalid) shakes once — every form sets aria-invalid on its error fields */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+[aria-invalid="true"] {
+  animation: shake 0.4s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  [aria-invalid="true"] { animation: none; }
+}

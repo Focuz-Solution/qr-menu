@@ -6,13 +6,14 @@ import { prisma } from "@/lib/db";
 const BADGE = { new: "new", best_seller: "best", sale: "sale" } as const;
 
 /**
- * What the shop shows: visible categories (admin order) and their visible, not-deleted products,
+ * What the shop `shopId` shows: visible categories (admin order) and their visible, not-deleted products,
  * mapped to the shop's `Product` shape. Read when a page is built/regenerated; Menu saves refresh the shop.
  */
-export const getMenu = cache(async (): Promise<{ categories: ShopCategory[]; products: Product[] }> => {
+export const getMenu = cache(async (shopId: string | null): Promise<{ categories: ShopCategory[]; products: Product[] }> => {
   try {
+    if (!shopId) return { categories: [], products: [] };
     const rows = await prisma.category.findMany({
-      where: { isVisible: true },
+      where: { shopId, isVisible: true },
       orderBy: { sortOrder: "asc" },
       select: {
         slug: true,

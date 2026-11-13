@@ -89,7 +89,7 @@ export function OrderView({ order: o }: { order: AdminOrder }) {
     <>
       {/* header: back to the list, order number + status, date */}
       <div className="mb-5 flex flex-col gap-3">
-        <Link href="/admin/" className="inline-flex min-h-11 w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/admin/orders" className="inline-flex min-h-11 w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" aria-hidden />
           {t("orders.title")}
         </Link>
