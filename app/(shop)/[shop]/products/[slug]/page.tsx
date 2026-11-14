@@ -1,4 +1,4 @@
-import { productMetadata, productSlugs, ShopProduct } from "../../views";
+import { productMetadata, productSlugs, ShopProduct } from "../../views-product";
 
 export async function generateStaticParams({ params }: { params: { shop: string } }) {
   return productSlugs(params.shop);

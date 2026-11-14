@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { shop } from "@/lib/shop";
 import { defaultShopSlug } from "@/lib/shops";
@@ -27,7 +28,8 @@ export default async function HomeLayout({ children }: { children: React.ReactNo
   // no default shop: only the redirect / 404 renders here — own root layout, default theme
   return (
     <html lang={await getLocale()} className={`${fontVariables} h-full antialiased`}>
-      <body className="min-h-full">{children}</body>
+      {/* the provider: the loading skeleton reads its "Loading…" text while the redirect happens */}
+      <body className="min-h-full"><NextIntlClientProvider>{children}</NextIntlClientProvider></body>
     </html>
   );
 }

@@ -657,5 +657,8 @@
   },
   "form": {
     "optional": "optional"
+  },
+  "common": {
+    "loading": "Loading…"
   }
 }
