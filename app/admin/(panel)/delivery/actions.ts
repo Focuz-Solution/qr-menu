@@ -22,7 +22,7 @@ async function conflict(shopId: string, id: string | null, name: string, codes: 
 }
 
 export async function saveZone(id: string | null, input: ZoneInput): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("delivery.manage");
   const fields: Record<string, ErrorCode> = {};
   const name = input.name.trim();
   const feeCents = toCents(input.fee);
@@ -60,7 +60,7 @@ export async function saveZone(id: string | null, input: ZoneInput): Promise<Res
 }
 
 export async function setZoneActive(id: string, isActive: boolean): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("delivery.manage");
   const zone = await prisma.deliveryZone.findFirst({ where: { id, shopId: shop.id }, select: { name: true, provinceCodes: true } });
   if (!zone) return { ok: false, error: "notFound" };
   if (isActive) {
@@ -74,7 +74,7 @@ export async function setZoneActive(id: string, isActive: boolean): Promise<Resu
 
 /** old orders keep the zone name they were charged with, so deleting is safe */
 export async function deleteZone(id: string): Promise<Result> {
-  const { shop } = await requireUser(["owner"]);
+  const { shop } = await requireUser("delivery.manage");
   const { count } = await prisma.deliveryZone.deleteMany({ where: { id, shopId: shop.id } });
   if (!count) return { ok: false, error: "notFound" };
   revalidatePath("/", "layout"); // admin list + the shop's checkout (delivery fees)

@@ -1,39 +1,57 @@
 "use client";
 
-import { KeyRound, Plus, Trash2, UserCheck, UserX, Wand2 } from "lucide-react";
+import { KeyRound, Plus, Store, Trash2, UserCheck, UserX, Wand2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Role } from "@/lib/generated/prisma/enums";
-import { SHOP_ROLES } from "@/lib/roles";
 import type { ErrorCode, Result } from "@/lib/result";
 import { cn } from "@/lib/utils";
 import { Pager, paginate } from "@/components/Pager";
 import { type Sort, SortHead } from "@/components/SortHead";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-import { createStaff, deleteStaff, resetPassword, updateStaff } from "./actions";
+import { createStaff, deleteStaff, resetPassword, setUserShops, updateStaff } from "./actions";
 import { Req } from "@/components/FieldMark";
 
-type Staff = { id: string; name: string; email: string; role: Role; isActive: boolean; lastLoginAt: Date | null; locked: boolean };
-// roles in order (owner = every shop, then this shop's roles); which ones *you* may give comes from the page (`roles`)
-const ROLES: readonly Role[] = ["owner", ...SHOP_ROLES];
+/**
+ * A person on the list: `roleId` = their role in this shop ("owner" = the app owner, every shop);
+ * `canManage` = you may change them (worked out on the server, which checks again); `shops` = where they work
+ * and their role there (sent to the owner only, for the Shops dialog).
+ */
+type Staff = {
+  id: string;
+  name: string;
+  /** phone or email (masked for owners when you aren't one) */
+  contact: string;
+  roleId: string;
+  isActive: boolean;
+  lastLoginAt: Date | null;
+  locked: boolean;
+  canManage: boolean;
+  shops: { shopId: string; roleId: string }[];
+};
+/** a role from Admin → Roles; `givable` = not stronger than yours, so you may give it */
+type RoleOption = { id: string; name: string; givable: boolean };
+type ShopOption = { id: string; name: string };
+const OWNER = "owner";
 const PAGE_SIZE = 10;
-type SortKey = "name" | "email" | "role" | "lastLoginAt" | "status";
+type SortKey = "name" | "contact" | "role" | "lastLoginAt" | "status";
 // status order: active, locked, disabled
 const statusRank = (u: Staff) => (!u.isActive ? 2 : u.locked ? 1 : 0);
-const compare: Record<SortKey, (a: Staff, b: Staff) => number> = {
+const compareBy = (roles: RoleOption[]): Record<SortKey, (a: Staff, b: Staff) => number> => ({
   name: (a, b) => a.name.localeCompare(b.name),
-  email: (a, b) => a.email.localeCompare(b.email),
-  role: (a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role),
+  contact: (a, b) => a.contact.localeCompare(b.contact),
+  // in the Roles page's order
+  role: (a, b) => roles.findIndex((r) => r.id === a.roleId) - roles.findIndex((r) => r.id === b.roleId),
   lastLoginAt: (a, b) => (a.lastLoginAt ? +a.lastLoginAt : 0) - (b.lastLoginAt ? +b.lastLoginAt : 0),
   status: (a, b) => statusRank(a) - statusRank(b),
-};
+});
 
 // 16 random characters (browser crypto) — the owner copies it to the staff member before saving
 function randomPassword() {
@@ -41,8 +59,22 @@ function randomPassword() {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-/** `roles` = the roles you may give (owner: admin/staff/packer; a shop admin: staff/packer) */
-export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[]; meId: string; readOnly: boolean; roles: readonly Role[] }) {
+/** `isOwner` = you are the app owner: you may make owners and set which shops someone works in */
+export function StaffManager({
+  users,
+  meId,
+  isOwner,
+  roles,
+  shops,
+  currentShopId,
+}: {
+  users: Staff[];
+  meId: string;
+  isOwner: boolean;
+  roles: RoleOption[];
+  shops: ShopOption[];
+  currentShopId: string;
+}) {
   const t = useTranslations("admin.staff");
   const ts = useTranslations("admin.settings");
   const tr = useTranslations("admin.roles");
@@ -50,20 +82,20 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
   const format = useFormatter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<ErrorCode | null>(null);
-  const [dialog, setDialog] = useState<{ kind: "add" } | { kind: "reset"; user: Staff } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "add" } | { kind: "reset"; user: Staff } | { kind: "shops"; user: Staff } | null>(null);
   const [sort, setSort] = useState<Sort<SortKey>>({ key: "name", desc: false });
   const [page, setPage] = useState(0);
-  // owners, then shop admins, are pinned to the top; the column sort orders people inside each group
-  const pin = (u: Staff) => (u.role === "owner" ? 0 : u.role === "admin" ? 1 : 2);
+  // owners are pinned to the top; the column sort orders people inside each group
+  const pin = (u: Staff) => (u.roleId === OWNER ? 0 : 1);
+  const compare = compareBy(roles);
   const sorted = users.toSorted((a, b) => pin(a) - pin(b) || (sort.desc ? -1 : 1) * compare[sort.key](a, b));
+  const roleName = (id: string) => (id === OWNER ? tr("owner") : (roles.find((r) => r.id === id)?.name ?? "—"));
   const { pages, current, rows } = paginate(sorted, page, PAGE_SIZE);
   const onSort = (key: SortKey) => {
     setSort((s) => ({ key, desc: s.key === key ? !s.desc : true }));
     setPage(0);
   };
 
-  // only an owner can touch owners and shop admins (the server checks the same)
-  const iAmOwner = roles.includes("owner");
   const [removing, setRemoving] = useState<Staff | null>(null);
   // disabling asks first (enabling again doesn't)
   const [disabling, setDisabling] = useState<Staff | null>(null);
@@ -85,12 +117,10 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
           <h1 className="font-heading text-2xl font-medium md:text-3xl">{ts("staffTitle")}</h1>
           <p className="text-sm text-muted-foreground">{ts("staffIntro")}</p>
         </div>
-        {!readOnly && (
-          <Button size="sm" onClick={() => setDialog({ kind: "add" })}>
-            <Plus aria-hidden />
-            {t("add")}
-          </Button>
-        )}
+        <Button size="sm" onClick={() => setDialog({ kind: "add" })}>
+          <Plus aria-hidden />
+          {t("add")}
+        </Button>
       </div>
 
       {error && (
@@ -99,14 +129,12 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
         </p>
       )}
 
-      {/* not the owner → add / role / reset / disable are all disabled (the actions also check "owner") */}
-      <fieldset disabled={readOnly} className="min-w-0 disabled:opacity-70">
       <Card className="gap-0 overflow-hidden py-0">
         <Table>
           <TableHeader className="bg-muted/50 [&_th]:h-11 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
             <TableRow className="hover:bg-transparent">
               <SortHead k="name" sort={sort} onSort={onSort} className="w-[34%] pl-4 md:w-[21%]">{t("name")}</SortHead>
-              <SortHead k="email" sort={sort} onSort={onSort} className="hidden w-[24%] md:table-cell">{t("email")}</SortHead>
+              <SortHead k="contact" sort={sort} onSort={onSort} className="hidden w-[24%] md:table-cell">{t("contact")}</SortHead>
               <SortHead k="role" sort={sort} onSort={onSort} className="w-[22%] md:w-[17%]">{t("role")}</SortHead>
               <SortHead k="lastLoginAt" sort={sort} onSort={onSort} className="hidden w-[20%] md:table-cell">{t("lastLogin")}</SortHead>
               <SortHead k="status" sort={sort} onSort={onSort} className="hidden w-[12%] sm:table-cell">{t("status")}</SortHead>
@@ -124,32 +152,37 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
             )}
             {rows.map((u) => {
               const me = u.id === meId;
-              // yourself: only a new password; an owner / shop admin row: only an owner may change it
-              const canManage = !me && (iAmOwner || (u.role !== "owner" && u.role !== "admin"));
+              // yourself: only a new password; anyone else: only if your role is strong enough (worked out by the page)
+              const canManage = !me && u.canManage;
               return (
                 <TableRow key={u.id} className={cn("h-14", !u.isActive && "opacity-60")}>
                   <TableCell className="max-w-0 pl-4">
                     <p className="truncate font-medium">
                       {u.name}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground md:hidden">{u.email}</p>
+                    <p className="truncate text-xs text-muted-foreground md:hidden">{u.contact}</p>
                   </TableCell>
-                  <TableCell className="hidden max-w-0 truncate text-muted-foreground md:table-cell" title={u.email}>
-                    {u.email}
+                  <TableCell className="hidden max-w-0 truncate text-muted-foreground md:table-cell" title={u.contact}>
+                    {u.contact}
                   </TableCell>
                   <TableCell>
-                    {/* a role you can't give (e.g. a shop admin looking at another admin), or an owner (app-wide), can't be changed here */}
-                    <Select value={u.role} disabled={me || pending || !roles.includes(u.role) || u.role === "owner"} onValueChange={(role) => run(() => updateStaff(u.id, { role }))}>
-                      <SelectTrigger aria-label={t("role")} size="sm" className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {/* only the roles you may give (+ the row's own role, so it still shows its name) */}
-                        {ROLES.filter((r) => roles.includes(r) || r === u.role).map((r) => (
-                          <SelectItem key={r} value={r} disabled={!roles.includes(r)}>{tr(r)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {/* someone you can't manage, or an owner (app-wide, not a role in a shop), can't be changed here;
+                        someone not in this shop (owner's view): picking a role adds them */}
+                    {u.roleId === OWNER || !canManage ? (
+                      <span className="text-sm text-muted-foreground">{roleName(u.roleId)}</span>
+                    ) : (
+                      <Select value={u.roleId} disabled={pending} onValueChange={(roleId) => run(() => updateStaff(u.id, { roleId }))}>
+                        <SelectTrigger aria-label={`${t("role")}: ${u.name}`} size="sm" className={cn("w-36", !u.roleId && "text-muted-foreground")}>
+                          <SelectValue placeholder={t("notHere")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* roles stronger than yours show but can't be picked */}
+                          {roles.map((r) => (
+                            <SelectItem key={r.id} value={r.id} disabled={!r.givable}>{r.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground tabular-nums md:table-cell">
                     {u.lastLoginAt ? format.dateTime(u.lastLoginAt, { dateStyle: "medium", timeStyle: "short" }) : t("never")}
@@ -168,6 +201,20 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
                   <TableCell className="pr-4">
                     {/* icon-only actions, like the Menu category toolbar */}
                     <div className="flex items-center justify-end gap-0.5">
+                      {/* the owner: which shops this person works in (owners already have every shop) */}
+                      {isOwner && !me && u.roleId !== OWNER && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="rounded-md text-muted-foreground hover:text-foreground"
+                          disabled={pending}
+                          onClick={() => setDialog({ kind: "shops", user: u })}
+                          aria-label={`${t("shops")}: ${u.name}`}
+                          title={t("shops")}
+                        >
+                          <Store aria-hidden />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -197,7 +244,7 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
                           variant="ghost"
                           size="icon-sm"
                           className="rounded-md text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-                          disabled={pending || !canManage}
+                          disabled={pending || !canManage || !u.roleId}
                           onClick={() => {
                             setRemoveError(undefined);
                             setRemoving(u);
@@ -216,7 +263,6 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
           </TableBody>
         </Table>
       </Card>
-      </fieldset>
       <Pager page={current} pages={pages} size={PAGE_SIZE} shown={rows.length} total={sorted.length} onPage={setPage} />
 
       {/* disable: confirm first — they're signed out right away */}
@@ -250,7 +296,7 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
           });
         }}
         title={t("deleteTitle", { name: removing?.name ?? "" })}
-        description={t(removing?.role === "owner" ? "deleteOwnerText" : "deleteText")}
+        description={t(removing?.roleId === OWNER ? "deleteOwnerText" : "deleteText")}
         cancelLabel={t("cancel")}
         deleteLabel={t("delete")}
         pending={pending}
@@ -259,8 +305,11 @@ export function StaffManager({ users, meId, readOnly, roles }: { users: Staff[];
 
       <Dialog open={!!dialog} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent className="gap-0 p-0 sm:max-w-md">
-          {dialog?.kind === "add" && <AddForm roles={roles} onDone={() => setDialog(null)} />}
+          {dialog?.kind === "add" && <AddForm roles={roles} isOwner={isOwner} onDone={() => setDialog(null)} />}
           {dialog?.kind === "reset" && <ResetForm user={dialog.user} onDone={() => setDialog(null)} />}
+          {dialog?.kind === "shops" && (
+            <ShopsForm user={dialog.user} shops={shops} roles={roles} currentShopId={currentShopId} onDone={() => setDialog(null)} />
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -287,7 +336,7 @@ function PasswordField({ error }: { error?: ErrorCode }) {
   );
 }
 
-function AddForm({ roles, onDone }: { roles: readonly Role[]; onDone: () => void }) {
+function AddForm({ roles, isOwner, onDone }: { roles: RoleOption[]; isOwner: boolean; onDone: () => void }) {
   const t = useTranslations("admin.staff");
   const tr = useTranslations("admin.roles");
   const te = useTranslations("errors");
@@ -304,8 +353,8 @@ function AddForm({ roles, onDone }: { roles: readonly Role[]; onDone: () => void
         start(async () => {
           const r = await createStaff({
             name: String(f.get("name") ?? ""),
-            email: String(f.get("email") ?? ""),
-            role: String(f.get("role") ?? ""),
+            contact: String(f.get("contact") ?? ""),
+            roleId: String(f.get("role") ?? ""),
             password: String(f.get("password") ?? ""),
           });
           if (r.ok) return onDone();
@@ -325,22 +374,26 @@ function AddForm({ roles, onDone }: { roles: readonly Role[]; onDone: () => void
           {fields.name && <p className="text-xs text-destructive">{te(fields.name)}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">{t("email")} <Req /></Label>
-          <Input id="email" name="email" type="email" required autoComplete="off" placeholder={t("emailPlaceholder")} aria-invalid={!!fields.email || undefined} className="h-11" />
-          {fields.email && <p className="text-xs text-destructive">{te(fields.email)}</p>}
+          {/* phone (most people) or email — one field, the server tells them apart */}
+          <Label htmlFor="contact">{t("contact")} <Req /></Label>
+          <Input id="contact" name="contact" type="text" required autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={254} placeholder={t("contactPlaceholder")} aria-invalid={!!fields.contact || undefined} className="h-11" />
+          {fields.contact && <p className="text-xs text-destructive">{te(fields.contact)}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="role">{t("role")} <Req /></Label>
-          <Select name="role" defaultValue="staff">
-            <SelectTrigger id="role" className="h-11! w-full">
+          {/* the roles you may give (+ Owner for the owner); starts on the weakest one you may give */}
+          <Select name="role" defaultValue={roles.findLast((r) => r.givable)?.id}>
+            <SelectTrigger id="role" className="h-11! w-full" aria-invalid={!!fields.role || undefined}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {roles.map((r) => (
-                <SelectItem key={r} value={r}>{tr(r)}</SelectItem>
+              {isOwner && <SelectItem value={OWNER}>{tr("owner")}</SelectItem>}
+              {roles.filter((r) => r.givable).map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {fields.role && <p className="text-xs text-destructive">{te(fields.role)}</p>}
         </div>
         <PasswordField error={fields.password} />
         {formError && <p role="alert" className="text-sm text-destructive">{te(formError)}</p>}
@@ -383,6 +436,84 @@ function ResetForm({ user, onDone }: { user: Staff; onDone: () => void }) {
       <DialogFooter className="flex-row border-t px-6 py-4">
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onDone}>{t("cancel")}</Button>
         <Button type="submit" className="h-11 flex-1" disabled={pending}>{t("save")}</Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+/** the owner: tick the shops this person works in and pick their role in each; saved together */
+function ShopsForm({
+  user,
+  shops,
+  roles,
+  currentShopId,
+  onDone,
+}: {
+  user: Staff;
+  shops: ShopOption[];
+  roles: RoleOption[];
+  currentShopId: string;
+  onDone: () => void;
+}) {
+  const t = useTranslations("admin.staff");
+  const te = useTranslations("errors");
+  // shop id → role id, for the ticked shops; starts from where they work now
+  const [picked, setPicked] = useState<Record<string, string>>(() => Object.fromEntries(user.shops.map((s) => [s.shopId, s.roleId])));
+  const [error, setError] = useState<ErrorCode>();
+  const [pending, start] = useTransition();
+  const fallbackRole = user.shops.find((s) => s.shopId === currentShopId)?.roleId ?? roles.at(-1)?.id ?? "";
+
+  function toggle(shopId: string, on: boolean) {
+    setPicked((p) => {
+      const next = { ...p };
+      if (on) next[shopId] = p[shopId] ?? fallbackRole;
+      else delete next[shopId];
+      return next;
+    });
+  }
+
+  return (
+    <form
+      className="flex flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError(undefined);
+        start(async () => {
+          const r = await setUserShops(user.id, Object.entries(picked).map(([shopId, roleId]) => ({ shopId, roleId })));
+          if (r.ok) onDone();
+          else setError(r.fields?.shops ? "shopsRequired" : r.error);
+        });
+      }}
+    >
+      <DialogHeader className="border-b px-6 pt-6 pb-4">
+        <DialogTitle>{t("shopsTitle", { name: user.name })}</DialogTitle>
+        <DialogDescription>{t("shopsHint")}</DialogDescription>
+      </DialogHeader>
+      <ul className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto px-6 py-4">
+        {shops.map((shop) => {
+          const on = shop.id in picked;
+          return (
+            <li key={shop.id} className="flex min-h-11 items-center gap-3">
+              <Checkbox id={`shop-${shop.id}`} checked={on} onCheckedChange={(v) => toggle(shop.id, v === true)} />
+              <Label htmlFor={`shop-${shop.id}`} className="min-w-0 flex-1 truncate font-normal">{shop.name}</Label>
+              <Select value={picked[shop.id] ?? ""} disabled={!on} onValueChange={(roleId) => setPicked((p) => ({ ...p, [shop.id]: roleId }))}>
+                <SelectTrigger aria-label={`${t("role")}: ${shop.name}`} size="sm" className="w-36">
+                  <SelectValue placeholder={t("role")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </li>
+          );
+        })}
+      </ul>
+      {error && <p role="alert" className="px-6 pb-2 text-sm text-destructive">{te(error)}</p>}
+      <DialogFooter className="flex-row border-t px-6 py-4">
+        <Button type="button" variant="outline" className="h-11 flex-1" onClick={onDone}>{t("cancel")}</Button>
+        <Button type="submit" className="h-11 flex-1" disabled={pending || !Object.keys(picked).length}>{t("save")}</Button>
       </DialogFooter>
     </form>
   );

@@ -1,8 +1,9 @@
 "use client";
 
-import { CheckCircle2, Search, Send } from "lucide-react";
+import { CheckCircle2, Loader2, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { Opt, Req } from "@/components/FieldMark";
 import { Button } from "@/components/ui/button";
@@ -12,19 +13,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { ErrorCode } from "@/lib/result";
-import { cn } from "@/lib/utils";
-import { detectChats, disconnectTelegram, enableTelegramButtons, linkTelegramUser, saveBotToken, saveChat, sendTest, setTelegramEnabled } from "./telegram-actions";
+import { checkTelegramConnect, disconnectTelegram, linkTelegramUser, sendTest, setTelegramEnabled, startTelegramConnect } from "./telegram-actions";
 
 type Settings = {
-  connected: boolean;
-  botUsername: string | null;
   chatId: string | null;
   chatTitle: string | null;
-  threadId: number | null;
   isEnabled: boolean;
   lastTestAt: Date | null;
   lastError: string | null;
 };
+
+const POLL_MS = 3_000;
+const WAIT_MS = 15 * 60_000; // the connect code lasts 15 minutes
 
 function Part({ title, done, blocked, children }: { title: string; done: boolean; blocked?: string; children: React.ReactNode }) {
   return (
@@ -44,32 +44,66 @@ function Part({ title, done, blocked, children }: { title: string; done: boolean
   );
 }
 
-export function TelegramSetup({ settings: s, keyReady, staff }: { settings: Settings; keyReady: boolean; staff: { id: string; name: string; telegramId: string }[] }) {
+export function TelegramSetup({ settings: s, botReady, staff }: { settings: Settings; botReady: boolean; staff: { id: string; name: string; telegramId: string }[] }) {
   const t = useTranslations("admin.telegram");
   const te = useTranslations("errors");
   const format = useFormatter();
+  const router = useRouter();
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [linked, setLinked] = useState(false);
-  const [registered, setRegistered] = useState(false);
   const [pending, start] = useTransition();
   const [error, setError] = useState<ErrorCode | null>(null);
-  const [fields, setFields] = useState<Record<string, ErrorCode>>({});
-  const [changingToken, setChangingToken] = useState(!s.connected);
-  const [chats, setChats] = useState<{ id: string; title: string; isForum: boolean }[] | null>(null);
-  const [chatId, setChatId] = useState(s.chatId ?? "");
-  const [chatTitle, setChatTitle] = useState(s.chatTitle ?? "");
+  // the t.me link while waiting for the admin to pick a group in Telegram
+  const [connectUrl, setConnectUrl] = useState<string | null>(null);
   const hasChat = !!s.chatId;
 
-  function run(action: () => Promise<{ ok: boolean; error?: ErrorCode; fields?: Record<string, ErrorCode> }>, after?: () => void) {
+  function run(action: () => Promise<{ ok: boolean; error?: ErrorCode }>, after?: () => void) {
     setError(null);
-    setFields({});
     start(async () => {
       const r = await action();
       if (r.ok) return after?.();
-      setFields(r.fields ?? {});
-      if (!r.fields) setError(r.error ?? "server");
+      setError(r.error ?? "server");
     });
   }
+
+  function connect() {
+    setError(null);
+    // open the tab now (inside the click) so the browser doesn't block it, then send it to Telegram
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null; // the Telegram page can't reach back into the admin tab
+    start(async () => {
+      const r = await startTelegramConnect();
+      if (!r.ok || !r.data) {
+        tab?.close();
+        setError(r.ok ? "server" : r.error);
+        return;
+      }
+      if (tab) tab.location.href = r.data.url;
+      setConnectUrl(r.data.url);
+    });
+  }
+
+  // while waiting: ask the server every few seconds whether the bot was added to a group
+  useEffect(() => {
+    if (!connectUrl) return;
+    const startedAt = Date.now();
+    let busy = false;
+    const timer = setInterval(async () => {
+      if (busy) return;
+      if (Date.now() - startedAt > WAIT_MS) {
+        setConnectUrl(null);
+        return;
+      }
+      busy = true;
+      const r = await checkTelegramConnect().catch(() => null);
+      busy = false;
+      if (r?.ok && r.data?.linked) {
+        setConnectUrl(null);
+        router.refresh();
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [connectUrl, router]);
 
   return (
     <>
@@ -78,13 +112,30 @@ export function TelegramSetup({ settings: s, keyReady, staff }: { settings: Sett
       )}
 
       <Card className="gap-0 divide-y overflow-hidden py-0">
-        <Part title={t("step1")} done={s.connected && !changingToken} blocked={!keyReady ? t("keyRequired") : undefined}>
-          {s.connected && !changingToken ? (
+        <Part title={t("step1")} done={hasChat && !connectUrl} blocked={!botReady ? t("botNotSet") : undefined}>
+          {connectUrl ? (
+            <div role="status" className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                {t("waiting")}
+              </p>
+              <p className="text-xs text-muted-foreground">{t("waitingHint")}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <a href={connectUrl} target="_blank" rel="noreferrer">
+                    <Send aria-hidden />
+                    {t("openTelegram")}
+                  </a>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConnectUrl(null)}>{t("cancel")}</Button>
+              </div>
+            </div>
+          ) : hasChat ? (
             <div className="flex flex-wrap items-center gap-2">
               <p className="mr-auto text-sm">
-                {t("botConnected")} <span className="font-medium">@{s.botUsername}</span>
+                {t("groupLinked")} <span className="font-medium">{s.chatTitle || s.chatId}</span>
               </p>
-              <Button variant="outline" size="sm" onClick={() => setChangingToken(true)}>{t("changeToken")}</Button>
+              <Button variant="outline" size="sm" disabled={pending} onClick={connect}>{t("changeGroup")}</Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -99,88 +150,17 @@ export function TelegramSetup({ settings: s, keyReady, staff }: { settings: Sett
               </Button>
             </div>
           ) : (
-            <form
-              className="flex flex-wrap items-end gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const token = String(new FormData(e.currentTarget).get("token") ?? "");
-                run(() => saveBotToken(token), () => setChangingToken(false));
-              }}
-            >
-              <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1.5">
-                <Label htmlFor="token">{t("token")} <Req /></Label>
-                <Input id="token" name="token" type="password" required autoComplete="off" spellCheck={false} placeholder="123456789:AA…" aria-invalid={!!fields.token || undefined} className="h-11 font-mono sm:h-9" />
-                {fields.token && <p className="text-xs text-destructive">{te(fields.token)}</p>}
-              </div>
-              {s.connected && (
-                <Button type="button" variant="outline" size="sm" className="mb-1.5 sm:mb-0.5" onClick={() => setChangingToken(false)}>{t("cancel")}</Button>
-              )}
-              <Button type="submit" size="sm" className="mb-1.5 sm:mb-0.5" disabled={pending}>{t("saveToken")}</Button>
-            </form>
+            <>
+              <p className="text-sm text-muted-foreground">{t("connectHint")}</p>
+              <Button className="h-11 w-fit" disabled={pending} onClick={connect}>
+                {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
+                {t("connect")}
+              </Button>
+            </>
           )}
         </Part>
 
-        <Part title={t("step2")} done={hasChat} blocked={!s.connected ? t("botRequired") : undefined}>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-fit"
-            disabled={pending}
-            onClick={() => run(async () => {
-              const r = await detectChats();
-              if (r.ok) setChats(r.data ?? []);
-              return r;
-            })}
-          >
-            <Search aria-hidden />
-            {t("detect")}
-          </Button>
-          {chats && !chats.length && <p className="text-sm text-muted-foreground">{t("noGroupsFound")}</p>}
-          {!!chats?.length && (
-            <ul className="flex flex-col gap-2">
-              {chats.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setChatId(c.id);
-                      setChatTitle(c.title);
-                    }}
-                    className={cn(
-                      "flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 text-left text-sm hover:bg-foreground/5",
-                      chatId === c.id && "border-foreground",
-                    )}
-                  >
-                    <span className="font-medium">{c.title}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{c.id}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <form
-            className="flex flex-wrap items-end gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
-              run(() => saveChat({ chatId, chatTitle, threadId: String(f.get("threadId") ?? "") }));
-            }}
-          >
-            <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1.5">
-              <Label htmlFor="chatId">{t("chatId")} <Req /></Label>
-              <Input id="chatId" value={chatId} onChange={(e) => setChatId(e.target.value)} required inputMode="numeric" placeholder="-1001234567890" aria-invalid={!!fields.chatId || undefined} className="h-11 font-mono sm:h-9" />
-              {fields.chatId && <p className="text-xs text-destructive">{te(fields.chatId)}</p>}
-            </div>
-            <div className="flex w-36 flex-col gap-1.5">
-              <Label htmlFor="threadId">{t("threadId")} <Opt /></Label>
-              <Input id="threadId" name="threadId" inputMode="numeric" placeholder="—" defaultValue={s.threadId ?? ""} aria-invalid={!!fields.threadId || undefined} className="h-11 font-mono sm:h-9" />
-              {fields.threadId && <p className="text-xs text-destructive">{te(fields.threadId)}</p>}
-            </div>
-            <Button type="submit" size="sm" className="mb-1.5 sm:mb-0.5" disabled={pending || !chatId}>{t("saveGroup")}</Button>
-          </form>
-        </Part>
-
-        <Part title={t("step3")} done={s.isEnabled} blocked={!s.connected || !hasChat ? t("groupRequired") : undefined}>
+        <Part title={t("step3")} done={s.isEnabled} blocked={!hasChat ? t("groupRequired") : undefined}>
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" size="sm" disabled={pending} onClick={() => run(sendTest)}>
               <Send aria-hidden />
@@ -202,10 +182,9 @@ export function TelegramSetup({ settings: s, keyReady, staff }: { settings: Sett
             <Label asChild><span id="telegram-notifications-label">{t("enabled")}</span></Label>
           </div>
         </Part>
-        <Part title={t("buttonAccess")} done={registered} blocked={!hasChat ? t("groupRequired") : undefined}>
-          <Button type="button" size="sm" variant="outline" className="w-fit" disabled={pending} onClick={() => run(enableTelegramButtons, () => setRegistered(true))}>
-            {registered ? t("buttonsEnabled") : t("enableButtons")}
-          </Button>
+
+        <Part title={t("buttonAccess")} done={staff.some((account) => account.telegramId)} blocked={!hasChat ? t("groupRequired") : undefined}>
+          <p className="text-xs text-muted-foreground">{t("buttonAccessHint")}</p>
           <form className="@container grid gap-2" onSubmit={(e) => {
             e.preventDefault();
             const data = new FormData(e.currentTarget);
@@ -251,10 +230,7 @@ export function TelegramSetup({ settings: s, keyReady, staff }: { settings: Sett
         deleteLabel={t("disconnect")}
         pending={pending}
         error={error ? te(error) : undefined}
-        onConfirm={() => run(disconnectTelegram, () => {
-          setConfirmingDisconnect(false);
-          setChangingToken(true);
-        })}
+        onConfirm={() => run(disconnectTelegram, () => setConfirmingDisconnect(false))}
       />
     </>
   );

@@ -86,14 +86,14 @@
     "login": {
       "title": "Welcome back",
       "subtitle": "Sign in to the {shop} admin",
-      "email": "Email",
+      "contact": "Phone or email",
       "password": "Password",
       "submit": "Sign in",
       "errors": {
-        "badLogin": "Wrong email or password",
+        "badLogin": "Wrong phone/email or password",
         "locked": "Too many wrong tries. Try again in {minutes} min."
       },
-      "emailPlaceholder": "Enter your email",
+      "contactPlaceholder": "e.g. 012 345 678",
       "passwordPlaceholder": "Enter your password",
       "forgot": "Forgot your password?",
       "forgotTitle": "Forgot your password?",
@@ -114,7 +114,8 @@
       "account": "Account",
       "delivery": "Delivery",
       "settings": "Settings",
-      "users": "Users"
+      "users": "Users",
+      "roles": "Roles"
     },
     "status": {
       "all": "All",
@@ -207,7 +208,8 @@
           "orders": "Orders this year",
           "revenue": "Revenue this year"
         }
-      }
+      },
+      "noStatusPermission": "Your role can't change order status."
     },
     "menu": {
       "title": "Menu",
@@ -286,11 +288,11 @@
       "active": "Active",
       "actions": "Actions",
       "add": "Add user",
-      "addHint": "They sign in with this email and password. Copy the password and send it to them.",
+      "addHint": "They sign in with this phone or email and password. Copy the password and send it to them.",
       "name": "Name",
-      "email": "Email",
+      "contact": "Phone or email",
       "namePlaceholder": "Enter name",
-      "emailPlaceholder": "Enter email",
+      "contactPlaceholder": "e.g. 012 345 678 or name@gmail.com",
       "role": "Role",
       "password": "Password",
       "passwordHint": "At least 8 characters",
@@ -312,7 +314,11 @@
       "deleteTitle": "Delete {name}?",
       "deleteText": "They'll be removed from this shop and signed out. Past orders stay as they are.",
       "deleteOwnerText": "This owner account will be deleted and can't open any shop again. Past orders stay as they are.",
-      "disableTitle": "Disable {name}?"
+      "disableTitle": "Disable {name}?",
+      "shops": "Shops",
+      "shopsTitle": "Shops for {name}",
+      "shopsHint": "Tick the shops this person works in and pick their role in each. They switch shop from their user menu.",
+      "notHere": "Not in this shop"
     },
     "delivery": {
       "coverageTitle": "Where do you deliver?",
@@ -360,46 +366,41 @@
       "callbackConfirmed": "Order confirmed.",
       "confirmedBy": "Confirmed by {name}",
       "buttonAccess": "Order button access",
-      "enableButtons": "Register Telegram webhook",
-      "buttonsEnabled": "Webhook registered",
       "staffAccount": "Staff account",
       "telegramUserId": "Telegram user ID",
       "telegramUserHint": "Enter the numeric ID for the selected account. Leave blank to unlink it.",
       "saveLink": "Save account link",
       "linkSaved": "Account link saved.",
-      "keyRequired": "Set the encryption key to continue.",
-      "botRequired": "Save the bot token to choose a group.",
-      "groupRequired": "Save a group to send a test message.",
+      "groupRequired": "Connect a group first.",
       "connectedGroup": "Connected to {group}",
       "previewTitle": "What the group sees",
       "previewHint": "Sample order · preview only",
       "previewBot": "Orders Bot",
-      "previewMessage": "🛍 New order #PB-261108-0041\n🕒 08/11/2026 14:32\n\n👤 Sokha Chan\n📍 Phnom Penh\n\n2 × Sweet Cat · $44.00\n1 × Eyeliner · $4.00\n\nSubtotal · $48.00\nDelivery · $1.50\nTotal · $49.50\nCash on delivery · Unpaid",
+      "previewMessage": "🛍 New order #PB-261108-0041\n🕒 08/11/2026 14:32\n------------------------\n👤 Sokha Chan\n📍 Phnom Penh\n------------------------\n2 × Sweet Cat · $44.00\n1 × Eyeliner · $4.00\n------------------------\nSubtotal · $48.00\nDelivery · $1.50\nTotal · $49.50\nCash on delivery · Unpaid\n__________________________",
       "previewConfirm": "✓ Confirm",
       "previewCancel": "✕ Cancel",
       "previewDashboard": "Open in dashboard",
       "title": "Telegram",
       "intro": "Send every new order to the shop's Telegram group so staff can pack it.",
-      "step1": "Connect the bot",
-      "step2": "Choose the group",
+      "step1": "Connect a Telegram group",
       "step3": "Test and turn on",
-      "token": "Bot token",
-      "saveToken": "Save token",
-      "botConnected": "Connected:",
-      "changeToken": "Change token",
-      "detect": "Find groups",
-      "noGroupsFound": "No group found. Send a message in the group again, then tap again.",
-      "chatId": "Group id (chat id)",
-      "threadId": "Topic id",
-      "saveGroup": "Use this group",
       "sendTest": "Send test message",
       "lastTest": "Last test: {time}",
       "lastError": "Last error",
       "enabled": "Send new orders to this group",
       "disconnect": "Disconnect Telegram",
-      "confirmDisconnect": "Disconnect the bot and group? You'll need to connect again.",
+      "confirmDisconnect": "Disconnect this group? New orders will no longer be sent to it.",
       "cancel": "Cancel",
-      "testMessage": "✅ Telegram is connected. This sample shows how new orders will appear in your packing group."
+      "testMessage": "✅ Telegram is connected. This sample shows how new orders will appear in your packing group.",
+      "connectHint": "Tap Connect group and Telegram opens. Pick the group that should get orders and add the bot — that's it.",
+      "connect": "Connect group",
+      "waiting": "Waiting for Telegram…",
+      "waitingHint": "In Telegram, pick a group and tap to add the bot. This page updates by itself.",
+      "openTelegram": "Open Telegram again",
+      "groupLinked": "Connected group:",
+      "changeGroup": "Change group",
+      "botNotSet": "The bot isn't set up on the server (TELEGRAM_BOT_TOKEN). Contact the app admin.",
+      "buttonAccessHint": "Whoever connected the group is linked automatically. Add other staff below."
     },
     "settings": {
       "namePlaceholder": "Enter shop name",
@@ -474,6 +475,64 @@
       "slugPlaceholder": "sunset-coffee",
       "current": "Current shop",
       "switching": "Opening {name}…"
+    },
+    "rolesPage": {
+      "title": "Roles",
+      "intro": "What each role may do. Roles are shared by every shop; give people a role on the Users page.",
+      "add": "Add role",
+      "newRoleName": "New role",
+      "ownerHint": "The app owner can do everything, in every shop. It isn't a role and can't be changed here.",
+      "name": "Role name",
+      "people": "{count, plural, =0 {Nobody has this role} one {# person} other {# people}}",
+      "permissions": "Can do",
+      "save": "Save",
+      "saved": "Saved",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "deleteTitle": "Delete the role {name}?",
+      "deleteText": "Only a role nobody has can be deleted. Move its people to another role first.",
+      "perm": {
+        "orders": {
+          "status": "Change order status",
+          "delete": "Delete orders"
+        },
+        "menu": {
+          "edit": "Edit the menu"
+        },
+        "delivery": {
+          "manage": "Delivery"
+        },
+        "telegram": {
+          "manage": "Telegram"
+        },
+        "users": {
+          "manage": "Manage people"
+        },
+        "settings": {
+          "edit": "Edit shop settings"
+        }
+      },
+      "permHint": {
+        "orders": {
+          "status": "Confirm, pack, ship, deliver or cancel — also the Telegram Confirm button",
+          "delete": "Remove an order for good"
+        },
+        "menu": {
+          "edit": "Categories, products and photos"
+        },
+        "delivery": {
+          "manage": "Delivery zones and fees"
+        },
+        "telegram": {
+          "manage": "The shop's bot, group and buttons"
+        },
+        "users": {
+          "manage": "Add people, give roles no stronger than their own, reset passwords"
+        },
+        "settings": {
+          "edit": "Shop details, appearance, links and logo"
+        }
+      }
     }
   },
   "lang": {
@@ -526,7 +585,7 @@
     "orderNo": "Order number",
     "backToShop": "Back to the shop",
     "tgNew": "New order {no}",
-    "tgOrderHint": "Review the items, delivery address, and payment details below."
+    "tgUnpaid": "Unpaid"
   },
   "errors": {
     "badPhone": "Enter a valid Cambodian phone number (e.g. 012 345 678)",
@@ -542,8 +601,8 @@
     "discountTooHigh": "The discount must be less than the price",
     "invalid": "Please check the highlighted fields",
     "required": "This field is required",
-    "badEmail": "Enter a valid email",
-    "emailTaken": "This email is already used",
+    "badContact": "Enter a Cambodian phone number (e.g. 012 345 678) or a valid email",
+    "contactTaken": "This phone or email is already used",
     "weakPassword": "Password needs at least 8 characters",
     "notAllowed": "You can't do this",
     "notFound": "Not found",
@@ -554,16 +613,17 @@
     "badTransition": "This status was already changed or can't be changed. Reload the page.",
     "provinceTaken": "This service already has a rate for some selected provinces.",
     "fallbackExists": "This service already has an active fallback rate.",
-    "badToken": "That token isn't valid. Copy it again from @BotFather.",
     "telegramFailed": "Telegram didn't answer or refused. Check and try again.",
-    "missingKey": "TELEGRAM_ENCRYPTION_KEY is missing on the server.",
+    "botMissing": "The Telegram bot isn't set up on the server (TELEGRAM_BOT_TOKEN).",
     "noChat": "Connect the bot and choose a group first.",
     "badUrl": "The link must start with https://",
     "badSlug": "Use 3–40 letters a–z, numbers or - (some words are reserved)",
     "slugTaken": "Another shop already uses this address",
     "slugIsLink": "Type only the shop part, e.g. sunset-coffee — not the whole link",
     "slugLocked": "Can't be changed: this shop already has orders",
-    "badMapUrl": "Paste a link from Google Maps (e.g. https://maps.app.goo.gl/…)"
+    "badMapUrl": "Paste a link from Google Maps (e.g. https://maps.app.goo.gl/…)",
+    "shopsRequired": "Pick at least one shop and a role for each.",
+    "roleInUse": "Some people still have this role. Move them to another role first."
   },
   "form": {
     "optional": "optional"

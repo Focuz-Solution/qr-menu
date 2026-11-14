@@ -3,9 +3,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { contactOf } from "@/lib/contact";
 import { prisma } from "@/lib/db";
-import type { Role } from "@/lib/generated/prisma/client";
-import { hasRole } from "@/lib/roles";
+import { can, type Permission } from "@/lib/permissions";
+import { membershipPermissions } from "@/lib/staff-roles";
 
 const COOKIE = "admin_session";
 const SESSION_DAYS = 7;
@@ -50,22 +51,26 @@ export async function deleteSession() {
 }
 
 /** the signed-in person; `shopId` = the shop this login is working in (null until one is picked on /admin/shops/) */
-export type AdminUser = { id: string; name: string; email: string; isOwner: boolean; shopId: string | null; sessionId: string };
+/** `contact` = their email or phone, ready to show */
+export type AdminUser = { id: string; name: string; contact: string; isOwner: boolean; shopId: string | null; sessionId: string };
 
 export const getCurrentUser = cache(async (): Promise<AdminUser | null> => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const session = await prisma.session.findUnique({
     where: { id: sha256(token) },
-    include: { user: { select: { id: true, name: true, email: true, isOwner: true, isActive: true } } },
+    include: { user: { select: { id: true, name: true, email: true, phone: true, isOwner: true, isActive: true } } },
   });
   if (!session || session.expiresAt < new Date() || !session.user.isActive) return null;
-  const { id, name, email, isOwner } = session.user;
-  return { id, name, email, isOwner, shopId: session.shopId, sessionId: session.id };
+  const { id, name, isOwner } = session.user;
+  return { id, name, contact: contactOf(session.user), isOwner, shopId: session.shopId, sessionId: session.id };
 });
 
-/** the signed-in person inside their current shop: role there ("owner" = super-admin) + the shop */
-export type ShopUser = AdminUser & { role: Role; shop: { id: string; slug: string; name: string } };
+/**
+ * The signed-in person inside their current shop: their role's name there (null for the owner, who has every
+ * permission) + what they may do (`permissions`, check with `can()` from lib/permissions.ts) + the shop.
+ */
+export type ShopUser = AdminUser & { roleName: string | null; permissions: Permission[]; shop: { id: string; slug: string; name: string } };
 
 /** current shop + role, or null (not signed in, no shop picked, or no longer a member of it) */
 export const getShopUser = cache(async (): Promise<ShopUser | null> => {
@@ -73,11 +78,21 @@ export const getShopUser = cache(async (): Promise<ShopUser | null> => {
   if (!user?.shopId) return null;
   const shop = await prisma.shop.findUnique({
     where: { id: user.shopId },
-    select: { id: true, slug: true, settings: { select: { name: true } }, memberships: { where: { userId: user.id }, select: { role: true } } },
+    select: {
+      id: true,
+      slug: true,
+      settings: { select: { name: true } },
+      memberships: { where: { userId: user.id }, select: { role: true, staffRole: { select: { name: true, permissions: true } } } },
+    },
   });
-  const role = user.isOwner ? "owner" : shop?.memberships[0]?.role;
-  if (!shop || !role) return null;
-  return { ...user, role, shop: { id: shop.id, slug: shop.slug, name: shop.settings?.name ?? shop.slug } };
+  const member = shop?.memberships[0];
+  if (!shop || (!user.isOwner && !member)) return null;
+  return {
+    ...user,
+    roleName: user.isOwner ? null : (member!.staffRole?.name ?? null),
+    permissions: user.isOwner ? [] : membershipPermissions(member!), // the owner: can() always says yes
+    shop: { id: shop.id, slug: shop.slug, name: shop.settings?.name ?? shop.slug },
+  };
 });
 
 /** whole-app pages (shop list): signed in is enough */
@@ -87,12 +102,22 @@ export async function requireLogin() {
   return user;
 }
 
-/** every page and action inside a shop: signed in + a shop picked + allowed role. Filter every query by `shop.id`. */
-export async function requireUser(roles?: Role[]) {
+/**
+ * Every page and action inside a shop: signed in + a shop picked + (if given) the permission there.
+ * Filter every query by `shop.id`. Without the permission → back to Orders (everyone in a shop may see them).
+ */
+export async function requireUser(permission?: Permission) {
   if (!(await getCurrentUser())) redirect("/admin/login");
   const user = await getShopUser();
   if (!user) redirect("/admin/shops");
-  if (!hasRole(user.role, roles)) redirect("/admin/orders"); // every role may see orders
+  if (permission && !can(user, permission)) redirect("/admin/orders");
+  return user;
+}
+
+/** app-wide settings (roles, default shop, making shops): the owner (super-admin) only */
+export async function requireOwner() {
+  const user = await requireUser();
+  if (!user.isOwner) redirect("/admin/orders");
   return user;
 }
 

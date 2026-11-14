@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Check, EllipsisVertical, Languages, LogOut, Package, Plus, ReceiptText, Send, Settings, Truck, Users } from "lucide-react";
+import { ArrowLeftRight, Check, EllipsisVertical, Languages, LogOut, Package, Plus, ReceiptText, Send, Settings, ShieldCheck, Truck, Users } from "lucide-react";
 import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,8 +8,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ShopLogo } from "@/components/ShopLogo";
 import { SwitchingOverlay } from "@/components/SwitchingOverlay";
 import type { ShopUser } from "@/lib/auth";
-import type { Role } from "@/lib/generated/prisma/enums";
-import { hasRole } from "@/lib/roles";
+import { can, type Permission } from "@/lib/permissions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,13 +43,15 @@ export function AdminShell({
   const t = useTranslations("admin");
   const path = usePathname().replace(/\/$/, "");
   const nav = [
-    { group: "sales" as const, href: "/admin/orders", match: "/admin/orders", label: t("nav.orders"), icon: ReceiptText, count: newOrders, roles: ["owner", "staff", "packer"] as Role[] },
-    { group: "sales" as const, href: "/admin/menu", match: "/admin/menu", label: t("nav.menu"), icon: Package, roles: ["owner", "staff"] as Role[] },
-    { group: "setup" as const, href: "/admin/delivery", match: "/admin/delivery", label: t("nav.delivery"), icon: Truck, roles: ["owner"] as Role[] },
-    { group: "setup" as const, href: "/admin/telegram", match: "/admin/telegram", label: t("telegram.title"), icon: Send, roles: ["owner"] as Role[] },
-    { group: "setup" as const, href: "/admin/users", match: "/admin/users", label: t("nav.users"), icon: Users, roles: ["owner"] as Role[] },
-    { group: "setup" as const, href: "/admin/settings", match: "/admin/settings", label: t("nav.settings"), icon: Settings, roles: ["owner", "staff", "packer"] as Role[] },
-  ].filter((item) => hasRole(user.role, item.roles)); // "owner" here also lets the shop's admin in
+    // `perm`: shown only to people whose role has it (no perm = everyone in the shop); `owner`: the owner only
+    { group: "sales" as const, href: "/admin/orders", match: "/admin/orders", label: t("nav.orders"), icon: ReceiptText, count: newOrders },
+    { group: "sales" as const, href: "/admin/menu", match: "/admin/menu", label: t("nav.menu"), icon: Package, perm: "menu.edit" as Permission },
+    { group: "setup" as const, href: "/admin/delivery", match: "/admin/delivery", label: t("nav.delivery"), icon: Truck, perm: "delivery.manage" as Permission },
+    { group: "setup" as const, href: "/admin/telegram", match: "/admin/telegram", label: t("telegram.title"), icon: Send, perm: "telegram.manage" as Permission },
+    { group: "setup" as const, href: "/admin/users", match: "/admin/users", label: t("nav.users"), icon: Users, perm: "users.manage" as Permission },
+    { group: "setup" as const, href: "/admin/roles", match: "/admin/roles", label: t("nav.roles"), icon: ShieldCheck, owner: true },
+    { group: "setup" as const, href: "/admin/settings", match: "/admin/settings", label: t("nav.settings"), icon: Settings },
+  ].filter((item) => (item.owner ? user.isOwner : !item.perm || can(user, item.perm)));
 
   return (
     <div className="min-h-full md:grid md:grid-cols-[220px_1fr]">
@@ -110,7 +111,7 @@ export function AdminShell({
   );
 }
 
-/** shadcn-style user button: avatar + name + email + ⋮; opens a menu (language, sign out) */
+/** shadcn-style user button: avatar + name + phone / email + ⋮; opens a menu (language, sign out) */
 type MenuShop = { id: string; name: string; logo: string };
 
 function UserMenu({ user, shops }: { user: ShopUser; shops: MenuShop[] }) {
@@ -130,7 +131,7 @@ function UserMenu({ user, shops }: { user: ShopUser; shops: MenuShop[] }) {
   const who = (
     <span className="grid min-w-0 flex-1 text-left leading-tight">
       <span className="truncate text-sm font-medium">{user.name}</span>
-      <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+      <span className="truncate text-xs text-muted-foreground">{user.contact}</span>
     </span>
   );
 
@@ -144,10 +145,10 @@ function UserMenu({ user, shops }: { user: ShopUser; shops: MenuShop[] }) {
           className="flex min-h-11 w-full items-center gap-2.5 rounded-md p-1.5 outline-none hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=open]:bg-foreground/5"
         >
           {avatar}
-          {/* name, role under it (the email shows inside the menu) */}
+          {/* name, role under it (the phone / email shows inside the menu) */}
           <span className="hidden min-w-0 flex-1 text-left leading-tight md:grid">
             <span className="truncate text-sm font-medium">{user.name}</span>
-            <span className="truncate text-xs text-muted-foreground">{t(`roles.${user.role}`)}</span>
+            <span className="truncate text-xs text-muted-foreground">{user.isOwner ? t("roles.owner") : user.roleName}</span>
           </span>
           <EllipsisVertical className="hidden size-4 shrink-0 text-muted-foreground md:block" aria-hidden />
         </DropdownMenuTrigger>

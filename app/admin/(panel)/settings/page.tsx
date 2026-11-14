@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { Kaushan_Script } from "next/font/google";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
@@ -13,13 +14,13 @@ const script = Kaushan_Script({ weight: "400", subsets: ["latin"] });
 
 export default async function ShopSettingsPage() {
   const me = await requireUser();
-  const owner = me.role === "owner" || me.role === "admin"; // may edit the shop's settings
+  const owner = can(me, "settings.edit"); // may edit the shop's settings (everyone in the shop may look)
   const [row, orders, defaultShop] = await Promise.all([
     prisma.shopSettings.findUnique({ where: { shopId: me.shop.id } }),
     // the link address locks once customers have ordered (their links / printed QR codes use it)
     prisma.order.count({ where: { shopId: me.shop.id }, take: 1 }),
     // super-admin: which shop the main address shows now (this one, another one, or none)
-    me.role === "owner"
+    me.isOwner
       ? prisma.shop.findFirst({ where: { isDefault: true }, select: { id: true, slug: true, settings: { select: { name: true } } } })
       : null,
   ]);
@@ -52,7 +53,7 @@ export default async function ShopSettingsPage() {
       slugLocked={orders > 0}
       host={publicHost()}
       defaultShop={
-        me.role === "owner" && (
+        me.isOwner && (
           <DefaultShop
             isDefault={defaultShop?.id === me.shop.id}
             host={publicHost()}

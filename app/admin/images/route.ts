@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { getShopUser } from "@/lib/auth";
-import { hasRole } from "@/lib/roles";
+import { can } from "@/lib/permissions";
 import { imageObjectKey, imageStorage } from "@/lib/r2";
 
 // Upload one photo (product photo or shop logo) — signed-in owner/staff only. Lives under /admin because the
@@ -16,9 +16,9 @@ const error = (code: string, status: number) => Response.json({ error: code }, {
 
 export async function POST(request: Request) {
   if (request.headers.get("origin") !== new URL(request.url).origin) return error("notAllowed", 403);
-  // signed in, inside a shop, and allowed to edit the menu (owner / admin / staff)
+  // signed in, inside a shop, and allowed to add photos there: product photos (menu) or the logo (settings)
   const user = await getShopUser();
-  if (!user || !hasRole(user.role, ["owner", "staff"])) return error("notAllowed", 401);
+  if (!user || !(can(user, "menu.edit") || can(user, "settings.edit"))) return error("notAllowed", 401);
   if (!/^image\/(jpeg|png|webp)$/.test(request.headers.get("content-type") ?? "")) return error("badImage", 400);
   if (Number(request.headers.get("content-length")) > MAX_BYTES) return error("imageTooLarge", 413);
 

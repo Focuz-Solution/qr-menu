@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireOwner, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type { ErrorCode, Result } from "@/lib/result";
@@ -45,7 +45,7 @@ function mapLink(value: string) {
  * are checked and written, so the other cards' saved values stay as they are.
  */
 export async function saveShopSettings(input: Partial<ShopInput>): Promise<Result> {
-  const { shop: current } = await requireUser(["owner"]);
+  const { shop: current } = await requireUser("settings.edit");
   const fields: Record<string, ErrorCode> = {};
   const data: Prisma.ShopSettingsUpdateInput = {};
   /** the field's text when it was sent, else undefined (not part of this card) */
@@ -144,8 +144,7 @@ export async function saveShopSettings(input: Partial<ShopInput>): Promise<Resul
  * app-wide. At most one default shop: turning it on here turns it off for every other shop.
  */
 export async function setDefaultShop(isDefault: boolean): Promise<Result> {
-  const me = await requireUser(["owner"]);
-  if (me.role !== "owner") return { ok: false, error: "notAllowed" }; // "owner" in the list also lets a shop's admin in
+  const me = await requireOwner();
   await prisma.$transaction([
     prisma.shop.updateMany({ where: { isDefault: true, id: { not: me.shop.id } }, data: { isDefault: false } }),
     prisma.shop.update({ where: { id: me.shop.id }, data: { isDefault: isDefault === true } }),

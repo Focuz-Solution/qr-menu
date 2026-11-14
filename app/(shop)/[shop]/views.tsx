@@ -35,6 +35,8 @@ export async function shopMetadata(slug: string, base: string): Promise<Metadata
     title: { default: name, template: `%s | ${name}` },
     description: t("description"),
     alternates: { canonical: base || "/" },
+    // tab icon = the shop's logo (uploaded in Settings → Appearance, else public/logo.png)
+    icons: { icon: logo, apple: logo },
     openGraph: {
       type: "website",
       siteName: name,
