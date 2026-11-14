@@ -234,9 +234,11 @@ function Section({ title, children }: { title?: React.ReactNode; children: React
 /** photo box: shows the photo (or an upload icon); tap to pick a new one */
 function PhotoPick({ id, url, busy, label, onFile }: { id?: string; url: string; busy: boolean; label: string; onFile: (file: File | undefined) => void }) {
   return (
+    // relative: keeps the hidden (sr-only, absolute) file input inside this box. Without it the input sits relative to the
+    // dialog, and with many variants picking a photo scrolled the whole dialog frame to it → the dialog went blank white.
     <label
       title={label}
-      className="flex size-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+      className="relative flex size-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
     >
       <input
         id={id}
