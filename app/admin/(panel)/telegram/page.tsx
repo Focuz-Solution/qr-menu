@@ -1,15 +1,17 @@
 import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
-import { hasEncryptionKey } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
+import { botInfo, hasBotToken } from "@/lib/telegram";
 import { TelegramSetup } from "../settings/TelegramSetup";
 
 export default async function TelegramPage() {
-  const me = await requireUser(["owner"]);
+  const me = await requireUser("telegram.manage");
   const t = await getTranslations("admin.telegram");
   const preview = await getTranslations({ locale: "km", namespace: "admin.telegram" });
   const tg = await prisma.telegramSettings.findUnique({ where: { shopId: me.shop.id } });
+  const botReady = hasBotToken();
+  const bot = botReady ? await botInfo().catch(() => null) : null;
   // people of this shop (and yourself) who can tap the order buttons
   const accounts = await prisma.user.findMany({
     where: { OR: [{ id: me.id }, { memberships: { some: { shopId: me.shop.id } } }] },
@@ -29,7 +31,7 @@ export default async function TelegramPage() {
           <h1 className="font-heading text-2xl font-medium md:text-3xl">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{t("intro")}</p>
         </div>
-        {tg?.botTokenEnc && tg.chatId != null && (
+        {tg?.chatId != null && (
           <p className="flex items-center gap-2 text-sm font-medium">
             <span className="size-2 shrink-0 rounded-full bg-ok-foreground" aria-hidden />
             {t("connectedGroup", { group: tg.chatTitle || tg.chatId.toString() })}
@@ -39,13 +41,10 @@ export default async function TelegramPage() {
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <section className="min-w-0">
           <TelegramSetup staff={staff}
-            keyReady={hasEncryptionKey()}
+            botReady={botReady}
             settings={{
-              connected: !!tg?.botTokenEnc,
-              botUsername: tg?.botUsername ?? null,
               chatId: tg?.chatId?.toString() ?? null,
               chatTitle: tg?.chatTitle ?? null,
-              threadId: tg?.messageThreadId ?? null,
               isEnabled: tg?.isEnabled ?? false,
               lastTestAt: tg?.lastTestAt ?? null,
               lastError: tg?.lastError ?? null,
@@ -57,7 +56,7 @@ export default async function TelegramPage() {
           <p className="text-xs text-muted-foreground">{t("previewHint")}</p>
           <div lang="km" className="mx-auto w-full max-w-sm space-y-2 rounded-xl bg-(--telegram-preview-surface) p-3 text-(--telegram-preview-text)">
             <div className="space-y-2 rounded-lg bg-(--telegram-preview-bubble) p-3 text-sm">
-              <p className="font-semibold text-(--telegram-preview-accent)">{tg?.botUsername ? `@${tg.botUsername}` : preview("previewBot")}</p>
+              <p className="font-semibold text-(--telegram-preview-accent)">{bot ? `@${bot.username}` : preview("previewBot")}</p>
               <p className="whitespace-pre-line">{preview("previewMessage")}</p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-center text-xs font-medium">

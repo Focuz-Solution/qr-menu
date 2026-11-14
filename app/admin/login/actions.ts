@@ -3,20 +3,22 @@
 import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
 import { clientIp, createSession } from "@/lib/auth";
+import { parseContact } from "@/lib/contact";
 import { prisma } from "@/lib/db";
 import { getTranslations } from "next-intl/server";
 import { DUMMY_HASH, verifyPassword } from "@/lib/password";
 import { createFirstShop } from "@/lib/shops";
+import { ensureBuiltInRoles } from "@/lib/staff-roles";
 
 export type LoginState = { error: "badLogin" } | { error: "locked"; minutes: number } | undefined;
 
-// 5 wrong passwords from one computer (IP) → that computer waits 15 minutes. Counted per IP, not per email,
-// so a stranger guessing the owner's email can't lock the owner out. The count lives in the database
+// 5 wrong passwords from one computer (IP) → that computer waits 15 minutes. Counted per IP, not per account,
+// so a stranger guessing the owner's phone or email can't lock the owner out. The count lives in the database
 // (login_throttles), so every server instance on Vercel shares it.
 const MAX_FAILS = 5;
 const WAIT_MS = 15 * 60_000;
 
-// same answer for unknown email or wrong password
+// same answer for an unknown phone / email or a wrong password
 export async function login(_: LoginState, form: FormData): Promise<LoginState> {
   const key = createHash("sha256").update(`login:${await clientIp()}`).digest("hex");
   const now = new Date();
@@ -32,22 +34,25 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   const locked = { error: "locked", minutes: Math.ceil((+until - +now) / 60_000) } as const;
   if (fails > MAX_FAILS) return locked; // already used up: the password isn't even checked
 
+  // one field for both: "@" → email, else a Cambodian phone (012 345 678, +855…) saved as +855…
   // length caps: nobody's email/password is longer, and huge inputs would only waste server time
-  const email = String(form.get("email") ?? "").trim().toLowerCase().slice(0, 254);
+  const contact = parseContact(String(form.get("contact") ?? ""));
   const password = String(form.get("password") ?? "").slice(0, 256);
-  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+  const user = contact ? await prisma.user.findUnique({ where: contact }) : null;
 
-  // always run the slow hash check, so an unknown email takes as long as a wrong password
+  // always run the slow hash check, so an unknown phone / email takes as long as a wrong password
   const passwordOk = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !user.isActive || !passwordOk) return fails >= MAX_FAILS ? locked : { error: "badLogin" };
 
   // one shop → straight into its dashboard; several → pick one on "Your shops";
   // the owner with no shop yet gets a first one made and lands on its Settings (name, logo)
-  const [, , , shops] = await Promise.all([
+  const [, , , , shops] = await Promise.all([
     prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() } }),
     // housekeeping: expired sessions are never used again, so each login clears them out
     prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
     // this computer's count is cleared; other computers' old counts (past their 15 minutes) go too
+    // first sign-in after the roles update: built-in roles made + people moved onto them (one count once done)
+    ensureBuiltInRoles(),
     prisma.loginThrottle.deleteMany({ where: { OR: [{ key }, { until: { lt: now } }] } }),
     prisma.shop.findMany({
       where: user.isOwner ? {} : { memberships: { some: { userId: user.id } } },

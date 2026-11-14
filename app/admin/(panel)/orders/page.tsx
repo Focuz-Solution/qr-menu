@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { ORDER_STATUSES } from "@/lib/order-status";
 import { orderListSelect, toAdminOrderRow } from "../order-data";
 import { Orders } from "../Orders";
@@ -71,5 +72,5 @@ export default async function AdminOrdersPage() {
     periods: { week, month, year: yearStats },
   };
 
-  return <Orders orders={orders} stats={stats} periodStarts={periodStarts} canDelete={user.role === "owner" || user.role === "admin"} />;
+  return <Orders orders={orders} stats={stats} periodStarts={periodStarts} canDelete={can(user, "orders.delete")} />;
 }

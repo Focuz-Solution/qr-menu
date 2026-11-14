@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { shopSettings } from "@/lib/shop-settings";
+import { shop } from "@/lib/shop";
 import { AdminShell } from "./AdminShell";
 
 // every page inside the panel needs a logged-in admin; pages with fewer roles check again themselves
@@ -22,7 +23,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       newOrders={newOrders}
       shopName={name}
       logo={logo}
-      shops={shops.map((s) => ({ id: s.id, name: s.settings?.name ?? s.slug, logo: s.settings?.logoUrl ?? "" }))}
+      shops={shops.map((s) => ({ id: s.id, name: s.settings?.name ?? s.slug, logo: s.settings?.logoUrl ?? shop.logo }))}
     >
       {children}
     </AdminShell>

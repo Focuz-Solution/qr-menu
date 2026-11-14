@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
+import { shop } from "@/lib/shop";
 import { defaultShopSlug } from "@/lib/shops";
 import { ShopShell, shopMetadata } from "../(shop)/[shop]/views";
 import { fontVariables } from "../fonts";
@@ -11,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const slug = await defaultShopSlug();
   if (slug) return shopMetadata(slug, "");
   const t = await getTranslations("notFound");
-  return { title: `404 · ${t("title")}`, robots: { index: false } };
+  return { title: `404 · ${t("title")}`, robots: { index: false }, icons: { icon: shop.logo, apple: shop.logo } };
 }
 
 export default async function HomeLayout({ children }: { children: React.ReactNode }) {

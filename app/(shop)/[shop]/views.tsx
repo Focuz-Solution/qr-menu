@@ -17,6 +17,7 @@ import { fontVariables } from "../../fonts";
 import { Catalogue } from "./Catalogue";
 import { Checkout } from "./checkout/Checkout";
 import { Footer } from "./Footer";
+import { richToText } from "@/lib/rich-text";
 import { Header } from "./Header";
 import { ProductView } from "./products/[slug]/ProductView";
 import "../../globals.css";
@@ -35,6 +36,8 @@ export async function shopMetadata(slug: string, base: string): Promise<Metadata
     title: { default: name, template: `%s | ${name}` },
     description: t("description"),
     alternates: { canonical: base || "/" },
+    // tab icon = the shop's logo (uploaded in Settings → Appearance, else public/logo.png)
+    icons: { icon: logo, apple: logo },
     openGraph: {
       type: "website",
       siteName: name,
@@ -113,7 +116,7 @@ export async function productMetadata(shop: string, base: string, slug: string):
   const { language: locale } = await shopSettings(shopId);
   if (!p) return {};
   const title = pick(p.name, locale);
-  const description = pick(p.description, locale).split("\n")[0];
+  const description = richToText(pick(p.description, locale)).split("\n").find(Boolean) ?? "";
   return {
     title,
     description,

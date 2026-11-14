@@ -29,7 +29,8 @@ function Box({ title, children, className }: { title: string; children: React.Re
 }
 
 /** one order on its own page: customer, items, totals, status buttons, history */
-export function OrderView({ order: o }: { order: AdminOrder }) {
+/** `canChangeStatus` = the person's role has "orders.status" (else the next-step buttons are replaced by a note) */
+export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; canChangeStatus: boolean }) {
   const t = useTranslations("admin");
   const te = useTranslations("errors");
   const format = useFormatter();
@@ -141,7 +142,9 @@ export function OrderView({ order: o }: { order: AdminOrder }) {
             <section className="flex flex-col gap-2 pt-2">
               <h3 className="text-sm font-semibold">{t("orders.updateStatus")}</h3>
               {o.status === "cancelled" && o.cancelReason && <p className="text-sm">{t("orders.cancelReason")}: {o.cancelReason}</p>}
-              {next.length ? (
+              {next.length && !canChangeStatus ? (
+                <p className="text-sm text-muted-foreground">{t("orders.noStatusPermission")}</p>
+              ) : next.length ? (
                 <div className="flex flex-wrap gap-2">
                   {next
                     .filter((s) => s !== "cancelled")
