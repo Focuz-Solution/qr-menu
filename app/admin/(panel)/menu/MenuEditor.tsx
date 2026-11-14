@@ -819,8 +819,9 @@ function ItemForm({
           </div>
         </Section>
 
-        {/* price + discount, then variants: one block */}
-        <Section title={t("sectionPrice")}>
+        {/* a line instead of a title; then price + discount, then variants: one block */}
+        <Separator />
+        <Section>
           <div className="grid grid-cols-1 gap-x-3 gap-y-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="price">{t("price")} <Req /></Label>
