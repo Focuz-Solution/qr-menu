@@ -1,4 +1,4 @@
-import { checkoutMetadata, ShopCheckout } from "../views";
+import { checkoutMetadata, ShopCheckout } from "../views-checkout";
 
 export async function generateMetadata({ params }: PageProps<"/[shop]/checkout">) {
   return checkoutMetadata((await params).shop);

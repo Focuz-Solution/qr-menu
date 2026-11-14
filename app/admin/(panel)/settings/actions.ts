@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireOwner, requireUser } from "@/lib/auth";
+import { revalidateShop } from "@/lib/revalidate-shop";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type { ErrorCode, Result } from "@/lib/result";
@@ -134,8 +135,10 @@ export async function saveShopSettings(input: Partial<ShopInput>): Promise<Resul
   });
   // replaced/removed logo
   if (logoUrl !== undefined && before?.logoUrl && before.logoUrl !== (logoUrl || null)) await deleteImageIfUnused(before.logoUrl);
-  // the shop reads language + header message from here → rebuild every page (both root layouts)
-  revalidatePath("/", "layout");
+  // the shop reads language, header message, logo… from here → rebuild this shop's pages (not every shop's)
+  await revalidateShop(current.id);
+  // renamed address: the old one's cached pages go too (it is a 404 now)
+  if (slug !== undefined && slug !== current.slug) revalidatePath(`/${current.slug}`, "layout");
   return { ok: true };
 }
 

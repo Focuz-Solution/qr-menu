@@ -130,11 +130,26 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
     });
   }
 
+  // min-order note, error and the send button: under the summary on desktop, after the form on phones
+  const send = (
+    <>
+      {belowMin && <p className="text-xs text-destructive">{t("minOrder", { amount: money(minOrderCents) })}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{te(error)}</p>}
+      <Button type="submit" className="h-12 rounded-full text-base" disabled={pending || belowMin || !zone}>
+        {pending && <Loader2 className="animate-spin" aria-hidden />}
+        {t("send")}
+      </Button>
+    </>
+  );
+
   return (
-    <form onSubmit={submit} noValidate className="grid gap-6 md:grid-cols-[1fr_320px] md:items-start">
-      <div className="flex min-w-0 flex-col gap-5">
+    // phones: one column — summary, payment, receiver, delivery address, send button (CSS order below);
+    // desktop: the form on the left, the summary sticking on the right
+    <form onSubmit={submit} noValidate className="grid gap-5 md:grid-cols-[1fr_320px] md:items-start md:gap-6">
+      {/* "contents" on phones: its sections join the page's column, so payment can move up under the summary */}
+      <div className="contents md:flex md:min-w-0 md:flex-col md:gap-5">
         {/* who receives it */}
-        <section className="flex flex-col gap-4 rounded-2xl border p-4">
+        <section className="flex min-w-0 flex-col gap-4 rounded-2xl border p-4">
           <h2 className="font-semibold">{t("receiver")}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -151,7 +166,7 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
         </section>
 
         {/* where to deliver */}
-        <section className="flex flex-col gap-4 rounded-2xl border p-4">
+        <section className="flex min-w-0 flex-col gap-4 rounded-2xl border p-4">
           <h2 className="font-semibold">{t("deliverTo")}</h2>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="province">{t("province")} <Req /></Label>
@@ -218,8 +233,8 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
           </div>
         </section>
 
-        {/* payment */}
-        <fieldset className="flex flex-col gap-3 rounded-2xl border p-4">
+        {/* payment: right after the summary on phones */}
+        <fieldset className="-order-1 flex min-w-0 flex-col gap-3 rounded-2xl border p-4 md:order-none">
           <legend className="sr-only">{t("payment")}</legend>
           <p className="font-semibold" aria-hidden>{t("payment")}</p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -248,8 +263,11 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
         </fieldset>
       </div>
 
-      {/* order summary (sticks beside the form on desktop) */}
-      <aside className="flex flex-col gap-4 rounded-2xl border p-4 md:sticky md:top-4">
+      {/* phones: the send button comes after the form (the summary is at the top) */}
+      <div className="flex flex-col gap-3 md:hidden">{send}</div>
+
+      {/* order summary: first on phones (see what you're ordering before filling the form); sticks beside the form on desktop */}
+      <aside className="order-first flex flex-col gap-4 rounded-2xl border p-4 md:sticky md:top-4 md:order-none">
         <h2 className="font-semibold">{t("summary")}</h2>
         <ul className="flex flex-col gap-3">
           {items.map((i) => (
@@ -295,12 +313,8 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
             <dd className="text-xl font-bold text-primary tabular-nums">{money(subtotalCents + deliveryFeeCents)}</dd>
           </div>
         </dl>
-        {belowMin && <p className="text-xs text-destructive">{t("minOrder", { amount: money(minOrderCents) })}</p>}
-        {error && <p role="alert" className="text-sm text-destructive">{te(error)}</p>}
-        <Button type="submit" className="h-12 rounded-full text-base" disabled={pending || belowMin || !zone}>
-          {pending && <Loader2 className="animate-spin" aria-hidden />}
-          {t("send")}
-        </Button>
+        {/* desktop: under the totals */}
+        <div className="hidden flex-col gap-3 md:flex">{send}</div>
       </aside>
     </form>
   );

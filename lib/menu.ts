@@ -27,8 +27,9 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
     });
     const products = rows.flatMap((c) =>
       c.items.map((i): Product => {
-        // one name/description for both languages (admin types Khmer or English)
-        const one = (s: string) => ({ km: s, en: s });
+        // one name/description for both languages (admin types Khmer or English): kept once, as km —
+        // pick() falls back to it, so the text isn't sent to the browser twice
+        const one = (s: string) => ({ km: s, en: "" });
         const [image = "", ...images] = i.images.map((x) => x.url);
         const variants = (Array.isArray(i.variants) ? i.variants : []) as { label: string; hex?: string; image?: string; priceCents?: number }[];
         return {
@@ -54,4 +55,16 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
     if (process.env.DATABASE_URL) throw cause;
     return { categories: [], products: [] };
   }
+});
+
+const NO_TEXT = { km: "", en: "" };
+
+/**
+ * The menu for pages that list products (home grid, cart, checkout): the same products WITHOUT their descriptions,
+ * which only the product page shows. Every shop page carries this list, so long descriptions would otherwise be
+ * downloaded on every page. One array per request: the layout and the page share it (sent once).
+ */
+export const getMenuList = cache(async (shopId: string | null) => {
+  const { categories, products } = await getMenu(shopId);
+  return { categories, products: products.map((p) => ({ ...p, description: NO_TEXT })) };
 });

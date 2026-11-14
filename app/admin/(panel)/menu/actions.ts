@@ -1,8 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/auth";
+import { revalidateShop } from "@/lib/revalidate-shop";
 import { prisma } from "@/lib/db";
 import { toCents, type DiscountType, salePrice } from "@/lib/money";
 import { Badge } from "@/lib/generated/prisma/enums";
@@ -13,8 +13,8 @@ import type { ItemInput } from "./types";
 
 // Menu admin (plan/api.md → Menu, plan/business-rules.md 1–11). Owner/admin + staff only; every query is limited to the current shop.
 
-// refreshes the admin list and every shop page (they read the menu from the database)
-const changed = () => revalidatePath("/", "layout");
+// refreshes the admin list and this shop's pages (they read the menu from the database); other shops stay cached
+const changed = async () => revalidateShop((await requireUser()).shop.id);
 
 /** "Lash lift kit (small)" → "lash-lift-kit-small"; Khmer-only names give "" → caller falls back */
 function slugify(text: string) {
@@ -48,7 +48,7 @@ export async function createCategory(): Promise<Result<{ id: string }>> {
   const { id } = await prisma.category.create({
     data: { shopId: shop.id, slug, name, isVisible: false, sortOrder: (last._max.sortOrder ?? -1) + 1 },
   });
-  changed();
+  await changed();
   return { ok: true, data: { id } };
 }
 
@@ -62,7 +62,7 @@ export async function updateCategory(id: string, patch: { name?: string; isVisib
     data: { name, isVisible: patch.isVisible },
   });
   if (!count) return { ok: false, error: "notFound" };
-  changed();
+  await changed();
   return { ok: true };
 }
 
@@ -75,7 +75,7 @@ export async function reorderCategories(ids: string[]): Promise<Result> {
     return { ok: false, error: "invalid" };
   }
   await prisma.$transaction(ids.map((id, i) => prisma.category.update({ where: { id }, data: { sortOrder: i } })));
-  changed();
+  await changed();
   return { ok: true };
 }
 
@@ -88,7 +88,7 @@ export async function deleteCategory(id: string): Promise<Result> {
     prisma.category.deleteMany({ where: { id, shopId: shop.id } }),
   ]);
   if (!count) return { ok: false, error: "notFound" };
-  changed();
+  await changed();
   return { ok: true };
 }
 
@@ -172,7 +172,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
     const created = await prisma.item.create({
       data: { ...data, shopId: shop.id, slug, sortOrder: await nextSort(), images: { create: images.map((url, i) => ({ url, sortOrder: i })) } },
     });
-    changed();
+    await changed();
     return { ok: true, data: { id: created.id } };
   }
 
@@ -188,7 +188,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   });
   // removed photos: delete the files, unless another product / logo (any shop) or an old order still shows one
   await Promise.all(oldImages.filter((u) => !images.includes(u)).map(deleteImageIfUnused));
-  changed();
+  await changed();
   return { ok: true, data: { id } };
 }
 
@@ -200,7 +200,7 @@ export async function setItemFlags(id: string, patch: { isAvailable?: boolean; i
     data: { isAvailable: patch.isAvailable, isVisible: patch.isVisible },
   });
   if (!count) return { ok: false, error: "notFound" };
-  changed();
+  await changed();
   return { ok: true };
 }
 
@@ -213,7 +213,7 @@ export async function reorderItems(categoryId: string, ids: string[]): Promise<R
     return { ok: false, error: "invalid" };
   }
   await prisma.$transaction(ids.map((id, i) => prisma.item.update({ where: { id }, data: { sortOrder: i } })));
-  changed();
+  await changed();
   return { ok: true };
 }
 
@@ -222,6 +222,6 @@ export async function deleteItem(id: string): Promise<Result> {
   const { shop } = await requireUser("menu.edit");
   const { count } = await prisma.item.updateMany({ where: { id, shopId: shop.id, deletedAt: null }, data: { deletedAt: new Date() } });
   if (!count) return { ok: false, error: "notFound" };
-  changed();
+  await changed();
   return { ok: true };
 }

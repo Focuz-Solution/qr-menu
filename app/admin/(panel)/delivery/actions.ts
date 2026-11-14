@@ -1,7 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
+import { revalidateShop } from "@/lib/revalidate-shop";
 import { prisma } from "@/lib/db";
 import { toCents } from "@/lib/money";
 import { isProvinceCode } from "@/lib/provinces";
@@ -55,7 +55,7 @@ export async function saveZone(id: string | null, input: ZoneInput): Promise<Res
     const last = await prisma.deliveryZone.aggregate({ where: { shopId: shop.id }, _max: { sortOrder: true } });
     await prisma.deliveryZone.create({ data: { ...data, shopId: shop.id, sortOrder: (last._max.sortOrder ?? -1) + 1 } });
   }
-  revalidatePath("/", "layout"); // admin list + the shop's checkout (delivery fees)
+  await revalidateShop(shop.id); // admin list + this shop's checkout (delivery fees)
   return { ok: true };
 }
 
@@ -68,7 +68,7 @@ export async function setZoneActive(id: string, isActive: boolean): Promise<Resu
     if (clash) return { ok: false, error: clash };
   }
   await prisma.deliveryZone.updateMany({ where: { id, shopId: shop.id }, data: { isActive } });
-  revalidatePath("/", "layout"); // admin list + the shop's checkout (delivery fees)
+  await revalidateShop(shop.id); // admin list + this shop's checkout (delivery fees)
   return { ok: true };
 }
 
@@ -77,6 +77,6 @@ export async function deleteZone(id: string): Promise<Result> {
   const { shop } = await requireUser("delivery.manage");
   const { count } = await prisma.deliveryZone.deleteMany({ where: { id, shopId: shop.id } });
   if (!count) return { ok: false, error: "notFound" };
-  revalidatePath("/", "layout"); // admin list + the shop's checkout (delivery fees)
+  await revalidateShop(shop.id); // admin list + this shop's checkout (delivery fees)
   return { ok: true };
 }

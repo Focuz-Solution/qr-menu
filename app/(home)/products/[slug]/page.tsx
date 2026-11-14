@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { defaultShopSlug } from "@/lib/shops";
-import { productMetadata, productSlugs, ShopProduct } from "../../../(shop)/[shop]/views";
+import { productMetadata, productSlugs, ShopProduct } from "../../../(shop)/[shop]/views-product";
 
 // app.com/products/<item>: a product of the default shop (no default shop → not found)
 export async function generateStaticParams() {
