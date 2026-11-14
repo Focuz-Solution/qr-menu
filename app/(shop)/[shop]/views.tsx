@@ -1,29 +1,21 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { MenuProvider } from "@/components/MenuProvider";
+import { getMenuList } from "@/lib/menu";
 import { ShakeOnSubmit } from "@/components/ShakeOnSubmit";
 import { appUrl } from "@/lib/app-url";
 import { brandStyles } from "@/lib/brand-colors";
-import { prisma } from "@/lib/db";
-import { getMenu } from "@/lib/menu";
-import type { Zone } from "@/lib/orders";
-import { pick } from "@/lib/shop";
 import { ShopPathProvider } from "@/lib/shop-path";
 import { shopSettings } from "@/lib/shop-settings";
 import { shopBySlug } from "@/lib/shops";
 import { fontVariables } from "../../fonts";
-import { Catalogue } from "./Catalogue";
-import { Checkout } from "./checkout/Checkout";
-import { Footer } from "./Footer";
-import { richToText } from "@/lib/rich-text";
-import { Header } from "./Header";
-import { ProductView } from "./products/[slug]/ProductView";
 import "../../globals.css";
 
 // A shop's pages, shared by its own address (app.com/<shop>/…, base "/<shop>") and — for the default shop — the
 // app's main address (app.com/…, base ""). The route files only work out which shop and which base.
+// One file per page (views-home / views-product / views-checkout): each page then only downloads its own
+// browser code — the home page doesn't load the checkout form, the checkout doesn't load the product gallery.
 
 // ---------- layout ----------
 
@@ -53,7 +45,8 @@ export async function ShopShell({ slug, base, children }: { slug: string; base: 
   // the shop shows the language the owner picked in Settings → Appearance (not the address)
   const { language: locale, brandColor, brandText } = await shopSettings(shopId);
   setRequestLocale(locale);
-  const { products } = await getMenu(shopId);
+  // the light list (no descriptions): the cart, checkout and every page read it
+  const { products } = await getMenuList(shopId);
   // customers' browsers get the shop texts only, not the admin panel's (a third of the file)
   const messages = Object.fromEntries(Object.entries(await getMessages()).filter(([namespace]) => namespace !== "admin"));
   // brand colour from Settings → Appearance replaces the theme's main colour (buttons, chips, prices, focus ring)
@@ -77,90 +70,4 @@ export async function ShopShell({ slug, base, children }: { slug: string; base: 
       </body>
     </html>
   );
-}
-
-// ---------- home: the catalogue ----------
-
-export async function ShopHome({ slug }: { slug: string }) {
-  const shopId = await shopBySlug(slug);
-  if (!shopId) notFound();
-  const { language, layout, notice, name, logo, links, contact } = await shopSettings(shopId);
-  setRequestLocale(language);
-  const { categories, products } = await getMenu(shopId);
-
-  return (
-    <>
-      <Header notice={notice} name={name} logo={logo} />
-      <Catalogue categories={categories} products={products} layout={layout} />
-      <Footer name={name} logo={logo} links={links} contact={contact} />
-    </>
-  );
-}
-
-// ---------- product page ----------
-
-/** the shop's id + this product of it (null / undefined when either doesn't exist) */
-async function findProduct(shop: string, slug: string) {
-  const shopId = await shopBySlug(shop);
-  return { shopId, product: (await getMenu(shopId)).products.find((p) => p.slug === slug) };
-}
-
-/** products that exist at build time are pre-built; new ones (added in Admin later) render on first visit */
-export async function productSlugs(shop: string) {
-  return (await getMenu(await shopBySlug(shop))).products.map((p) => ({ slug: p.slug }));
-}
-
-/** link preview for this product in the page's language: name, first line of the description, product photo */
-export async function productMetadata(shop: string, base: string, slug: string): Promise<Metadata> {
-  const { shopId, product: p } = await findProduct(shop, slug);
-  const { language: locale } = await shopSettings(shopId);
-  if (!p) return {};
-  const title = pick(p.name, locale);
-  const description = richToText(pick(p.description, locale)).split("\n").find(Boolean) ?? "";
-  return {
-    title,
-    description,
-    alternates: { canonical: `${base}/products/${slug}` },
-    openGraph: { type: "website", title, description, images: p.image ? [p.image] : [] },
-  };
-}
-
-export async function ShopProduct({ shop, slug }: { shop: string; slug: string }) {
-  const { shopId, product } = await findProduct(shop, slug);
-  if (!product) notFound();
-  setRequestLocale((await shopSettings(shopId)).language);
-  return <ProductView product={product} />;
-}
-
-// ---------- checkout ----------
-
-export async function checkoutMetadata(shop: string): Promise<Metadata> {
-  const t = await getTranslations({ locale: (await shopSettings(await shopBySlug(shop))).language, namespace: "checkout" });
-  return { title: t("title"), robots: { index: false } };
-}
-
-/** delivery zones + ordering rules for the page (the server checks them again when the order is sent) */
-async function rules(shopId: string): Promise<{ zones: Zone[]; minOrderCents: number; orderingEnabled: boolean }> {
-  try {
-    const [zones, s] = await Promise.all([
-      prisma.deliveryZone.findMany({
-        where: { shopId, isActive: true },
-        orderBy: { sortOrder: "asc" },
-        select: { id: true, name: true, provinceCodes: true, feeCents: true, freeOverCents: true, eta: true },
-      }),
-      prisma.shopSettings.findUnique({ where: { shopId }, select: { minOrderCents: true, orderingEnabled: true } }),
-    ]);
-    return { zones, minOrderCents: s?.minOrderCents ?? 0, orderingEnabled: s?.orderingEnabled ?? true };
-  } catch (cause) {
-    // no database at build → server decides on send; with one, throw so Next keeps the last good page (not "no delivery")
-    if (process.env.DATABASE_URL) throw cause;
-    return { zones: [], minOrderCents: 0, orderingEnabled: true };
-  }
-}
-
-export async function ShopCheckout({ shop }: { shop: string }) {
-  const shopId = await shopBySlug(shop);
-  if (!shopId) notFound();
-  setRequestLocale((await shopSettings(shopId)).language);
-  return <Checkout {...await rules(shopId)} />;
 }
