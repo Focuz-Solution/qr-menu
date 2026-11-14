@@ -136,9 +136,8 @@ export async function saveShopSettings(input: Partial<ShopInput>): Promise<Resul
   // replaced/removed logo
   if (logoUrl !== undefined && before?.logoUrl && before.logoUrl !== (logoUrl || null)) await deleteImageIfUnused(before.logoUrl);
   // the shop reads language, header message, logo… from here → rebuild this shop's pages (not every shop's)
-  await revalidateShop(current.id);
   // renamed address: the old one's cached pages go too (it is a 404 now)
-  if (slug !== undefined && slug !== current.slug) revalidatePath(`/${current.slug}`, "layout");
+  await revalidateShop(current.id, current.slug);
   return { ok: true };
 }
 

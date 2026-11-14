@@ -280,7 +280,11 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
               </Link>
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex items-start gap-2">
-                  <span className="line-clamp-2 flex-1 text-sm">{pick(i.product.name, lang)}{i.variant && ` · ${vname(i.variant)}`}</span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="line-clamp-2 text-sm">{pick(i.product.name, lang)}</span>
+                    {/* the picked variant: its own line, small, bold, in the shop colour */}
+                    {i.variant && <span className="text-xs font-semibold text-primary">{vname(i.variant)}</span>}
+                  </span>
                   <span className="text-sm font-medium tabular-nums">{formatPrice(i.price * i.qty)}</span>
                 </div>
                 {/* quantity: − stops at 1; the bin removes the line */}
