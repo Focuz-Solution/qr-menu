@@ -1,14 +1,14 @@
 "use client";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Img } from "@/components/Img";
-import { formatPrice, type Product, pick, thumbUrl } from "@/lib/shop";
+import { formatPrice, type Product, pick, thumbUrl, variantAt } from "@/lib/shop";
 import { cn } from "@/lib/utils";
 import { Gallery } from "./Gallery";
 
 // Photo on top, then a white sheet with the price. `header` and `details` are static parts rendered on the server.
-// ponytail: no variant picker; the photo showing is the style that add-to-cart (`footer`) puts in the cart
+// Variant buttons (name only) jump the gallery to that variant's photo; the photo showing is what add-to-cart (`footer`) puts in the cart.
 export function Variants({
   product: p,
   header,
@@ -22,10 +22,17 @@ export function Variants({
   footer?: (image: string) => React.ReactNode;
 }) {
   const lang = useLocale();
+  const t = useTranslations("product");
   // main photo, extra photos, then variant photos — each once
   const images = [...new Set([p.image, ...(p.images ?? []), ...(p.variants ?? []).flatMap((x) => (x.image ? [x.image] : []))])];
   const [photo, setPhoto] = useState(0);
   const [jump, setJump] = useState<{ i: number }>();
+  // the variant showing (if the photo is one); its own price replaces the product price (no sale price on it)
+  const current = variantAt(p, images[photo]);
+  const own = current?.price;
+  const variants = (p.variants ?? []).filter((v) => v.image && images.includes(v.image));
+  // a variant without a name shows as "Option 2" (its place in the list)
+  const nameOf = (v: { label: string; image?: string }) => v.label || t("optionN", { n: variants.findIndex((x) => x.image === v.image) + 1 });
   const stripRef = useRef<HTMLDivElement>(null);
 
   // keep the current thumbnail in view inside the strip (scrolls the strip only, not the page)
@@ -51,8 +58,8 @@ export function Variants({
           <div className="min-w-0 flex-1">
             {header}
             <p className="mt-1 flex items-baseline gap-3">
-              {p.oldPrice && <span className="text-lg text-destructive line-through">{formatPrice(p.oldPrice)}</span>}
-              <span className="text-2xl font-bold">{formatPrice(p.price)}</span>
+              {own == null && p.oldPrice && <span className="text-lg text-destructive line-through">{formatPrice(p.oldPrice)}</span>}
+              <span className="text-2xl font-bold">{formatPrice(own ?? p.price)}</span>
             </p>
           </div>
           {images.length > 1 && (
@@ -78,6 +85,36 @@ export function Variants({
             </div>
           )}
         </div>
+
+        {/* variants: "Option" title + one name button per variant; tapping shows its photo and price */}
+        {variants.length > 0 && (
+          <div className="space-y-2 pt-1">
+            {/* title only: the chosen variant is the highlighted button */}
+            <p className="text-sm text-muted-foreground">{t("option")}</p>
+            <div role="radiogroup" aria-label={t("option")} className="flex flex-wrap gap-2">
+              {variants.map((v) => {
+                const i = images.indexOf(v.image!);
+                const on = i === photo;
+                return (
+                  <button
+                    key={v.image}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setJump({ i })}
+                    className={cn(
+                      // 36px pill; the invisible after: edge keeps a 44px tap area
+                      "relative flex h-9 items-center rounded-full border bg-background px-3.5 text-sm transition-colors outline-none after:absolute after:-inset-y-1 after:inset-x-0 focus-visible:ring-3 focus-visible:ring-ring/50",
+                      on ? "border-primary font-medium ring-1 ring-primary" : "hover:border-foreground/30",
+                    )}
+                  >
+                    {nameOf(v)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {details}
         {footer?.(images[photo])}

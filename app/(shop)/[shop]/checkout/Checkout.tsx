@@ -121,7 +121,7 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
         orderNo: r.data!.orderNo,
         details: d,
         deliveryZoneName: r.data!.deliveryZoneName,
-        lines: items.map((i) => ({ key: i.key, name: pick(i.product.name, lang), image: i.image, qty: i.qty, cents: Math.round(i.product.price * 100) * i.qty })),
+        lines: items.map((i) => ({ key: i.key, name: [pick(i.product.name, lang), i.variant].filter(Boolean).join(" · "), image: i.image, qty: i.qty, cents: Math.round(i.price * 100) * i.qty })),
         subtotalCents,
         deliveryFeeCents: r.data!.deliveryFeeCents,
         totalCents: r.data!.totalCents,
@@ -259,8 +259,8 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
               </Link>
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex items-start gap-2">
-                  <span className="line-clamp-2 flex-1 text-sm">{pick(i.product.name, lang)}</span>
-                  <span className="text-sm font-medium tabular-nums">{formatPrice(i.product.price * i.qty)}</span>
+                  <span className="line-clamp-2 flex-1 text-sm">{pick(i.product.name, lang)}{i.variant && ` · ${i.variant}`}</span>
+                  <span className="text-sm font-medium tabular-nums">{formatPrice(i.price * i.qty)}</span>
                 </div>
                 {/* quantity: − stops at 1; the bin removes the line */}
                 <div className="flex items-center justify-between">

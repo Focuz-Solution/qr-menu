@@ -69,7 +69,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
     // products: shown, not deleted, in a shown category, in stock — at today's price
     prisma.item.findMany({
       where: { shopId, slug: { in: slugs }, deletedAt: null, isVisible: true, category: { isVisible: true } },
-      select: { id: true, slug: true, name: true, priceCents: true, isAvailable: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
+      select: { id: true, slug: true, name: true, priceCents: true, isAvailable: true, variants: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
     }),
     prisma.deliveryZone.findMany({ where: { shopId, isActive: true }, orderBy: { sortOrder: "asc" } }),
   ]);
@@ -84,7 +84,11 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
     // the photo the customer picked (a style) if it is one of this product's photos, else the main photo
     const photos = item.images.map((i) => i.url);
     const image = typeof l.image === "string" && photos.includes(l.image) ? l.image : (photos[0] ?? null);
-    return { itemId: item.id, name: item.name, imageUrl: image, unitPriceCents: item.priceCents, quantity: l.qty, lineTotalCents: item.priceCents * l.qty };
+    // that photo's variant name (shade, size…), if it is a variant
+    const v = (Array.isArray(item.variants) ? (item.variants as { label?: string; image?: string; priceCents?: number }[]) : []).find((x) => x.image === image);
+    // the variant's own price from the database (rule 8), else the product price
+    const unit = typeof v?.priceCents === "number" && v.priceCents >= 0 ? v.priceCents : item.priceCents;
+    return { itemId: item.id, name: item.name, variant: v?.label || null, imageUrl: image, unitPriceCents: unit, quantity: l.qty, lineTotalCents: unit * l.qty };
   });
   const subtotalCents = orderLines.reduce((n, l) => n + l.lineTotalCents, 0);
   if (settings?.minOrderCents && subtotalCents < settings.minOrderCents) return { ok: false, error: "minOrder" };
@@ -152,7 +156,7 @@ async function notifyTelegram(
   orderId: string,
   o: {
     orderNo: string; name: string; phoneRaw: string; province: string; address: string; landmark: string; mapUrl: string; note: string;
-    payment: "cod" | "bank_transfer"; lines: { name: string; quantity: number; lineTotalCents: number }[];
+    payment: "cod" | "bank_transfer"; lines: { name: string; variant: string | null; quantity: number; lineTotalCents: number }[];
     deliveryZoneName: string; subtotalCents: number; deliveryFeeCents: number; totalCents: number;
   },
 ) {
@@ -171,7 +175,8 @@ async function notifyTelegram(
   const orderNo = dashboard ? `<a href="${dashboard}">#${e(o.orderNo)}</a>` : `#${e(o.orderNo)}`;
   const NO = "\u0000"; // placeholder: the title is escaped first, then the (already safe) link goes in
   // Telegram allows 4096 characters per message: a very long order shows its first items + "… +N"
-  const items = o.lines.map((l) => `${l.quantity} × ${e(l.name)} · ${money(l.lineTotalCents)}`);
+  // "2 × Lipstick (Red) · $24.00" — the variant name in brackets when there is one
+  const items = o.lines.map((l) => `${l.quantity} × ${e(l.name)}${l.variant ? ` (${e(l.variant)})` : ""} · ${money(l.lineTotalCents)}`);
   const build = (shown: number) => [
     `🛍 <b>${e(t("tgNew", { no: NO })).replace(NO, orderNo)}</b>`,
     `🕒 ${time}`,

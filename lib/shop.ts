@@ -7,7 +7,7 @@ export type T = Record<Lang, string>;
 export const pick = (t: T, lang: string) => t[lang as Lang] || t.km;
 
 // size ("100 ml") or shade (hex)
-export type Variant = { label: string; hex?: string; price?: number; image?: string };
+export type Variant = { label: string; hex?: string; price?: number; image?: string; };
 
 /** a category on the shop (from Admin → Menu): its slug is the anchor id, the name is shown as is */
 export type ShopCategory = { slug: string; name: string };
@@ -50,6 +50,11 @@ export const shop = {
   },
   currency: "USD",
 };
+
+/** the variant shown by this photo, if it is one */
+export const variantAt = (p: Product, image: string) => p.variants?.find((v) => v.image === image);
+/** price of the style picked by its photo: the variant's own price, else the product price (rule 8) */
+export const priceAt = (p: Product, image: string) => variantAt(p, image)?.price ?? p.price;
 
 export function discountPercent(p: { price: number; oldPrice?: number }) {
   return p.oldPrice && p.oldPrice > p.price

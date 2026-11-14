@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useProducts } from "@/components/MenuProvider";
-import type { Product } from "@/lib/shop";
+import { priceAt, type Product, variantAt } from "@/lib/shop";
 
 // Cart = { "slug|photo": qty } in localStorage, shared by every component through useSyncExternalStore.
 // The photo is the gallery image picked when adding (each photo is a style), so one product can have several lines.
@@ -13,7 +13,9 @@ export const cartKey = (slug: string, image: string) => `${slug}|${image}`;
 function parseKey(key: string, products: Product[]) {
   const [slug, image] = key.split("|");
   const product = products.find((p) => p.slug === slug);
-  return product ? { product, image: image || product.image } : null;
+  if (!product) return null;
+  const photo = image || product.image;
+  return { product, image: photo, price: priceAt(product, photo), variant: variantAt(product, photo)?.label || undefined };
 }
 
 // one cart per shop: "cart:<shop address>". The shop layout writes the shop on <html data-shop>, so the default
@@ -81,6 +83,6 @@ export function useCart() {
   return {
     items,
     count: items.reduce((n, i) => n + i.qty, 0),
-    total: items.reduce((n, i) => n + i.product.price * i.qty, 0),
+    total: items.reduce((n, i) => n + i.price * i.qty, 0),
   };
 }
