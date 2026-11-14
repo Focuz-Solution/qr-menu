@@ -16,7 +16,6 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { type DiscountType, salePrice, toCents } from "@/lib/money";
 import { formatPrice, thumbUrl } from "@/lib/shop";
@@ -30,9 +29,11 @@ import {
   deleteItem,
   reorderCategories,
   saveItem,
+  reorderItems,
   setItemFlags,
   updateCategory,
 } from "./actions";
+import { DescriptionEditor } from "./DescriptionEditor";
 import type { AdminCategory, AdminItem } from "./types";
 import { Opt, Req } from "@/components/FieldMark";
 
@@ -50,8 +51,9 @@ function Thumb({ item, className }: { item: AdminItem; className: string }) {
 type CatChange = { order: string[] } | { id: string; patch: Partial<AdminCategory> };
 
 const PAGE_SIZE = 20;
-type SortKey = "name" | "price" | "stock" | "shown";
+type SortKey = "order" | "name" | "price" | "stock" | "shown";
 const compare: Record<SortKey, (a: AdminItem, b: AdminItem) => number> = {
+  order: () => 0, // items come in shop order; a stable sort keeps it
   name: (a, b) => a.name.localeCompare(b.name),
   price: (a, b) => a.priceCents - b.priceCents,
   stock: (a, b) => Number(a.isAvailable) - Number(b.isAvailable),
@@ -59,20 +61,40 @@ const compare: Record<SortKey, (a: AdminItem, b: AdminItem) => number> = {
 };
 
 /** products of the selected category as a table (AGENTS.md → Admin UI patterns): sort, pages, quick switches */
-function ProductTable({ items, pending, onEdit, onFlag, onDelete }: {
+function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReorder }: {
   items: AdminItem[];
   pending: boolean;
+  onReorder: (ids: string[]) => void;
   onEdit: (item: AdminItem) => void;
   onFlag: (id: string, patch: { isAvailable?: boolean; isVisible?: boolean }) => void;
   onDelete: (item: AdminItem) => void;
 }) {
   const t = useTranslations("admin.menu");
-  const [sort, setSort] = useState<Sort<SortKey>>({ key: "name", desc: false });
+  // default = shop order, where rows can be dragged; sorting by a column hides the handles until its 3rd click
+  const [sort, setSort] = useState<Sort<SortKey>>({ key: "order", desc: false });
   const [page, setPage] = useState(0);
-  const sorted = items.toSorted((a, b) => (sort.desc ? -1 : 1) * compare[sort.key](a, b));
+  const shopOrder = sort.key === "order";
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const ordered = dragOrder ? dragOrder.map((id) => items.find((i) => i.id === id)!).filter(Boolean) : items;
+  const sorted = ordered.toSorted((a, b) => (sort.desc ? -1 : 1) * compare[sort.key](a, b));
+  const ids = items.map((i) => i.id);
+  const move = (order: string[], id: string, to: number) => {
+    const from = order.indexOf(id);
+    if (from < 0 || to < 0 || to >= order.length || from === to) return order;
+    const next = [...order];
+    next.splice(to, 0, ...next.splice(from, 1));
+    return next;
+  };
+  const endDrag = (save: boolean) => {
+    if (save && dragOrder && dragOrder.join() !== ids.join()) onReorder(dragOrder);
+    setDragId(null);
+    setDragOrder(null);
+  };
   const { pages, current, rows } = paginate(sorted, page, PAGE_SIZE);
+  // 1st click: descending, 2nd: ascending, 3rd: back to shop order (drag handles show again)
   const onSort = (key: SortKey) => {
-    setSort((s) => ({ key, desc: s.key === key ? !s.desc : true }));
+    setSort((s) => (s.key !== key ? { key, desc: true } : s.desc ? { key, desc: false } : { key: "order", desc: false }));
     setPage(0);
   };
 
@@ -81,7 +103,9 @@ function ProductTable({ items, pending, onEdit, onFlag, onDelete }: {
       <Table>
         <TableHeader className="bg-muted/50 [&_th]:h-11 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
           <TableRow className="hover:bg-transparent">
-            <SortHead k="name" sort={sort} onSort={onSort} className="w-[34%] pl-4">{t("colProduct")}</SortHead>
+            {/* drag-handle column (no header) */}
+            <TableHead className="w-10 pr-0 pl-2" />
+            <SortHead k="name" sort={sort} onSort={onSort} className="w-[34%] pl-1">{t("colProduct")}</SortHead>
             <SortHead k="price" sort={sort} onSort={onSort} className="w-[18%]">{t("colPrice")}</SortHead>
             <SortHead k="stock" sort={sort} onSort={onSort} className="hidden w-[16%] pl-8 sm:table-cell">{t("inStock")}</SortHead>
             <SortHead k="shown" sort={sort} onSort={onSort} className="w-[14%] pl-4">{t("colShown")}</SortHead>
@@ -90,8 +114,48 @@ function ProductTable({ items, pending, onEdit, onFlag, onDelete }: {
         </TableHeader>
         <TableBody>
           {rows.map((item) => (
-            <TableRow key={item.id} className={cn("h-16 hover:bg-transparent", (!item.isAvailable || !item.isVisible) && "opacity-60")}>
-              <TableCell className="max-w-0 pl-4">
+            <TableRow
+              key={item.id}
+              data-item={item.id}
+              className={cn(
+                "h-16 hover:bg-transparent",
+                (!item.isAvailable || !item.isVisible) && "opacity-60",
+                dragId === item.id && "relative z-10 bg-background opacity-100 shadow-md",
+              )}
+            >
+              {/* drag handle (shop order only): mouse + touch via pointer events (saved on release), keyboard via ↑/↓ */}
+              <TableCell className="w-10 pr-0 pl-2">
+                {shopOrder && items.length > 1 && (
+                  <button
+                    type="button"
+                    aria-label={t("reorder", { name: item.name })}
+                    disabled={pending}
+                    className="flex size-10 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
+                    onPointerDown={(e) => {
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      setDragId(item.id);
+                      setDragOrder(ids);
+                    }}
+                    onPointerMove={(e) => {
+                      if (dragId !== item.id || !dragOrder) return;
+                      const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-item]")?.dataset.item;
+                      if (over && over !== item.id) setDragOrder(move(dragOrder, item.id, dragOrder.indexOf(over)));
+                    }}
+                    onPointerUp={() => endDrag(true)}
+                    onPointerCancel={() => endDrag(false)}
+                    onKeyDown={(e) => {
+                      const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+                      if (!d) return;
+                      e.preventDefault();
+                      const order = move(ids, item.id, ids.indexOf(item.id) + d);
+                      if (order !== ids) onReorder(order);
+                    }}
+                  >
+                    <GripVertical className="size-4" aria-hidden />
+                  </button>
+                )}
+              </TableCell>
+              <TableCell className="max-w-0 pl-1">
                 <div className="flex items-center gap-3">
                   <Thumb item={item} className="size-10 shrink-0 rounded-md" />
                   <div className="min-w-0">
@@ -157,6 +221,53 @@ function ProductTable({ items, pending, onEdit, onFlag, onDelete }: {
   );
 }
 
+/** one block of the product form (optional title; blocks are split by space, no lines) */
+function Section({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      {title && <h3 className="text-sm font-semibold">{title}</h3>}
+      {children}
+    </section>
+  );
+}
+
+/** photo box: shows the photo (or an upload icon); tap to pick a new one */
+function PhotoPick({ id, url, busy, label, onFile }: { id?: string; url: string; busy: boolean; label: string; onFile: (file: File | undefined) => void }) {
+  return (
+    <label
+      title={label}
+      className="flex size-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+    >
+      <input
+        id={id}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        aria-label={label}
+        onChange={(e) => {
+          onFile(e.target.files?.[0]);
+          e.target.value = ""; // picking the same file again still fires onChange
+        }}
+      />
+      {busy ? (
+        <Loader2 className="size-5 animate-spin" aria-hidden />
+      ) : url ? (
+        <Img src={thumbUrl(url)} alt="" sizes="80px" className="size-full" />
+      ) : (
+        <ImagePlus className="size-7" strokeWidth={1.5} aria-hidden />
+      )}
+    </label>
+  );
+}
+
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button type="button" variant="secondary" size="icon-xs" className="absolute -top-1.5 -right-1.5 rounded-full shadow-sm" onClick={onClick} aria-label={label}>
+      <X aria-hidden />
+    </Button>
+  );
+}
+
 export function MenuEditor({ categories, items }: { categories: AdminCategory[]; items: AdminItem[] }) {
   const t = useTranslations("admin.menu");
   const te = useTranslations("errors");
@@ -169,8 +280,11 @@ export function MenuEditor({ categories, items }: { categories: AdminCategory[];
       ? change.order.map((id) => state.find((c) => c.id === id)!).filter(Boolean)
       : state.map((c) => (c.id === change.id ? { ...c, ...change.patch } : c)),
   );
-  const [list, applyItem] = useOptimistic(items, (state, change: { id: string; patch: Partial<AdminItem> }) =>
-    state.map((i) => (i.id === change.id ? { ...i, ...change.patch } : i)),
+  const [list, applyItem] = useOptimistic(items, (state, change: { id: string; patch: Partial<AdminItem> } | { order: string[] }) =>
+    "order" in change
+      ? // that category's products in the new order (after the rest; only the order within a category matters)
+        [...state.filter((i) => !change.order.includes(i.id)), ...change.order.map((id) => state.find((i) => i.id === id)!).filter(Boolean)]
+      : state.map((i) => (i.id === change.id ? { ...i, ...change.patch } : i)),
   );
 
   const [catId, setCatId] = useState(categories[0]?.id ?? "");
@@ -421,6 +535,7 @@ export function MenuEditor({ categories, items }: { categories: AdminCategory[];
                   setProductDeleteError(undefined);
                   setDeletingProduct(item);
                 }}
+                onReorder={(order) => run(() => reorderItems(cat.id, order), () => applyItem({ order }))}
               />
             )}
           </Card>
@@ -555,31 +670,34 @@ function ItemForm({
   const te = useTranslations("errors");
   const [fields, setFields] = useState<Record<string, ErrorCode>>({});
   const [formError, setFormError] = useState<ErrorCode>();
-  // album: uploaded addresses (/api/images/<id>.webp) in order, first = card photo; uploaded as soon as picked, saved with the product
-  const [photos, setPhotos] = useState<string[]>(item?.images ?? []);
-  const [uploadingCount, setUploadingCount] = useState(0);
-  const uploading = uploadingCount > 0;
-  // drag to reorder photos (mouse + touch via pointer events); first = main.
-  // The tile follows the pointer; it swaps with the tile under the pointer; a move under 5 px is a tap, not a drag.
-  const [drag, setDrag] = useState<{ url: string; dx: number; dy: number } | null>(null);
-  const dragStart = useRef<{ url: string; x: number; y: number } | null>(null);
-  const dragged = useRef(false); // a drag that moved must not also count as a tap
-  const photoList = useRef<HTMLUListElement>(null);
-  const movePhoto = (url: string, to: number) =>
-    setPhotos((all) => {
-      const from = all.indexOf(url);
-      if (from < 0 || to < 0 || to >= all.length || from === to) return all;
-      const next = [...all];
-      next.splice(to, 0, ...next.splice(from, 1));
-      return next;
-    });
-  // empty photo slots: one to start when there's no photo; ＋ adds another; picking photos fills them
-  const [slots, setSlots] = useState(item?.images.length ? 0 : 1);
-  const [photoError, setPhotoError] = useState<ErrorCode>();
-  const [saving, setSaving] = useState<string>(); // "4.2 MB → 210 KB" after shrinking
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [pending, start] = useTransition();
   const dollars = (cents: number | null | undefined) => (cents == null ? "" : String(cents / 100));
+  // main photo + variants (each its own photo + name); photos upload as soon as picked and are saved with the product
+  const [photo, setPhoto] = useState(() => item?.images.find((u) => !item.variants.some((v) => v.image === u)) ?? "");
+  const [variants, setVariants] = useState(() =>
+    // old products: extra photos without a variant show up as unnamed variants
+    (item?.images ?? []).filter((u) => u !== photo).map((image) => {
+      const v = item?.variants.find((x) => x.image === image);
+      return { key: image, image, label: v?.label ?? "", price: dollars(v?.priceCents) };
+    }),
+  );
+  const [busy, setBusy] = useState<string[]>([]); // keys uploading: "main" or a variant key
+  const uploading = busy.length > 0;
+  const setVariant = (key: string, patch: { image?: string; label?: string; price?: string }) =>
+    setVariants((all) => all.map((v) => (v.key === key ? { ...v, ...patch } : v)));
+  // last upload's message under its own box ("main" or a variant): an error, or "4.2 MB → 210 KB" after shrinking
+  const [upMsg, setUpMsg] = useState<{ key: string; error?: ErrorCode; size?: string }>();
+  const upload = (key: string, file: File | undefined, done: (url: string) => void) => {
+    if (!file) return;
+    setUpMsg(undefined);
+    setBusy((b) => [...b, key]);
+    uploadImage(file).then((r) => {
+      setBusy((b) => b.filter((k) => k !== key));
+      if (!("url" in r)) return setUpMsg({ key, error: r.error });
+      done(r.url);
+      setUpMsg({ key, size: t("photoSize", { before: formatBytes(r.before), after: formatBytes(r.after) }) });
+    });
+  };
+  const [pending, start] = useTransition();
   // editing a product on sale: its discount as a whole % when it is one (10 %), else as $ off
   const off = item?.compareAtCents ? item.compareAtCents - item.priceCents : 0;
   const wholePct = off > 0 && (off * 100) % item!.compareAtCents! === 0;
@@ -589,6 +707,9 @@ function ItemForm({
   // live "Customer pays $9.00" under the discount (the save action works it out again)
   const priceCents = toCents(price);
   const preview = priceCents && !Number.isNaN(priceCents) ? salePrice(priceCents, discountType, discount) : null;
+  const upMessage = (key: string) =>
+    upMsg?.key === key &&
+    (upMsg.error ? <p role="alert" className="text-xs text-destructive">{te(upMsg.error)}</p> : <p className="text-xs text-muted-foreground tabular-nums">{upMsg.size}</p>);
   const err = (key: string) => fields[key] && <p className="text-xs text-destructive">{te(fields[key])}</p>;
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -606,7 +727,8 @@ function ItemForm({
       isAvailable: f.get("isAvailable") === "on",
       isVisible: f.get("isVisible") === "on",
       description: str("description"),
-      images: photos,
+      image: photo,
+      variants: variants.map(({ label, image, price }) => ({ label, image, price })),
     };
     start(async () => {
       const r = await saveItem(item?.id ?? null, input);
@@ -623,287 +745,201 @@ function ItemForm({
         <DialogDescription className="sr-only">{item ? t("edit") : t("add")}</DialogDescription>
       </DialogHeader>
 
-      {/* photo on top (box + buttons side by side), then the fields in a two-column grid */}
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="photo">{t("photos")} <Opt /></Label>
-          <input
-            ref={fileInput}
-            id="photo"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="sr-only"
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              e.target.value = ""; // picking the same files again still fires onChange
-              if (!files.length) return;
-              setPhotoError(undefined);
-              setSaving(undefined);
-              setUploadingCount((n) => n + files.length);
-              setSlots((n) => Math.max(0, n - files.length)); // the uploads take the empty slots' places
-              let before = 0;
-              let after = 0;
-              Promise.all(
-                files.map((file) =>
-                  uploadImage(file).then((r) => {
-                    setUploadingCount((n) => n - 1);
-                    if (!("url" in r)) {
-                      setSlots((n) => n + 1); // failed: give the empty slot back
-                      return setPhotoError(r.error);
-                    }
-                    setPhotos((all) => [...all, r.url]);
-                    before += r.before;
-                    after += r.after;
-                  }),
-                ),
-              ).then(() => {
-                if (after) setSaving(t("photoSize", { before: formatBytes(before), after: formatBytes(after) }));
-              });
-            }}
-          />
-          {/* album: tiles in order; first = main (card photo); tap another to make it main; ✕ removes */}
-          <ul ref={photoList} className="flex flex-wrap gap-2">
-            {photos.map((url, i) => (
-              <li
-                key={url}
-                data-photo={url}
-                // no native image drag (it would cancel ours); no page scroll while dragging on phones
-                className={cn(
-                  "group relative size-20 touch-none select-none [&_img]:pointer-events-none",
-                  photos.length > 1 && "cursor-grab",
-                  drag?.url === url && "z-10 cursor-grabbing shadow-xl",
-                )}
-                style={drag?.url === url ? { transform: `translate(${drag.dx}px, ${drag.dy}px) scale(1.08)` } : undefined}
-                onPointerDown={(e) => {
-                  if (photos.length < 2 || (e.target as HTMLElement).closest("[data-remove]")) return;
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  dragged.current = false;
-                  dragStart.current = { url, x: e.clientX, y: e.clientY };
-                }}
-                onPointerMove={(e) => {
-                  const start = dragStart.current;
-                  if (!start || start.url !== url) return;
-                  const dx = e.clientX - start.x;
-                  const dy = e.clientY - start.y;
-                  if (!dragged.current && Math.hypot(dx, dy) < 5) return; // still a tap
-                  dragged.current = true;
-                  // the other tile under the pointer (by position: the dragged tile itself is under the pointer too)
-                  const over = [...(photoList.current?.querySelectorAll<HTMLElement>("[data-photo]") ?? [])].find((el) => {
-                    if (el.dataset.photo === url) return false;
-                    const r = el.getBoundingClientRect();
-                    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-                  })?.dataset.photo;
-                  if (over) {
-                    movePhoto(url, photos.indexOf(over));
-                    // the tile jumped to its new spot under the pointer: measure from here again
-                    dragStart.current = { url, x: e.clientX, y: e.clientY };
-                    setDrag({ url, dx: 0, dy: 0 });
-                  } else {
-                    setDrag({ url, dx, dy });
-                  }
-                }}
-                onPointerUp={() => {
-                  dragStart.current = null;
-                  setDrag(null);
-                }}
-                onPointerCancel={() => {
-                  dragStart.current = null;
-                  setDrag(null);
-                }}
-              >
-                <button
-                  type="button"
-                  // tap = make it the main photo; ← / → move it
-                  onClick={() => {
-                    if (dragged.current) return void (dragged.current = false);
-                    if (i > 0) movePhoto(url, 0);
-                  }}
-                  onKeyDown={(e) => {
-                    const d = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
-                    if (!d) return;
-                    e.preventDefault();
-                    movePhoto(url, i + d);
-                  }}
-                  aria-label={`${i === 0 ? t("mainPhoto") : t("makeMain")} (${i + 1}/${photos.length})`}
-                  title={i === 0 ? t("mainPhoto") : t("makeMain")}
-                  className={cn(
-                    "block size-full rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                    i === 0 && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
-                  )}
-                >
-                  <Img src={thumbUrl(url)} alt="" sizes="80px" className="size-full rounded-lg border" />
-                </button>
-                {/* main: "Main" badge; others: "Set as main" shows on hover / keyboard focus */}
-                <span
-                  className={cn(
-                    "pointer-events-none absolute bottom-1 left-1 rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium",
-                    i === 0
-                      ? "bg-foreground text-background"
-                      : "bg-background/90 text-foreground opacity-0 shadow-sm group-hover:opacity-100 group-has-focus-visible:opacity-100",
-                  )}
-                  aria-hidden
-                >
-                  {i === 0 ? t("mainPhoto") : t("setMain")}
-                </span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon-xs"
-                  data-remove
-                  className="absolute -top-1.5 -right-1.5 rounded-full shadow-sm"
-                  onClick={() => {
-                    setPhotos((all) => all.filter((u) => u !== url));
-                    setSaving(undefined);
-                  }}
-                  aria-label={t("removePhoto")}
-                >
-                  <X aria-hidden />
-                </Button>
-              </li>
-            ))}
-            {Array.from({ length: uploadingCount }, (_, i) => (
-              <li key={`uploading-${i}`} className="grid size-20 place-items-center rounded-lg border bg-muted/40" aria-hidden>
-                <Loader2 className="size-5 animate-spin text-muted-foreground" />
-              </li>
-            ))}
-            {/* empty slots: click one to pick photos; ✕ drops it */}
-            {Array.from({ length: slots }, (_, i) => (
-              <li key={`slot-${i}`} className="relative size-20">
-                <button
-                  type="button"
-                  onClick={() => fileInput.current?.click()}
-                  aria-label={t("uploadPhoto")}
-                  title={t("uploadPhoto")}
-                  className="flex size-full items-center justify-center rounded-lg border bg-muted/60 text-muted-foreground/60 outline-none hover:bg-muted hover:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <ImagePlus className="size-7" strokeWidth={1.5} aria-hidden />
-                </button>
-                {(slots > 1 || photos.length > 0) && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon-xs"
-                    className="absolute -top-1.5 -right-1.5 rounded-full shadow-sm"
-                    onClick={() => setSlots((n) => n - 1)}
-                    aria-label={t("removePhoto")}
-                  >
-                    <X aria-hidden />
-                  </Button>
-                )}
-              </li>
-            ))}
-            {/* ＋ adds another empty slot (no limit) */}
-            <li>
-              <button
-                type="button"
-                onClick={() => setSlots((n) => n + 1)}
-                aria-label={t("addSlot")}
-                title={t("addSlot")}
-                className="flex size-20 items-center justify-center rounded-lg border-2 border-dashed bg-muted/40 text-muted-foreground outline-none hover:border-foreground/30 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <Plus className="size-7" strokeWidth={1.75} aria-hidden />
-              </button>
-            </li>
-          </ul>
-          {/* also shown with 2+ photos: how to pick the main one */}
-          {photos.length > 1 && <p className="text-xs text-muted-foreground">{t("photosOrderHint")}</p>}
-          {photoError && <p role="alert" className="text-xs text-destructive">{te(photoError)}</p>}
-          {saving && !photoError && <p className="text-xs text-muted-foreground tabular-nums">{saving}</p>}
-        </div>
-
-        <div className="grid grid-cols-2 content-start gap-x-3 gap-y-4">
-          <div className="col-span-2 flex flex-col gap-1.5">
-            <Label htmlFor="name">{t("name")} <Req /></Label>
-            <Input id="name" name="name" aria-required maxLength={200} placeholder={t("namePlaceholder")} defaultValue={item?.name} aria-invalid={!!fields.name || undefined} className="h-11" />
-            {err("name")}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="brand">{t("brand")} <Opt /></Label>
-            <Input id="brand" name="brand" placeholder={t("brandPlaceholder")} defaultValue={item?.brand ?? ""} className="h-11" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="categoryId">{t("category")} <Req /></Label>
-            <Select name="categoryId" defaultValue={item?.categoryId ?? defaultCategory}>
-              <SelectTrigger id="categoryId" aria-required className="h-11! w-full" aria-invalid={!!fields.categoryId || undefined}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {err("categoryId")}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="price">{t("price")} <Req /></Label>
-            {/* on sale: the saved price is the discount and compareAt keeps the original */}
-            <Input id="price" name="price" aria-required inputMode="decimal" placeholder={t("pricePlaceholder")} value={price} onChange={(e) => setPrice(latinDigits(e.target.value))} aria-invalid={!!fields.price || undefined} className="h-11" />
-            {err("price")}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="discount">{t("discountLabel")} <Opt /></Label>
-            {/* the amount + its type: % off or $ off */}
-            <div className="flex gap-2">
-              <Input
-                id="discount"
-                name="discount"
-                inputMode="decimal"
-                placeholder={discountType === "percent" ? "10" : "1.50"}
-                value={discount}
-                onChange={(e) => setDiscount(latinDigits(e.target.value))}
-                aria-invalid={!!fields.discount || undefined}
-                className="h-11 min-w-0 flex-1"
-              />
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={discountType}
-                onValueChange={(v) => v && setDiscountType(v as DiscountType)}
-                aria-label={t("discountType")}
-                className="shrink-0"
-              >
-                <ToggleGroupItem value="percent" aria-label={t("percentOff")} className="h-11 w-12 data-[state=on]:bg-foreground data-[state=on]:text-background">%</ToggleGroupItem>
-                <ToggleGroupItem value="amount" aria-label={t("amountOff")} className="h-11 w-12 data-[state=on]:bg-foreground data-[state=on]:text-background">$</ToggleGroupItem>
-              </ToggleGroup>
+      {/* three sections: basic info → price → variants */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+        <Section title={t("sectionBasic")}>
+          {/* photo left of the name on wider screens, on top on phones */}
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="flex shrink-0 flex-col gap-1.5">
+              <Label htmlFor="photo">{t("photos")} <Opt /></Label>
+              <div className="relative size-28">
+                <PhotoPick id="photo" url={photo} busy={busy.includes("main")} label={t("uploadPhoto")} onFile={(f) => upload("main", f, setPhoto)} />
+                {photo && <RemoveButton label={t("removePhoto")} onClick={() => setPhoto("")} />}
+              </div>
+              {upMessage("main")}
             </div>
-            {typeof preview === "number" && !fields.discount && (
-              <p className="text-xs text-muted-foreground tabular-nums">{t("customerPays", { price: money(preview) })}</p>
-            )}
-            {err("discount")}
+            <div className="grid min-w-0 flex-1 grid-cols-2 content-start gap-x-3 gap-y-4 sm:grid-cols-3">
+              <div className="col-span-full flex flex-col gap-1.5">
+                <Label htmlFor="name">{t("name")} <Req /></Label>
+                <Input id="name" name="name" aria-required maxLength={200} placeholder={t("namePlaceholder")} defaultValue={item?.name} aria-invalid={!!fields.name || undefined} className="h-11" />
+                {err("name")}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="brand">{t("brand")} <Opt /></Label>
+                <Input id="brand" name="brand" placeholder={t("brandPlaceholder")} defaultValue={item?.brand ?? ""} className="h-11" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="categoryId">{t("category")} <Req /></Label>
+                <Select name="categoryId" defaultValue={item?.categoryId ?? defaultCategory}>
+                  <SelectTrigger id="categoryId" aria-required className="h-11! w-full" aria-invalid={!!fields.categoryId || undefined}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {err("categoryId")}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="badge">{t("badge")} <Opt /></Label>
+                {/* no "Sale" choice: a discount shows its own "Sale" pill; an old "sale" badge opens as None and is cleared on save */}
+                <Select name="badge" defaultValue={!item?.badge || item.badge === "sale" ? "none" : item.badge}>
+                  <SelectTrigger id="badge" className="h-11! w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{t("none")}</SelectItem>
+                    <SelectItem value="new">{tp("new")}</SelectItem>
+                    <SelectItem value="best_seller">{tp("best")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="badge">{t("badge")} <Opt /></Label>
-            {/* no "Sale" choice: a discount shows its own "Sale" pill; an old "sale" badge opens as None and is cleared on save */}
-            <Select name="badge" defaultValue={!item?.badge || item.badge === "sale" ? "none" : item.badge}>
-              <SelectTrigger id="badge" className="h-11! w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t("none")}</SelectItem>
-                <SelectItem value="new">{tp("new")}</SelectItem>
-                <SelectItem value="best_seller">{tp("best")}</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="description">{t("description")} <Opt /></Label>
+            <DescriptionEditor id="description" name="description" label={t("description")} placeholder={t("descriptionPlaceholder")} defaultValue={item?.description ?? ""} />
+            {err("description")}
           </div>
-          {/* switches share the Badge row, lined up with the select box */}
-          <div className="flex flex-wrap items-end gap-x-5 self-end">
-            <Label className="flex min-h-11 items-center gap-2">
-              <Switch name="isAvailable" defaultChecked={item?.isAvailable ?? true} />
-              {t("inStock")}
-            </Label>
-            <Label className="flex min-h-11 items-center gap-2">
-              <Switch name="isVisible" defaultChecked={item?.isVisible ?? true} />
-              {t("visible")}
-            </Label>
+          {/* whether customers can order / see it: a titled group like the other fields (switches get no required/optional mark) */}
+          <div role="group" aria-labelledby="status-title" className="flex flex-col gap-1.5">
+            <p id="status-title" className="text-sm leading-none font-medium">{t("status")}</p>
+            <div className="flex flex-wrap gap-x-5">
+              <Label className="flex min-h-11 items-center gap-2 font-normal">
+                <Switch name="isAvailable" defaultChecked={item?.isAvailable ?? true} />
+                {t("inStock")}
+              </Label>
+              <Label className="flex min-h-11 items-center gap-2 font-normal">
+                <Switch name="isVisible" defaultChecked={item?.isVisible ?? true} />
+                {t("visible")}
+              </Label>
+            </div>
           </div>
-        </div>
+        </Section>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="description">{t("description")} <Opt /></Label>
-          <Textarea id="description" name="description" placeholder={t("descriptionPlaceholder")} defaultValue={item?.description} rows={4} />
-        </div>
+        {/* price + discount, then variants: one block */}
+        <Section title={t("sectionPrice")}>
+          <div className="grid grid-cols-1 gap-x-3 gap-y-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="price">{t("price")} <Req /></Label>
+              {/* on sale: the saved price is the discount and compareAt keeps the original */}
+              <Input id="price" name="price" aria-required inputMode="decimal" placeholder={t("pricePlaceholder")} value={price} onChange={(e) => setPrice(latinDigits(e.target.value))} aria-invalid={!!fields.price || undefined} className="h-11" />
+              {err("price")}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="discount">{t("discountLabel")} <Opt /></Label>
+              {/* the amount + its type: a small % / $ switch inside the right end of the box */}
+              <div className="relative">
+                <Input
+                  id="discount"
+                  name="discount"
+                  inputMode="decimal"
+                  placeholder={discountType === "percent" ? "10" : "1.50"}
+                  value={discount}
+                  onChange={(e) => setDiscount(latinDigits(e.target.value))}
+                  aria-invalid={!!fields.discount || undefined}
+                  className="h-11 pr-24"
+                />
+                <ToggleGroup
+                  type="single"
+                  spacing={0}
+                  value={discountType}
+                  onValueChange={(v) => v && setDiscountType(v as DiscountType)}
+                  aria-label={t("discountType")}
+                  className="absolute inset-y-1.5 right-1.5 rounded-full bg-muted p-0.5"
+                >
+                  {(["percent", "amount"] as const).map((v) => (
+                    <ToggleGroupItem
+                      key={v}
+                      value={v}
+                      aria-label={t(v === "percent" ? "percentOff" : "amountOff")}
+                      // after:-inset-y-1.5 grows the tap area to the full 44px box height
+                      className="relative h-full w-10 rounded-full! text-sm font-semibold text-muted-foreground after:absolute after:-inset-y-1.5 after:inset-x-0 data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                    >
+                      {v === "percent" ? "%" : "$"}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
+              {typeof preview === "number" && !fields.discount && (
+                <p className="text-xs text-muted-foreground tabular-nums">{t("customerPays", { price: money(preview) })}</p>
+              )}
+              {err("discount")}
+            </div>
+          </div>
+
+          {/* variants (same block as the price, no line between): photo + name + own price per row; the customer picks one by its photo */}
+          <h3 className="pt-1 text-sm font-semibold">{t("variants")} <Opt /></h3>
+          {/* one bordered box: column headers, a row per variant (lines between), "+ Add variant" as the last row */}
+          <div className="overflow-hidden rounded-xl border">
+            {variants.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground" aria-hidden>
+                  <span className="w-11 shrink-0">{t("photoShort")} <Req /></span>
+                  <span className="min-w-0 flex-1">{t("variantName")} <Opt /></span>
+                  <span className="w-28 shrink-0">{t("price")} <Opt /></span>
+                  <span className="w-11 shrink-0" />
+                </div>
+                <ul className="divide-y">
+                  {variants.map((v) => (
+                    <li key={v.key} className="flex flex-col gap-1 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="size-11 shrink-0">
+                          <PhotoPick url={v.image} busy={busy.includes(v.key)} label={t("uploadPhoto")} onFile={(f) => upload(v.key, f, (image) => setVariant(v.key, { image }))} />
+                        </div>
+                        <Input
+                          value={v.label}
+                          onChange={(e) => setVariant(v.key, { label: e.target.value })}
+                          maxLength={80}
+                          placeholder={t("variantPlaceholder")}
+                          aria-label={t("variantName")}
+                          className="h-11 min-w-0 flex-1"
+                        />
+                        {/* own price; empty = the product price (shown faded) */}
+                        <div className="relative w-28 shrink-0">
+                          <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-sm text-muted-foreground" aria-hidden>$</span>
+                          <Input
+                            value={v.price}
+                            onChange={(e) => setVariant(v.key, { price: latinDigits(e.target.value) })}
+                            inputMode="decimal"
+                            placeholder={price || "0.00"}
+                            aria-label={t("variantPrice")}
+                            className="h-11 pl-7 tabular-nums"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-11 shrink-0 rounded-md text-muted-foreground hover:text-destructive"
+                          onClick={() => setVariants((all) => all.filter((x) => x.key !== v.key))}
+                          aria-label={t("removePhoto")}
+                        >
+                          <Trash2 aria-hidden />
+                        </Button>
+                      </div>
+                      {upMessage(v.key)}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <button
+              type="button"
+              className={cn(
+                "flex h-12 w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground outline-none hover:bg-muted/50 hover:text-foreground focus-visible:bg-muted/50",
+                variants.length > 0 && "border-t",
+              )}
+              onClick={() => setVariants((all) => [...all, { key: crypto.randomUUID(), image: "", label: "", price: "" }])}
+            >
+              <Plus className="size-4" aria-hidden /> {t("addVariant")}
+            </button>
+          </div>
+          {err("variants")}
+        </Section>
+
         {formError && <p role="alert" className="text-sm text-destructive">{te(formError)}</p>}
       </div>
 
