@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { discountPercent, type Lang, pick, type Product } from "@/lib/shop";
 import { addToCart, cartKey, setQty, useCart } from "@/lib/cart";
+import { parseRich, type RichBlock, type RichDoc, type RichInline } from "@/lib/rich-text";
+import { cn } from "@/lib/utils";
 import { BackButton } from "./BackButton";
 import { Variants } from "./Variants";
 
@@ -128,8 +130,49 @@ function offerIcon(text: string): LucideIcon | null {
   return null;
 }
 
-// Product description as a checklist + offer box instead of raw emoji lines
+// Description written with the editor: drawn node by node with React (text only, never raw HTML)
+const ALIGN = { left: "", center: "text-center", right: "text-right" } as const;
+const MARK = { bold: "font-semibold text-foreground", italic: "italic", underline: "underline", strike: "line-through" } as const;
+
+function RichInlines({ nodes }: { nodes?: RichInline[] }) {
+  return nodes?.map((n, i) =>
+    n.type === "hardBreak" ? <br key={i} /> : n.marks ? <span key={i} className={cn(n.marks.map((m) => MARK[m.type]))}>{n.text}</span> : n.text,
+  );
+}
+
+function RichBlocks({ blocks }: { blocks: RichBlock[] }) {
+  return blocks.map((b, i) => {
+    if (b.type === "bulletList" || b.type === "orderedList") {
+      const L = b.type === "bulletList" ? "ul" : "ol";
+      return (
+        <L key={i} className={cn("space-y-1 pl-5", b.type === "bulletList" ? "list-disc" : "list-decimal")}>
+          {b.content.map((item, j) => (
+            <li key={j}><RichBlocks blocks={item.content} /></li>
+          ))}
+        </L>
+      );
+    }
+    const align = ALIGN[b.attrs?.textAlign ?? "left"];
+    if (b.type === "heading") {
+      const H = b.attrs.level === 2 ? "h3" : "h4"; // the page's own headings come first
+      return <H key={i} className={cn("pt-1 font-semibold text-foreground", b.attrs.level === 2 ? "text-lg" : "text-base", align)}><RichInlines nodes={b.content} /></H>;
+    }
+    return <p key={i} className={cn("min-h-[1lh]", align)}><RichInlines nodes={b.content} /></p>;
+  });
+}
+
+function RichDescription({ doc }: { doc: RichDoc }) {
+  return (
+    <div className="flex flex-col gap-1 whitespace-pre-wrap text-foreground/80">
+      <RichBlocks blocks={doc.content} />
+    </div>
+  );
+}
+
+// Product description: editor text as written; old plain text as a checklist + offer box instead of raw emoji lines
 function Description({ text }: { text: string }) {
+  const doc = parseRich(text);
+  if (doc) return <RichDescription doc={doc} />;
   // consecutive lines of the same kind form one group (one list / one box)
   const groups: { kind: LineKind; lines: string[] }[] = [];
   for (const raw of text.split("\n")) {

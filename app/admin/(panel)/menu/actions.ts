@@ -8,6 +8,7 @@ import { toCents, type DiscountType, salePrice } from "@/lib/money";
 import { Badge } from "@/lib/generated/prisma/enums";
 import type { ErrorCode, Result } from "@/lib/result";
 import { deleteImageIfUnused, imageKey } from "@/lib/r2";
+import { cleanRich, richHasText } from "@/lib/rich-text";
 import type { ItemInput } from "./types";
 
 // Menu admin (plan/api.md → Menu, plan/business-rules.md 1–11). Owner/admin + staff only; every query is limited to the current shop.
@@ -102,9 +103,31 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   const discountType: DiscountType = input.discountType === "amount" ? "amount" : "percent";
   // "sale" is no longer a badge choice — the discount itself shows the Sale pill
   const badge = Object.hasOwn(Badge, input.badge) && input.badge !== "sale" ? (input.badge as Badge) : null;
-  const images = [...new Set(input.images.map((u) => u.trim()).filter(Boolean))];
+  // up to 30 variants; own price optional, else the product price applies (rule 8). The product discount is not applied to it.
+  const variants = (Array.isArray(input.variants) ? input.variants : []).slice(0, 30).map((v) => ({
+    label: String(v?.label ?? "").trim().slice(0, 80),
+    image: String(v?.image ?? "").trim(),
+    priceCents: toCents(String(v?.price ?? "")) ?? undefined,
+  }));
+  if (variants.some((v) => !v.image)) fields.variants = "variantPhoto";
+  else if (variants.some((v) => Number.isNaN(v.priceCents))) fields.variants = "badPrice";
+  // image rows: main photo first, then the variant photos (cart, checkout and photo clean-up read these rows)
+  const images = [...new Set([String(input.image ?? "").trim(), ...variants.map((v) => v.image)].filter(Boolean))];
 
   if (!name || name.length > 200) fields.name = "required";
+  // description: the editor's JSON, cleaned to what the shop can show (lib/rich-text.ts); plain text is kept as is
+  let description = String(input.description ?? "").trim();
+  if (description.startsWith("{")) {
+    const doc = (() => {
+      try {
+        return cleanRich(JSON.parse(description));
+      } catch {
+        return null;
+      }
+    })();
+    description = doc && richHasText(doc) ? JSON.stringify(doc) : "";
+  }
+  if (description.length > 20000) fields.description = "invalid";
   // the product being edited and the chosen category (both of this shop), in one round trip
   const [current, category] = await Promise.all([
     id ? prisma.item.findFirst({
@@ -138,7 +161,8 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
     badge,
     isAvailable: input.isAvailable,
     isVisible: input.isVisible,
-    description: input.description.trim().slice(0, 5000),
+    description,
+    variants,
   };
   const nextSort = async () =>
     ((await prisma.item.aggregate({ where: { shopId: shop.id, categoryId: input.categoryId }, _max: { sortOrder: true } }))._max.sortOrder ?? -1) + 1;
@@ -176,6 +200,19 @@ export async function setItemFlags(id: string, patch: { isAvailable?: boolean; i
     data: { isAvailable: patch.isAvailable, isVisible: patch.isVisible },
   });
   if (!count) return { ok: false, error: "notFound" };
+  changed();
+  return { ok: true };
+}
+
+/** full new order of one category's products (= the order on the shop) */
+export async function reorderItems(categoryId: string, ids: string[]): Promise<Result> {
+  const { shop } = await requireUser("menu.edit");
+  // every id must be one of this shop's products in that category (so the updates below can't touch anything else)
+  const all = await prisma.item.findMany({ where: { shopId: shop.id, categoryId, deletedAt: null }, select: { id: true } });
+  if (ids.length !== all.length || new Set(ids).size !== ids.length || !all.every((i) => ids.includes(i.id))) {
+    return { ok: false, error: "invalid" };
+  }
+  await prisma.$transaction(ids.map((id, i) => prisma.item.update({ where: { id }, data: { sortOrder: i } })));
   changed();
   return { ok: true };
 }
