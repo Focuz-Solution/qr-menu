@@ -1,95 +1,76 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/auth";
-import { decrypt, encrypt, hasEncryptionKey } from "@/lib/crypto";
-import { appUrl } from "@/lib/app-url";
 import { prisma } from "@/lib/db";
 import type { Result } from "@/lib/result";
-import { telegram, TelegramError, type TelegramChat } from "@/lib/telegram";
+import { ALLOWED_UPDATES, botInfo, hasBotToken, telegram, TelegramError, webhookUrl } from "@/lib/telegram";
+import { handleUpdate, type Update } from "@/lib/telegram-bot";
 
-// Telegram setup — owner / shop admin (spec §7.1), one bot + group per shop. Order messages + status buttons come with checkout (plan P5/P6).
+// Telegram setup — owner / shop admin (spec §7.1). One bot for the whole app (TELEGRAM_BOT_TOKEN), one group per shop.
 const done = () => revalidatePath("/admin/telegram");
+const CONNECT_MINUTES = 15;
 
-async function botToken(shopId: string) {
-  const row = await prisma.telegramSettings.findUnique({ where: { shopId }, select: { botTokenEnc: true } });
-  return row?.botTokenEnc ? decrypt(row.botTokenEnc) : null;
-}
+/**
+ * 1. Connect: a one-time code + the link t.me/<bot>?startgroup=<code>. Telegram asks which group to add the bot to,
+ * then posts "/start <code>" there; the bot (lib/telegram-bot.ts) links that group to this shop.
+ */
+export async function startTelegramConnect(): Promise<Result<{ url: string }>> {
+  const me = await requireUser("telegram.manage");
+  if (!hasBotToken()) return { ok: false, error: "botMissing" };
 
-/** 1. paste the token from @BotFather → checked with Telegram (getMe) → saved encrypted */
-export async function saveBotToken(token: string): Promise<Result> {
-  const { shop } = await requireUser("telegram.manage");
-  if (!hasEncryptionKey()) return { ok: false, error: "missingKey" };
-  const value = token.trim();
-  if (!/^\d{5,}:[A-Za-z0-9_-]{30,}$/.test(value)) return { ok: false, error: "invalid", fields: { token: "badToken" } };
-
-  let username: string | undefined;
+  let username: string;
   try {
-    username = (await telegram<{ username?: string }>(value, "getMe")).username;
-  } catch (e) {
-    const unauthorized = e instanceof TelegramError && e.code === 401;
-    return unauthorized ? { ok: false, error: "invalid", fields: { token: "badToken" } } : { ok: false, error: "telegramFailed" };
-  }
-
-  const data = { botTokenEnc: encrypt(value), botUsername: username ?? null, isEnabled: false, lastError: null };
-  await prisma.telegramSettings.upsert({ where: { shopId: shop.id }, create: { shopId: shop.id, ...data }, update: data });
-  done();
-  return { ok: true };
-}
-
-/** 2a. groups the bot has seen recently (owner adds the bot to the group and sends any message there first) */
-export async function detectChats(): Promise<Result<{ id: string; title: string; isForum: boolean }[]>> {
-  const { shop } = await requireUser("telegram.manage");
-  const token = await botToken(shop.id);
-  if (!token) return { ok: false, error: "notFound" };
-
-  type Update = { message?: { chat: TelegramChat }; my_chat_member?: { chat: TelegramChat }; channel_post?: { chat: TelegramChat } };
-  let updates: Update[];
-  try {
-    updates = await telegram<Update[]>(token, "getUpdates", { allowed_updates: ["message", "my_chat_member", "channel_post"] });
+    username = (await botInfo()).username;
+    // production: Telegram sends updates to /api/telegram (set every time — cheap, and keeps allowed_updates current)
+    const hook = webhookUrl();
+    if (hook) await telegram("setWebhook", { url: hook.url, secret_token: hook.secret, allowed_updates: ALLOWED_UPDATES });
   } catch {
     return { ok: false, error: "telegramFailed" };
   }
-  const chats = new Map<string, { id: string; title: string; isForum: boolean }>();
-  for (const u of updates) {
-    const chat = u.message?.chat ?? u.my_chat_member?.chat ?? u.channel_post?.chat;
-    if (chat && chat.type !== "private") chats.set(String(chat.id), { id: String(chat.id), title: chat.title ?? String(chat.id), isForum: !!chat.is_forum });
-  }
-  return { ok: true, data: [...chats.values()] };
+
+  const code = randomBytes(18).toString("base64url");
+  const data = { connectCode: code, connectExpires: new Date(Date.now() + CONNECT_MINUTES * 60_000), connectUserId: me.id };
+  await prisma.telegramSettings.upsert({ where: { shopId: me.shop.id }, create: { shopId: me.shop.id, ...data }, update: data });
+  return { ok: true, data: { url: `https://t.me/${username}?startgroup=${code}` } };
 }
 
-/** 2b. use this group (picked from the list, or typed by hand); topic id only for groups with Topics */
-export async function saveChat(input: { chatId: string; chatTitle: string; threadId: string }): Promise<Result> {
-  const { shop } = await requireUser("telegram.manage");
-  const chatId = input.chatId.trim();
-  const threadId = input.threadId.trim();
-  if (!/^-?\d{5,20}$/.test(chatId)) return { ok: false, error: "invalid", fields: { chatId: "invalid" } };
-  if (threadId && !/^\d{1,10}$/.test(threadId)) return { ok: false, error: "invalid", fields: { threadId: "invalid" } };
+let pollOffset = 0;
 
-  const { count } = await prisma.telegramSettings.updateMany({
-    where: { shopId: shop.id, botTokenEnc: { not: null } },
-    data: {
-      chatId: BigInt(chatId),
-      chatTitle: input.chatTitle.trim() || null,
-      messageThreadId: threadId ? Number(threadId) : null,
-      lastError: null,
-    },
-  });
-  if (!count) return { ok: false, error: "notFound" };
-  done();
-  return { ok: true };
+/** 2. asked every few seconds while the admin waits: has a group been linked? (local mode: also fetches the bot's updates) */
+export async function checkTelegramConnect(): Promise<Result<{ linked: boolean }>> {
+  const me = await requireUser("telegram.manage");
+  if (!webhookUrl() && hasBotToken()) {
+    // no public https address (local) → no webhook; read the updates here instead
+    try {
+      const updates = await telegram<Update[]>("getUpdates", { offset: pollOffset, timeout: 0, allowed_updates: ALLOWED_UPDATES });
+      for (const update of updates) {
+        pollOffset = update.update_id + 1;
+        await handleUpdate(update).catch((e) => console.error("[telegram] update failed:", e));
+      }
+    } catch (e) {
+      // 409 = a webhook is set (e.g. by the live site with the same bot): updates go there, not here
+      if (!(e instanceof TelegramError && e.code === 409)) return { ok: false, error: "telegramFailed" };
+    }
+  }
+  const row = await prisma.telegramSettings.findUnique({ where: { shopId: me.shop.id }, select: { connectCode: true, chatId: true } });
+  const linked = !!row && row.chatId !== null && !row.connectCode;
+  if (linked) done();
+  return { ok: true, data: { linked } };
 }
 
 /** 3. send a test message to the group; the result is shown on the page (last test / last error) */
 export async function sendTest(): Promise<Result> {
   const { shop } = await requireUser("telegram.manage");
   const row = await prisma.telegramSettings.findUnique({ where: { shopId: shop.id } });
-  if (!row?.botTokenEnc || row.chatId === null) return { ok: false, error: "noChat" };
+  if (!hasBotToken()) return { ok: false, error: "botMissing" };
+  if (row?.chatId == null) return { ok: false, error: "noChat" };
   const t = await getTranslations({ locale: "km", namespace: "admin.telegram" });
 
   try {
-    await telegram(decrypt(row.botTokenEnc), "sendMessage", {
+    await telegram("sendMessage", {
       chat_id: row.chatId.toString(),
       text: `${t("testMessage")}\n\n${t("previewMessage")}`,
       ...(row.messageThreadId && { message_thread_id: row.messageThreadId }),
@@ -107,11 +88,11 @@ export async function sendTest(): Promise<Result> {
   return { ok: true };
 }
 
-/** send new orders to the group: on / off (needs bot + group) */
+/** send new orders to the group: on / off (needs a group) */
 export async function setTelegramEnabled(isEnabled: boolean): Promise<Result> {
   const { shop } = await requireUser("telegram.manage");
   const { count } = await prisma.telegramSettings.updateMany({
-    where: { shopId: shop.id, ...(isEnabled && { botTokenEnc: { not: null }, chatId: { not: null } }) },
+    where: { shopId: shop.id, ...(isEnabled && { chatId: { not: null } }) },
     data: { isEnabled },
   });
   if (!count) return { ok: false, error: "noChat" };
@@ -119,7 +100,7 @@ export async function setTelegramEnabled(isEnabled: boolean): Promise<Result> {
   return { ok: true };
 }
 
-/** forget the bot and the group */
+/** forget the group (the bot stays in it; remove it in Telegram if you like) */
 export async function disconnectTelegram(): Promise<Result> {
   const { shop } = await requireUser("telegram.manage");
   await prisma.telegramSettings.deleteMany({ where: { shopId: shop.id } });
@@ -143,21 +124,4 @@ export async function linkTelegramUser(userId: string, telegramId: string): Prom
   }
   done();
   return { ok: true };
-}
-
-export async function enableTelegramButtons(): Promise<Result> {
-  const { shop } = await requireUser("telegram.manage");
-  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  const base = appUrl();
-  if (!base || !secret || !/^[A-Za-z0-9_-]{32,256}$/.test(secret)) return { ok: false, error: "invalid" };
-  try {
-    const url = new URL("/api/telegram", base);
-    if (url.protocol !== "https:") return { ok: false, error: "invalid" };
-    const token = await botToken(shop.id);
-    if (!token) return { ok: false, error: "noChat" };
-    await telegram(token, "setWebhook", { url: url.href, secret_token: secret, allowed_updates: ["callback_query"] });
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "telegramFailed" };
-  }
 }

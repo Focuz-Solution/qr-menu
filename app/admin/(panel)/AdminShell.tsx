@@ -111,7 +111,7 @@ export function AdminShell({
   );
 }
 
-/** shadcn-style user button: avatar + name + email + ⋮; opens a menu (language, sign out) */
+/** shadcn-style user button: avatar + name + phone / email + ⋮; opens a menu (language, sign out) */
 type MenuShop = { id: string; name: string; logo: string };
 
 function UserMenu({ user, shops }: { user: ShopUser; shops: MenuShop[] }) {
@@ -131,7 +131,7 @@ function UserMenu({ user, shops }: { user: ShopUser; shops: MenuShop[] }) {
   const who = (
     <span className="grid min-w-0 flex-1 text-left leading-tight">
       <span className="truncate text-sm font-medium">{user.name}</span>
-      <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+      <span className="truncate text-xs text-muted-foreground">{user.contact}</span>
     </span>
   );
 
@@ -145,7 +145,7 @@ function UserMenu({ user, shops }: { user: ShopUser; shops: MenuShop[] }) {
           className="flex min-h-11 w-full items-center gap-2.5 rounded-md p-1.5 outline-none hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=open]:bg-foreground/5"
         >
           {avatar}
-          {/* name, role under it (the email shows inside the menu) */}
+          {/* name, role under it (the phone / email shows inside the menu) */}
           <span className="hidden min-w-0 flex-1 text-left leading-tight md:grid">
             <span className="truncate text-sm font-medium">{user.name}</span>
             <span className="truncate text-xs text-muted-foreground">{user.isOwner ? t("roles.owner") : user.roleName}</span>

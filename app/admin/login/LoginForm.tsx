@@ -21,20 +21,20 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   // React resets a form after its action runs; keeping the values in state means a wrong password
   // leaves both fields filled in so the person can fix them
-  const [email, setEmail] = useState("");
+  const [contact, setContact] = useState("");
   const [password, setPassword] = useState("");
-  const [invalid, setInvalid] = useState<{ email?: "required" | "badEmail"; password?: "required" }>({});
+  const [invalid, setInvalid] = useState<{ contact?: "required"; password?: "required" }>({});
 
   return (
     <form action={action} noValidate onSubmit={(event) => {
-      const emailInput = event.currentTarget.elements.namedItem("email") as HTMLInputElement;
+      const contactInput = event.currentTarget.elements.namedItem("contact") as HTMLInputElement;
       const passwordInput = event.currentTarget.elements.namedItem("password") as HTMLInputElement;
-      const emailError = emailInput.validity.valueMissing ? "required" : emailInput.validity.typeMismatch ? "badEmail" : undefined;
+      const contactError = contactInput.validity.valueMissing ? "required" : undefined;
       const passwordError = passwordInput.validity.valueMissing ? "required" : undefined;
-      setInvalid({ email: emailError, password: passwordError });
-      if (emailError || passwordError) {
+      setInvalid({ contact: contactError, password: passwordError });
+      if (contactError || passwordError) {
         event.preventDefault();
-        (emailError ? emailInput : passwordInput).focus();
+        (contactError ? contactInput : passwordInput).focus();
       }
     }} className="p-6 md:flex md:flex-col md:justify-center md:p-8">
       <FieldGroup>
@@ -44,21 +44,24 @@ export function LoginForm() {
           <p className="text-balance text-muted-foreground">{t("subtitle", { shop: platform.name })}</p>
         </div>
         <Field>
-          <FieldLabel htmlFor="email">{t("email")} <Req /></FieldLabel>
+          {/* phone or email in one field (the server tells them apart) */}
+          <FieldLabel htmlFor="contact">{t("contact")} <Req /></FieldLabel>
           <Input
-            id="email"
-            name="email"
-            type="email"
+            id="contact"
+            name="contact"
+            type="text"
             autoComplete="username"
-            placeholder={t("emailPlaceholder")}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder={t("contactPlaceholder")}
+            value={contact}
+            onChange={(event) => setContact(event.target.value)}
             required
-            aria-invalid={!!(invalid.email || state) || undefined}
-            aria-describedby={invalid.email ? "login-email-error" : undefined}
+            aria-invalid={!!(invalid.contact || state) || undefined}
+            aria-describedby={invalid.contact ? "login-contact-error" : undefined}
             className="h-11"
           />
-          {invalid.email && <FieldError id="login-email-error" role="alert">{errors(invalid.email)}</FieldError>}
+          {invalid.contact && <FieldError id="login-contact-error" role="alert">{errors(invalid.contact)}</FieldError>}
         </Field>
         <Field>
           <div className="flex items-center">
@@ -79,7 +82,7 @@ export function LoginForm() {
           {/* password + eye button to show / hide what was typed */}
           <InputGroup className="h-11">
             <InputGroupInput
-              aria-describedby={invalid.password || (state && !invalid.email) ? "login-error" : undefined}
+              aria-describedby={invalid.password || (state && !invalid.contact) ? "login-error" : undefined}
               id="password"
               name="password"
               type={showPassword ? "text" : "password"}
@@ -103,7 +106,7 @@ export function LoginForm() {
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          {(invalid.password || (state && !invalid.email)) && (
+          {(invalid.password || (state && !invalid.contact)) && (
             <FieldError id="login-error" role="alert">
               {invalid.password ? errors(invalid.password) : state?.error === "locked" ? t("errors.locked", { minutes: state.minutes }) : t("errors.badLogin")}
             </FieldError>

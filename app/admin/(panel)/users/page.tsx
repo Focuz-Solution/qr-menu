@@ -1,10 +1,11 @@
 import { requireUser } from "@/lib/auth";
+import { contactOf, formatPhone } from "@/lib/contact";
 import { prisma } from "@/lib/db";
 import { within } from "@/lib/permissions";
 import { allRoles, ensureBuiltInRoles, membershipPermissions } from "@/lib/staff-roles";
 import { StaffManager } from "./StaffManager";
 
-const userFields = { id: true, name: true, email: true, isActive: true, lastLoginAt: true, lockedUntil: true } as const;
+const userFields = { id: true, name: true, email: true, phone: true, isActive: true, lastLoginAt: true, lockedUntil: true } as const;
 
 /** "hello@focuzsolution.com" → "h***@f***.com" (an owner's email, shown to people who aren't owners) */
 function maskEmail(email: string) {
@@ -12,6 +13,12 @@ function maskEmail(email: string) {
   const dot = domain.lastIndexOf(".");
   const host = dot > 0 ? domain.slice(0, dot) : domain;
   return `${local.slice(0, 1)}***@${host.slice(0, 1)}***${dot > 0 ? domain.slice(dot) : ""}`;
+}
+
+/** "+85512345678" → "012 *** *78" (an owner's phone, shown to people who aren't owners) */
+function maskPhone(phone: string) {
+  const shown = formatPhone(phone);
+  return `${shown.slice(0, 4)}${shown.slice(4, -2).replace(/\d/g, "*")}${shown.slice(-2)}`;
 }
 
 // people of the current shop (their role here) + the owners (super-admins: every shop, listed as "Owner").
@@ -47,10 +54,10 @@ export default async function StaffPage() {
       ? prisma.shop.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, slug: true, settings: { select: { name: true } } } })
       : [],
   ]);
-  // owners' emails: in full for owners only; anyone else gets them masked (never sent to their browser)
-  const ownerRows = owners.map(({ lockedUntil, ...u }) => ({
+  // owners' phone / email: in full for owners only; anyone else gets them masked (never sent to their browser)
+  const ownerRows = owners.map(({ lockedUntil, email, phone, ...u }) => ({
     ...u,
-    email: me.isOwner ? u.email : maskEmail(u.email),
+    contact: me.isOwner ? contactOf({ email, phone }) : email ? maskEmail(email) : phone ? maskPhone(phone) : "",
     locked: !!lockedUntil && lockedUntil > now,
     roleId: "owner",
     canManage: me.isOwner && u.id !== me.id,
@@ -62,8 +69,9 @@ export default async function StaffPage() {
     const seen = byUser.get(m.user.id);
     if (!seen || (m.shopId === me.shop.id && seen.shopId !== me.shop.id)) byUser.set(m.user.id, m);
   }
-  const memberRows = [...byUser.values()].map(({ shopId, roleId, role, staffRole, user: { lockedUntil, memberships, _count, ...u } }) => ({
+  const memberRows = [...byUser.values()].map(({ shopId, roleId, role, staffRole, user: { lockedUntil, memberships, _count, email, phone, ...u } }) => ({
     ...u,
+    contact: contactOf({ email, phone }),
     locked: !!lockedUntil && lockedUntil > now,
     // "" = not in this shop (owner's view only)
     roleId: shopId === me.shop.id ? (roleId ?? "") : "",

@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { contactOf } from "@/lib/contact";
 import { prisma } from "@/lib/db";
 import { can, type Permission } from "@/lib/permissions";
 import { membershipPermissions } from "@/lib/staff-roles";
@@ -50,18 +51,19 @@ export async function deleteSession() {
 }
 
 /** the signed-in person; `shopId` = the shop this login is working in (null until one is picked on /admin/shops/) */
-export type AdminUser = { id: string; name: string; email: string; isOwner: boolean; shopId: string | null; sessionId: string };
+/** `contact` = their email or phone, ready to show */
+export type AdminUser = { id: string; name: string; contact: string; isOwner: boolean; shopId: string | null; sessionId: string };
 
 export const getCurrentUser = cache(async (): Promise<AdminUser | null> => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const session = await prisma.session.findUnique({
     where: { id: sha256(token) },
-    include: { user: { select: { id: true, name: true, email: true, isOwner: true, isActive: true } } },
+    include: { user: { select: { id: true, name: true, email: true, phone: true, isOwner: true, isActive: true } } },
   });
   if (!session || session.expiresAt < new Date() || !session.user.isActive) return null;
-  const { id, name, email, isOwner } = session.user;
-  return { id, name, email, isOwner, shopId: session.shopId, sessionId: session.id };
+  const { id, name, isOwner } = session.user;
+  return { id, name, contact: contactOf(session.user), isOwner, shopId: session.shopId, sessionId: session.id };
 });
 
 /**

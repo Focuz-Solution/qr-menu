@@ -27,7 +27,8 @@ import { Req } from "@/components/FieldMark";
 type Staff = {
   id: string;
   name: string;
-  email: string;
+  /** phone or email (masked for owners when you aren't one) */
+  contact: string;
   roleId: string;
   isActive: boolean;
   lastLoginAt: Date | null;
@@ -40,12 +41,12 @@ type RoleOption = { id: string; name: string; givable: boolean };
 type ShopOption = { id: string; name: string };
 const OWNER = "owner";
 const PAGE_SIZE = 10;
-type SortKey = "name" | "email" | "role" | "lastLoginAt" | "status";
+type SortKey = "name" | "contact" | "role" | "lastLoginAt" | "status";
 // status order: active, locked, disabled
 const statusRank = (u: Staff) => (!u.isActive ? 2 : u.locked ? 1 : 0);
 const compareBy = (roles: RoleOption[]): Record<SortKey, (a: Staff, b: Staff) => number> => ({
   name: (a, b) => a.name.localeCompare(b.name),
-  email: (a, b) => a.email.localeCompare(b.email),
+  contact: (a, b) => a.contact.localeCompare(b.contact),
   // in the Roles page's order
   role: (a, b) => roles.findIndex((r) => r.id === a.roleId) - roles.findIndex((r) => r.id === b.roleId),
   lastLoginAt: (a, b) => (a.lastLoginAt ? +a.lastLoginAt : 0) - (b.lastLoginAt ? +b.lastLoginAt : 0),
@@ -133,7 +134,7 @@ export function StaffManager({
           <TableHeader className="bg-muted/50 [&_th]:h-11 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
             <TableRow className="hover:bg-transparent">
               <SortHead k="name" sort={sort} onSort={onSort} className="w-[34%] pl-4 md:w-[21%]">{t("name")}</SortHead>
-              <SortHead k="email" sort={sort} onSort={onSort} className="hidden w-[24%] md:table-cell">{t("email")}</SortHead>
+              <SortHead k="contact" sort={sort} onSort={onSort} className="hidden w-[24%] md:table-cell">{t("contact")}</SortHead>
               <SortHead k="role" sort={sort} onSort={onSort} className="w-[22%] md:w-[17%]">{t("role")}</SortHead>
               <SortHead k="lastLoginAt" sort={sort} onSort={onSort} className="hidden w-[20%] md:table-cell">{t("lastLogin")}</SortHead>
               <SortHead k="status" sort={sort} onSort={onSort} className="hidden w-[12%] sm:table-cell">{t("status")}</SortHead>
@@ -159,10 +160,10 @@ export function StaffManager({
                     <p className="truncate font-medium">
                       {u.name}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground md:hidden">{u.email}</p>
+                    <p className="truncate text-xs text-muted-foreground md:hidden">{u.contact}</p>
                   </TableCell>
-                  <TableCell className="hidden max-w-0 truncate text-muted-foreground md:table-cell" title={u.email}>
-                    {u.email}
+                  <TableCell className="hidden max-w-0 truncate text-muted-foreground md:table-cell" title={u.contact}>
+                    {u.contact}
                   </TableCell>
                   <TableCell>
                     {/* someone you can't manage, or an owner (app-wide, not a role in a shop), can't be changed here;
@@ -352,7 +353,7 @@ function AddForm({ roles, isOwner, onDone }: { roles: RoleOption[]; isOwner: boo
         start(async () => {
           const r = await createStaff({
             name: String(f.get("name") ?? ""),
-            email: String(f.get("email") ?? ""),
+            contact: String(f.get("contact") ?? ""),
             roleId: String(f.get("role") ?? ""),
             password: String(f.get("password") ?? ""),
           });
@@ -373,9 +374,10 @@ function AddForm({ roles, isOwner, onDone }: { roles: RoleOption[]; isOwner: boo
           {fields.name && <p className="text-xs text-destructive">{te(fields.name)}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">{t("email")} <Req /></Label>
-          <Input id="email" name="email" type="email" required autoComplete="off" placeholder={t("emailPlaceholder")} aria-invalid={!!fields.email || undefined} className="h-11" />
-          {fields.email && <p className="text-xs text-destructive">{te(fields.email)}</p>}
+          {/* phone (most people) or email — one field, the server tells them apart */}
+          <Label htmlFor="contact">{t("contact")} <Req /></Label>
+          <Input id="contact" name="contact" type="text" required autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={254} placeholder={t("contactPlaceholder")} aria-invalid={!!fields.contact || undefined} className="h-11" />
+          {fields.contact && <p className="text-xs text-destructive">{te(fields.contact)}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="role">{t("role")} <Req /></Label>

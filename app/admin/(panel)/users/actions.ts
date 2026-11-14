@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireOwner, requireUser, type ShopUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { parseContact } from "@/lib/contact";
 import { hashPassword, MIN_PASSWORD } from "@/lib/password";
 import { within } from "@/lib/permissions";
 import type { ErrorCode, Result } from "@/lib/result";
@@ -13,7 +14,6 @@ import { membershipPermissions } from "@/lib/staff-roles";
 // Nobody gives a role stronger than their own, or manages someone whose role is stronger, or (unless they're
 // the owner) someone who also works in another shop. Only the owner makes owners and sets someone's shops.
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 /** what the role picker sends for "Owner" (every shop, every permission) — not a role row */
 const OWNER = "owner";
@@ -50,23 +50,24 @@ async function manageable(me: ShopUser, userId: string) {
   return { isOwner: false, here: true };
 }
 
-export async function createStaff(input: { name: string; email: string; roleId: string; password: string }): Promise<Result> {
+/** new account: signs in with a phone number or an email (one field; "@" → email) */
+export async function createStaff(input: { name: string; contact: string; roleId: string; password: string }): Promise<Result> {
   const me = await requireUser("users.manage");
   const name = input.name.trim();
-  const email = input.email.trim().toLowerCase();
+  const contact = parseContact(String(input.contact ?? ""));
   const makeOwner = input.roleId === OWNER;
   const fields: Record<string, ErrorCode> = {};
   if (!name || name.length > 80) fields.name = "required";
-  if (!EMAIL.test(email)) fields.email = "badEmail";
+  if (!contact) fields.contact = "badContact";
   const role = makeOwner ? null : await givableRole(me, input.roleId);
   if (makeOwner ? !me.isOwner : !role) fields.role = "required";
   if (input.password.length < MIN_PASSWORD) fields.password = "weakPassword";
-  if (Object.keys(fields).length) return { ok: false, error: "invalid", fields };
+  if (Object.keys(fields).length || !contact) return { ok: false, error: "invalid", fields };
 
   // an account that already exists: the owner can add it to this shop, or make it an owner (its password stays as it is)
-  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true, isOwner: true } });
+  const existing = await prisma.user.findUnique({ where: contact, select: { id: true, isOwner: true } });
   if (existing) {
-    if (!me.isOwner || existing.isOwner) return { ok: false, error: "invalid", fields: { email: "emailTaken" } };
+    if (!me.isOwner || existing.isOwner) return { ok: false, error: "invalid", fields: { contact: "contactTaken" } };
     if (makeOwner) {
       await prisma.user.update({ where: { id: existing.id }, data: { isOwner: true } });
       done();
@@ -75,7 +76,7 @@ export async function createStaff(input: { name: string; email: string; roleId: 
     try {
       await prisma.membership.create({ data: { userId: existing.id, shopId: me.shop.id, roleId: role!.id } });
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { ok: false, error: "invalid", fields: { email: "emailTaken" } };
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { ok: false, error: "invalid", fields: { contact: "contactTaken" } };
       throw e;
     }
     done();
@@ -87,14 +88,14 @@ export async function createStaff(input: { name: string; email: string; roleId: 
       // owner = every shop (no membership); anyone else belongs to this shop with the chosen role
       data: {
         name,
-        email,
+        ...contact,
         passwordHash: await hashPassword(input.password),
         ...(makeOwner ? { isOwner: true } : { memberships: { create: { shopId: me.shop.id, roleId: role!.id } } }),
       },
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return { ok: false, error: "invalid", fields: { email: "emailTaken" } };
+      return { ok: false, error: "invalid", fields: { contact: "contactTaken" } };
     }
     throw e;
   }

@@ -65,7 +65,9 @@ enum Role {
 
 model User {
   id             String       @id @default(uuid(7)) @db.Uuid
-  email          String       @unique
+  /// sign-in: an email, a phone (+855…, E.164), or both — at least one (checked in code)
+  email          String?      @unique
+  phone          String?      @unique
   passwordHash   String       @map("password_hash")
   name           String
   /// super-admin: creates shops, sees and manages every shop
@@ -347,12 +349,14 @@ model OrderCounter {
 model TelegramSettings {
   shopId          String    @id @map("shop_id") @db.Uuid
   shop            Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  botTokenEnc     String?   @map("bot_token_enc")
-  botUsername     String?   @map("bot_username")
   chatId          BigInt?   @map("chat_id")
   chatTitle       String?   @map("chat_title")
   messageThreadId Int?      @map("message_thread_id")
-  webhookSecret   String?   @map("webhook_secret")
+  /// one-time code in the "add to group" link (t.me/<bot>?startgroup=<code>); cleared once a group is linked
+  connectCode     String?   @unique @map("connect_code")
+  connectExpires  DateTime? @map("connect_expires")
+  /// the admin who pressed Connect: their Telegram account (the one adding the bot) is linked to them
+  connectUserId   String?   @map("connect_user_id") @db.Uuid
   isEnabled       Boolean   @default(false) @map("is_enabled")
   lastTestAt      DateTime? @map("last_test_at")
   lastError       String?   @map("last_error")

@@ -5,7 +5,6 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { clientIp } from "@/lib/auth";
-import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { shopBySlug } from "@/lib/shops";
@@ -14,7 +13,7 @@ import { isProvinceCode, PROVINCES } from "@/lib/provinces";
 import type { ErrorCode, Result } from "@/lib/result";
 import { formatPrice } from "@/lib/shop";
 import { shopSettings } from "@/lib/shop-settings";
-import { escapeHtml, telegram, telegramOrderUrl } from "@/lib/telegram";
+import { escapeHtml, hasBotToken, telegram, telegramOrderUrl, webhookUrl } from "@/lib/telegram";
 import type { CheckoutInput } from "./types";
 
 // Public checkout (no login): everything the browser sends is checked again here; prices come from the database.
@@ -158,39 +157,56 @@ async function notifyTelegram(
   },
 ) {
   const tg = await prisma.telegramSettings.findUnique({ where: { shopId } });
-  if (!tg?.isEnabled || !tg.botTokenEnc || tg.chatId === null) return;
+  if (!tg?.isEnabled || tg.chatId === null || !hasBotToken()) return;
   const t = await getTranslations({ locale: (await shopSettings(shopId)).language, namespace: "checkout" });
   const money = (c: number) => formatPrice(c / 100);
   const e = escapeHtml;
-  const message = [
-    `🛍️ <b>${e(t("tgNew", { no: o.orderNo }))}</b>`,
-    e(t("tgOrderHint")),
-    "",
+  // order time in Cambodia, e.g. 08/11/2026 14:32
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Phnom_Penh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date()).replace(",", "");
+  const DIVIDER = "------------------------";
+  // the order number links to the order in Admin (only when the site has a public https address)
+  const dashboard = telegramOrderUrl(orderId);
+  const orderNo = dashboard ? `<a href="${dashboard}">#${e(o.orderNo)}</a>` : `#${e(o.orderNo)}`;
+  const NO = "\u0000"; // placeholder: the title is escaped first, then the (already safe) link goes in
+  // Telegram allows 4096 characters per message: a very long order shows its first items + "… +N"
+  const items = o.lines.map((l) => `${l.quantity} × ${e(l.name)} · ${money(l.lineTotalCents)}`);
+  const build = (shown: number) => [
+    `🛍 <b>${e(t("tgNew", { no: NO })).replace(NO, orderNo)}</b>`,
+    `🕒 ${time}`,
+    DIVIDER,
     `👤 ${e(o.name)}`,
     `📞 ${e(o.phoneRaw)}`,
     `📍 ${e(o.province)} — ${e(o.address)}`,
     o.landmark ? `🏠 ${e(o.landmark)}` : null,
     o.mapUrl ? `🗺 ${e(o.mapUrl)}` : null,
     o.note ? `📝 ${e(o.note)}` : null,
-    "",
-    ...o.lines.map((l) => `• ${e(l.name)} × ${l.quantity} = ${money(l.lineTotalCents)}`),
-    "",
-    `${e(t("subtotal"))}: ${money(o.subtotalCents)}`,
-    `${e(t("delivery"))} (${e(o.deliveryZoneName)}): ${o.deliveryFeeCents ? money(o.deliveryFeeCents) : e(t("free"))}`,
-    `<b>${e(t("total"))}: ${money(o.totalCents)}</b>`,
-    `💳 ${e(t(o.payment === "cod" ? "payCod" : "payBank"))}`,
+    DIVIDER,
+    ...items.slice(0, shown),
+    shown < items.length ? `… +${items.length - shown}` : null,
+    DIVIDER,
+    `${e(t("subtotal"))} · ${money(o.subtotalCents)}`,
+    `${e(t("delivery"))} · ${o.deliveryFeeCents ? money(o.deliveryFeeCents) : e(t("free"))}`,
+    `<b>${e(t("total"))} · ${money(o.totalCents)}</b>`,
+    `${e(t(o.payment === "cod" ? "payCod" : "payBank"))} · ${e(t("tgUnpaid"))}`,
+    "__________________________",
   ]
-    .filter((line) => line !== null) // optional details left out; "" lines are intended gaps
+    .filter((line) => line !== null) // optional details left out
     .join("\n");
-  const dashboard = telegramOrderUrl(orderId);
+  let shown = items.length;
+  let message = build(shown);
+  while (message.length > 4096 && shown > 1) message = build(--shown);
+  message = message.slice(0, 4096);
   const buttons = await getTranslations({ locale: "km", namespace: "admin.telegram" });
   try {
-    const sent = await telegram<{ message_id: number }>(decrypt(tg.botTokenEnc), "sendMessage", {
+    const sent = await telegram<{ message_id: number }>("sendMessage", {
       chat_id: tg.chatId.toString(),
       text: message,
       parse_mode: "HTML",
       disable_web_page_preview: true,
-      ...(dashboard && process.env.TELEGRAM_WEBHOOK_SECRET && {
+      // buttons only when Telegram can reach this site (https + a valid webhook secret); otherwise ✓ Confirm would do nothing
+      ...(dashboard && webhookUrl() && {
         reply_markup: {
           inline_keyboard: [
             [{ text: buttons("previewConfirm"), callback_data: `c:${orderId}:${tg.chatId}` }, { text: buttons("previewCancel"), url: dashboard }],
