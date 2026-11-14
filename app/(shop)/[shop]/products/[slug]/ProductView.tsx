@@ -2,7 +2,6 @@
 
 import { Check, Gift, Minus, Plus, ShoppingBag, Tag, Truck, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CartLink } from "@/components/CartLink";
 import { DiscountBadge } from "@/components/DiscountBadge";
 import { Badge } from "@/components/ui/badge";
@@ -49,18 +48,17 @@ export function ProductView({ product: p }: { product: Product }) {
         }
         footer={(image) => <AddToCart slug={p.slug} image={image} disabled={!p.inStock} />}
         details={
-          <>
-          <Accordion type="multiple" defaultValue={["description"]} className="border-t">
+          // always open: each section a soft grey card (title + text), no collapse arrow
+          <div className="space-y-3 pt-2">
             {sections.map((s) => (
-              <AccordionItem key={s.key} value={s.key}>
-                <AccordionTrigger className="min-h-11 items-center">{s.title}</AccordionTrigger>
-                <AccordionContent className="leading-relaxed whitespace-pre-line text-muted-foreground">
+              <section key={s.key} className="space-y-2 rounded-2xl bg-muted/60 p-4">
+                <h2 className="font-semibold">{s.title}</h2>
+                <div className="leading-relaxed whitespace-pre-line text-muted-foreground">
                   {s.key === "howToUse" ? <Steps text={s.body!} /> : s.key === "description" ? <Description text={s.body!} /> : s.body}
-                </AccordionContent>
-              </AccordionItem>
+                </div>
+              </section>
             ))}
-          </Accordion>
-          </>
+          </div>
         }
       />
     </article>

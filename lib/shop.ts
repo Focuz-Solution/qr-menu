@@ -55,6 +55,12 @@ export const shop = {
 export const variantAt = (p: Product, image: string) => p.variants?.find((v) => v.image === image);
 /** price of the style picked by its photo: the variant's own price, else the product price (rule 8) */
 export const priceAt = (p: Product, image: string) => variantAt(p, image)?.price ?? p.price;
+/** the variant shown by this photo: its name, or "" + its number (1, 2…) when it has none; null when the photo isn't a variant */
+export function variantName(p: Product, image: string) {
+  const list = (p.variants ?? []).filter((v) => v.image);
+  const i = list.findIndex((v) => v.image === image);
+  return i < 0 ? null : { label: list[i].label, n: i + 1 };
+}
 
 export function discountPercent(p: { price: number; oldPrice?: number }) {
   return p.oldPrice && p.oldPrice > p.price

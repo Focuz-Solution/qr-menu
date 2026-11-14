@@ -79,16 +79,20 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
   const bySlug = new Map(items.map((i) => [i.slug, i]));
   if (lines.some((l) => !bySlug.get(String(l.slug))?.isAvailable)) return { ok: false, error: "unavailable" };
 
+  // unnamed variants are saved as "Option 2" in the shop's language (Admin → Orders and Telegram show it)
+  const tp = await getTranslations({ locale: (await shopSettings(shopId)).language, namespace: "product" });
   const orderLines = lines.map((l) => {
     const item = bySlug.get(String(l.slug))!;
     // the photo the customer picked (a style) if it is one of this product's photos, else the main photo
     const photos = item.images.map((i) => i.url);
     const image = typeof l.image === "string" && photos.includes(l.image) ? l.image : (photos[0] ?? null);
     // that photo's variant name (shade, size…), if it is a variant
-    const v = (Array.isArray(item.variants) ? (item.variants as { label?: string; image?: string; priceCents?: number }[]) : []).find((x) => x.image === image);
+    const withPhoto = (Array.isArray(item.variants) ? (item.variants as { label?: string; image?: string; priceCents?: number }[]) : []).filter((x) => x.image);
+    const n = withPhoto.findIndex((x) => x.image === image);
+    const v = n < 0 ? undefined : withPhoto[n];
     // the variant's own price from the database (rule 8), else the product price
     const unit = typeof v?.priceCents === "number" && v.priceCents >= 0 ? v.priceCents : item.priceCents;
-    return { itemId: item.id, name: item.name, variant: v?.label || null, imageUrl: image, unitPriceCents: unit, quantity: l.qty, lineTotalCents: unit * l.qty };
+    return { itemId: item.id, name: item.name, variant: v ? v.label || tp("optionN", { n: n + 1 }) : null, imageUrl: image, unitPriceCents: unit, quantity: l.qty, lineTotalCents: unit * l.qty };
   });
   const subtotalCents = orderLines.reduce((n, l) => n + l.lineTotalCents, 0);
   if (settings?.minOrderCents && subtotalCents < settings.minOrderCents) return { ok: false, error: "minOrder" };

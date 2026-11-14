@@ -215,22 +215,43 @@ export function CatalogueSkeleton() {
   );
 }
 
-/** product page: photo on the left (top on phones), name, price, options and buttons on the right */
+/** product page (copies ProductView + Gallery): back button, photo with the thumbnail column on desktop,
+ *  then brand, name, price, option pills, add button and the description */
 export function ProductSkeleton() {
   return (
-    <Loading>
-      <ShopHeaderSkeleton />
-      <div className="grid grid-cols-1 gap-5 pt-2 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:items-start md:gap-8">
-        <Skeleton className="-mx-4 aspect-square rounded-none md:mx-0 md:rounded-lg" />
-        <div className="flex flex-col gap-4">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-7 w-full" />
-          <Skeleton className="h-7 w-28" />
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-11 w-20 rounded-full" />)}
+    <Loading className="relative pb-6">
+      {/* back button: over the photo on phones, its own row on desktop */}
+      <div className="absolute inset-x-0 top-0 z-10 pt-3 md:static md:pb-4">
+        <Skeleton className="size-9 rounded-full bg-background/80 md:bg-muted" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:items-start md:gap-8">
+        <div className="-mx-4 md:mx-0 md:flex md:gap-4">
+          <div className="hidden w-20 shrink-0 flex-col items-center gap-3 md:flex">
+            <Skeleton className="size-11 rounded-full" />
+            {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="aspect-square w-full rounded-lg" />)}
+            <Skeleton className="size-11 rounded-full" />
           </div>
-          <Skeleton className="h-12 w-full rounded-full" />
-          <LinesSkeleton lines={4} className="pt-2" />
+          <Skeleton className="aspect-square rounded-none md:flex-1 md:rounded-lg" />
+        </div>
+        {/* phones: white sheet with round top over the photo, like the real page */}
+        <div className="relative -mx-4 -mt-6 flex flex-col gap-3 rounded-t-3xl bg-background px-4 pt-6 md:mx-0 md:mt-0 md:rounded-none md:px-0 md:pt-0">
+          <Skeleton className="h-6 w-28" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-2/3" />
+          </div>
+          <Skeleton className="h-8 w-28" />
+          <div className="flex flex-col gap-2 pt-1">
+            <Skeleton className="h-4 w-16" />
+            <div className="flex flex-wrap gap-2">
+              {["w-20", "w-24", "w-16"].map((w) => <Skeleton key={w} className={cn("h-9 rounded-full", w)} />)}
+            </div>
+          </div>
+          <Skeleton className="mt-2 h-12 w-full rounded-full" />
+          <div className="flex flex-col gap-3 pt-4">
+            <Skeleton className="h-5 w-32" />
+            <LinesSkeleton lines={4} />
+          </div>
         </div>
       </div>
     </Loading>
@@ -242,9 +263,12 @@ export function CheckoutSkeleton() {
   const box = "flex flex-col gap-4 rounded-2xl border p-4";
   return (
     <Loading>
-      <ShopHeaderSkeleton />
-      <Skeleton className="mt-2 mb-4 h-7 w-40" />
-      <div className="grid gap-6 md:grid-cols-[1fr_320px] md:items-start">
+      {/* back button + title (the real page has no shop header) */}
+      <div className="flex items-center gap-2 py-3">
+        <Skeleton className="size-9 rounded-full" />
+        <Skeleton className="h-7 w-40" />
+      </div>
+      <div className="mt-1 grid gap-6 md:grid-cols-[1fr_320px] md:items-start">
         <div className="flex flex-col gap-6">
           <div className={box}>
             {Array.from({ length: 2 }, (_, i) => (

@@ -57,6 +57,7 @@ export default async function ShopSettingsPage() {
           <DefaultShop
             isDefault={defaultShop?.id === me.shop.id}
             host={publicHost()}
+            slug={me.shop.slug}
             other={defaultShop && defaultShop.id !== me.shop.id ? (defaultShop.settings?.name ?? defaultShop.slug) : null}
           />
         )

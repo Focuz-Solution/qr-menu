@@ -475,11 +475,15 @@
       "slugLockedHint": "Locked: customers already order through this link — {link}",
       "mapUrl": "Google Maps location link",
       "defaultTitle": "Main address",
-      "defaultHint": "Only you (the app owner) see this. One shop can open at the main address, without its own name in the link.",
-      "defaultLabel": "Show this shop at {host}",
-      "defaultOn": "Customers who open {host} see this shop. Its own link still works too.",
-      "defaultOther": "{shop} opens at the main address now. Turning this on shows this shop there instead.",
-      "defaultNone": "No shop opens at the main address yet: it goes to the first shop's link."
+      "defaultHint": "Pick which shop customers see when they open {host} with nothing after it.",
+      "defaultLabel": "Open this shop at {host}",
+      "defaultOn": "On: customers who open {host} see this shop.",
+      "defaultOther": "Off: {shop} is at the main address now. Turn on to show this shop there instead.",
+      "defaultNone": "Off: no shop is chosen, so {host} goes to the first shop.",
+      "defaultOwnerOnly": "Owner only",
+      "defaultPreview": "Where each link goes",
+      "defaultThisShop": "This shop",
+      "defaultFirstShop": "The first shop"
     },
     "shops": {
       "title": "Your shops",
