@@ -49,20 +49,23 @@ export async function changeOrderStatus(actorId: string, shopId: string, id: str
 
   revalidatePath("/admin", "layout");
   // after the answer (staff don't wait for Telegram): the group's order message shows the new status,
-  // and the customer's Telegram (if they connected it at checkout) hears only "confirmed" — one message, not one per step
+  // and the customer's Telegram (if they connected it at checkout) hears only "confirmed" or "cancelled" — not every step
   after(() => syncOrderInGroup(id));
-  if (next === "confirmed") after(() => notifyCustomer(id));
+  if (next === "confirmed" || next === "cancelled") after(() => notifyCustomer(id, next, cancelReason));
   return { ok: true };
 }
 
-/** "✅ Your order #… is confirmed" → the customer's private chat with the bot. Never fails the status change. */
-async function notifyCustomer(orderId: string) {
+/** "✅ Your order #… is confirmed" / "❌ … was cancelled" + reason → the customer's chat with the bot. Never fails the status change. */
+async function notifyCustomer(orderId: string, status: "confirmed" | "cancelled", reason?: string) {
   if (!hasBotToken()) return;
   const order = await prisma.order.findUnique({ where: { id: orderId }, select: { orderNo: true, shopId: true, customerChatId: true } });
   if (!order?.customerChatId) return;
   const { language } = await shopSettings(order.shopId);
   const t = await getTranslations({ locale: language, namespace: "checkout" });
-  const text = t("tgConfirmed", { no: order.orderNo });
+  const text =
+    status === "confirmed"
+      ? t("tgConfirmed", { no: order.orderNo })
+      : [t("tgCancelled", { no: order.orderNo }), reason ? t("tgReason", { reason }) : null].filter(Boolean).join("\n");
   try {
     await telegram("sendMessage", { chat_id: order.customerChatId.toString(), text });
   } catch (cause) {

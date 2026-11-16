@@ -1,13 +1,14 @@
 import "server-only";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/db";
-import type { OrderStatus } from "@/lib/generated/prisma/enums";
 import { formatPrice } from "@/lib/shop";
 import { shopSettings } from "@/lib/shop-settings";
 import { escapeHtml, hasBotToken, telegram, telegramOrderUrl, webhookUrl } from "@/lib/telegram";
 
+// The order's message in the shop's Telegram group. Built from the database, so the same message can be
+// sent for a new order (postOrderToGroup) and rebuilt after every status change (syncOrderInGroup) — from the
+// dashboard or from ✓ in Telegram — with the status on top (not who changed it) and only the buttons that still make sense.
 
-const STATUS_EMOJI: Record<OrderStatus, string> = { new: "🛍", confirmed: "✅", packing: "📦", shipped: "🚚", delivered: "🎉", cancelled: "❌" };
 
 async function load(orderId: string) {
   return prisma.order.findUnique({
@@ -24,7 +25,7 @@ async function build(o: NonNullable<Awaited<ReturnType<typeof load>>>, chatId: b
   const money = (c: number) => formatPrice(c / 100);
   const e = escapeHtml;
   // order time in Cambodia, e.g. 08/11/2026 14:32
-  const time = new Intl.DateTimeFormat("en-GB", {
+  const time = new Intl.DateTimeFormat("en-GB", { 
     timeZone: "Asia/Phnom_Penh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(o.createdAt).replace(",", "");
   const DIVIDER = "------------------------";
@@ -32,11 +33,13 @@ async function build(o: NonNullable<Awaited<ReturnType<typeof load>>>, chatId: b
   const dashboard = telegramOrderUrl(o.id);
   const orderNo = dashboard ? `<a href="${dashboard}">#${e(o.orderNo)}</a>` : `#${e(o.orderNo)}`;
   const NO = "\u0000"; // placeholder: the title is escaped first, then the (already safe) link goes in
-  // after the first change: the status on top, e.g. "✅ Confirmed" (+ the reason when cancelled)
+  // on top, only two states: "❌ Cancelled" + reason, or "✅ Confirmed" (packing, shipped, delivered come after confirming)
   const status =
     o.status === "new"
       ? []
-      : [`${STATUS_EMOJI[o.status]} <b>${e(ta(`status.${o.status}`))}</b>`, o.status === "cancelled" && o.cancelReason ? e(t("tgReason", { reason: o.cancelReason })) : null, ""];
+      : o.status === "cancelled"
+        ? [`❌ <b>${e(ta("status.cancelled"))}</b>`, o.cancelReason ? e(t("tgReason", { reason: o.cancelReason })) : null, ""]
+        : [`✅ <b>${e(ta("status.confirmed"))}</b>`, ""];
   // Telegram allows 4096 characters per message: a very long order shows its first items + "… +N"
   // "2 × Lipstick (Red) · $24.00" — the variant name in brackets when there is one
   const items = o.items.map((l) => `${l.quantity} × ${e(l.name)}${l.variant ? ` (${e(l.variant)})` : ""} · ${money(l.lineTotalCents)}`);
