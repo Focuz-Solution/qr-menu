@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, CircleCheck, Download, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, CircleCheck, Download, MapPin, MessageCircle, Phone } from "lucide-react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { Req } from "@/components/FieldMark";
 import { Img } from "@/components/Img";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -107,12 +108,30 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
           <Box title={t("orders.customer")} className="[&>h2]:border-b-0 [&>div]:pt-1">
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-5">
               <div className="min-w-0">
-                <p className="font-semibold wrap-break-word">{o.customerName}</p>
+                {/* their Telegram photo (when they tapped Start on the receipt and it is public), else the first letter of the name */}
+                <div className="flex items-center gap-3">
+                  <Avatar className="size-12">
+                    {o.telegramLinked && <AvatarImage src={`/admin/orders/${o.id}/telegram-photo`} alt="" className="object-cover" />}
+                    <AvatarFallback className="text-base font-semibold">{Array.from((o.customerTelegramName ?? o.customerName).trim())[0]?.toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="font-semibold wrap-break-word">{o.customerName}</p>
+                    {o.customerTelegramName && (
+                      <p className="text-sm wrap-break-word text-muted-foreground">
+                        {t("orders.telegramName", { name: [o.customerTelegramName, o.customerTelegram].filter(Boolean).join(" ") })}
+                      </p>
+                    )}
+                  </div>
+                </div>
                 <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-11 w-fit items-center gap-2 text-sm text-primary underline-offset-4 hover:underline">
                   <Phone className="size-4 shrink-0" aria-hidden />
                   {phone}
                 </a>
-                {o.customerTelegram && <p className="text-sm break-all text-muted-foreground">{o.customerTelegram}</p>}
+                {/* chat with the customer on Telegram, next to the call link: by @username when known (always works), else by phone */}
+                <a href={`https://t.me/${o.customerTelegram?.slice(1) ?? o.customerPhone}`} target="_blank" rel="noopener noreferrer" className="ml-4 inline-flex min-h-11 w-fit items-center gap-2 text-sm text-primary underline-offset-4 hover:underline">
+                  <MessageCircle className="size-4 shrink-0" aria-hidden />
+                  {t("telegram.chatCustomer")}
+                </a>
               </div>
               <div className="min-w-0 space-y-1">
                 <p className="text-xs font-semibold text-muted-foreground">{t("orders.address")}</p>
