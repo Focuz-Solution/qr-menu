@@ -95,7 +95,7 @@
         "badLogin": "Wrong phone/email or password",
         "locked": "Too many wrong tries. Try again in {minutes} min."
       },
-      "contactPlaceholder": "e.g. 012 345 678",
+      "contactPlaceholder": "Enter phone or email",
       "passwordPlaceholder": "Enter your password",
       "forgot": "Forgot your password?",
       "forgotTitle": "Forgot your password?",
@@ -161,6 +161,7 @@
       "searchPlaceholder": "Search orders...",
       "order": "Order",
       "time": "Time",
+      "telegramName": "Telegram: {name}",
       "customer": "Customer",
       "phone": "Phone",
       "province": "Province",
@@ -408,6 +409,7 @@
       "previewMessage": "🛍 New order #PB-261108-0041\n🕒 08/11/2026 14:32\n------------------------\n👤 Sokha Chan\n📍 Phnom Penh\n------------------------\n2 × Sweet Cat · $44.00\n1 × Eyeliner · $4.00\n------------------------\nSubtotal · $48.00\nDelivery · $1.50\nTotal · $49.50\nCash on delivery · Unpaid\n__________________________",
       "previewConfirm": "✓ Confirm",
       "previewCancel": "✕ Cancel",
+      "chatCustomer": "Chat on Telegram",
       "previewDashboard": "Open in dashboard",
       "title": "Telegram",
       "intro": "Send every new order to the shop's Telegram group so staff can pack it.",
@@ -439,6 +441,8 @@
       "sectionShop": "Shop details",
       "name": "Shop name",
       "contactPhone": "Phone number",
+      "addPhone": "Add phone",
+      "removePhone": "Remove phone number",
       "sectionLinks": "Social links",
       "linksHint": "Shown on the shop so customers can contact you. Must start with https://",
       "telegramUrl": "Telegram link",
@@ -468,6 +472,8 @@
       "layoutFilterHint": "Show all, By category, By brand, Discount",
       "notice": "Header message",
       "noticePlaceholder": "Enter the running text for the shop header",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe your shop in a few sentences",
       "save": "Save",
       "saved": "Saved",
       "slug": "Link address",
@@ -618,7 +624,18 @@
     "orderNo": "Order number",
     "backToShop": "Back to the shop",
     "tgNew": "New order {no}",
-    "tgUnpaid": "Unpaid"
+    "tgUnpaid": "Unpaid",
+    "tgUpdates": "Get order updates on Telegram",
+    "tgUpdatesHint": "Tap Start in Telegram — we'll message you when your order is confirmed, sent and delivered.",
+    "tgSubscribed": "🔔 Done! You'll get updates here for order {no} at {shop}.",
+    "tgReason": "Reason: {reason}",
+    "tgStatus": {
+      "confirmed": "✅ Your order {no} at {shop} is confirmed.",
+      "packing": "📦 Your order {no} is being packed.",
+      "shipped": "🚚 Your order {no} is on the way.",
+      "delivered": "🎉 Your order {no} was delivered. Thank you for shopping at {shop}!",
+      "cancelled": "❌ Your order {no} at {shop} was cancelled."
+    }
   },
   "errors": {
     "badPhone": "Enter a valid Cambodian phone number (e.g. 012 345 678)",

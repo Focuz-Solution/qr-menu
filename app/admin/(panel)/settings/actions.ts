@@ -8,6 +8,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import type { ErrorCode, Result } from "@/lib/result";
 import { isHex, textOn } from "@/lib/brand-colors";
 import { deleteImageIfUnused, imageKey } from "@/lib/r2";
+import { cleanRichInput } from "@/lib/rich-text";
 import { isShopSlug } from "@/lib/shops";
 import type { ShopInput } from "./types";
 
@@ -66,10 +67,11 @@ export async function saveShopSettings(input: Partial<ShopInput>): Promise<Resul
     if (!name || name.length > 80) fields.name = "required";
     data.name = name;
   }
-  const phone = get("contactPhone")?.trim();
+  const phone = get("contactPhone");
   if (phone !== undefined) {
-    if (phone && !/^[+\d][\d\s-]{5,20}$/.test(phone)) fields.contactPhone = "invalid";
-    data.contactPhone = phone || null;
+    const phones = phone.split(",").map((p) => p.trim()).filter(Boolean);
+    if (phones.length > 5 || phones.some((p) => !/^[+\d][\d\s-]{5,20}$/.test(p))) fields.contactPhone = "invalid";
+    data.contactPhone = phones.join(", ") || null;
   }
   const map = get("mapUrl");
   if (map !== undefined) {
@@ -115,6 +117,12 @@ export async function saveShopSettings(input: Partial<ShopInput>): Promise<Resul
   }
   const notice = get("notice");
   if (notice !== undefined) data.notice = text(notice);
+  
+  const description = get("description");
+  if (description !== undefined) {
+    data.description = cleanRichInput(description);
+    if (data.description.length > 20000) fields.description = "invalid";
+  }
   if (Object.keys(fields).length) return { ok: false, error: "invalid", fields };
 
   if (slug !== undefined && slug !== current.slug) {

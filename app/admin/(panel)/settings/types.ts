@@ -21,4 +21,6 @@ export type ShopInput = {
   layout: string;
   /** running text in the shop header */
   notice: string;
+  /** link preview text when the shop link is shared, "" = the default sentence */
+  description: string;
 };

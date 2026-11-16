@@ -8,7 +8,7 @@ import { toCents, type DiscountType, salePrice } from "@/lib/money";
 import { Badge } from "@/lib/generated/prisma/enums";
 import type { ErrorCode, Result } from "@/lib/result";
 import { deleteImageIfUnused, imageKey } from "@/lib/r2";
-import { cleanRich, richHasText } from "@/lib/rich-text";
+import { cleanRichInput } from "@/lib/rich-text";
 import type { ItemInput } from "./types";
 
 // Menu admin (plan/api.md → Menu, plan/business-rules.md 1–11). Owner/admin + staff only; every query is limited to the current shop.
@@ -116,17 +116,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
 
   if (!name || name.length > 200) fields.name = "required";
   // description: the editor's JSON, cleaned to what the shop can show (lib/rich-text.ts); plain text is kept as is
-  let description = String(input.description ?? "").trim();
-  if (description.startsWith("{")) {
-    const doc = (() => {
-      try {
-        return cleanRich(JSON.parse(description));
-      } catch {
-        return null;
-      }
-    })();
-    description = doc && richHasText(doc) ? JSON.stringify(doc) : "";
-  }
+  const description = cleanRichInput(String(input.description ?? ""));
   if (description.length > 20000) fields.description = "invalid";
   // the product being edited and the chosen category (both of this shop), in one round trip
   const [current, category] = await Promise.all([

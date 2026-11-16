@@ -10,7 +10,9 @@ import { prisma } from "@/lib/db";
  * Read when a page is built/regenerated; saving the settings refreshes the shop (revalidatePath).
  */
 export type ShopLayout = "scroll" | "filter";
-type ShopLook = { language: Locale; layout: ShopLayout; notice: string; name: string; logo: string; brandColor: string | null; brandText: string | null;
+type ShopLook = { language: Locale; layout: ShopLayout; notice: string;
+  /** link preview text from Settings ("" = the default sentence) */
+  description: string; name: string; logo: string; brandColor: string | null; brandText: string | null;
   /** Social links from Settings (null = not set) — footer contact icons */
   links: { telegram: string | null; facebook: string | null; tiktok: string | null };
   /** Shop details from Settings ("" / null = not set → hidden in the footer) */
@@ -20,12 +22,13 @@ export const shopSettings = cache(async (shopId: string | null): Promise<ShopLoo
   try {
     const row = !shopId ? null : await prisma.shopSettings.findUnique({
       where: { shopId },
-      select: { language: true, layout: true, notice: true, name: true, logoUrl: true, brandColor: true, brandText: true, telegramUrl: true, facebookUrl: true, tiktokUrl: true, contactPhone: true, address: true, mapUrl: true },
+      select: { language: true, layout: true, notice: true, description: true, name: true, logoUrl: true, brandColor: true, brandText: true, telegramUrl: true, facebookUrl: true, tiktokUrl: true, contactPhone: true, address: true, mapUrl: true },
     });
     return {
       language: row?.language === "en" ? "en" : "km",
       layout: row?.layout === "filter" ? "filter" : "scroll",
       notice: row?.notice ?? "",
+      description: row?.description ?? "",
       name: row?.name ?? shop.name,
       logo: row?.logoUrl ?? shop.logo,
       brandColor: row?.brandColor ?? null,
@@ -37,6 +40,6 @@ export const shopSettings = cache(async (shopId: string | null): Promise<ShopLoo
     // no database configured (build without DATABASE_URL) → default Khmer shop; with one, a failed read throws
     // so Next keeps the last good page instead of caching the defaults
     if (process.env.DATABASE_URL) throw cause;
-    return { language: "km", layout: "scroll", notice: "", name: shop.name, logo: shop.logo, brandColor: null, brandText: null, links: { telegram: null, facebook: null, tiktok: null }, contact: { phone: null, address: "", mapUrl: null } };
+    return { language: "km", layout: "scroll", notice: "", description: "", name: shop.name, logo: shop.logo, brandColor: null, brandText: null, links: { telegram: null, facebook: null, tiktok: null }, contact: { phone: null, address: "", mapUrl: null } };
   }
 });

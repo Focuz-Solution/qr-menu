@@ -1,7 +1,7 @@
 "use client";
 
 import { useShopPath, useShopSlug } from "@/lib/shop-path";
-import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Trash2 } from "lucide-react";
+import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState, useTransition } from "react";
@@ -35,6 +35,8 @@ type Receipt = {
   deliveryFeeCents: number;
   deliveryZoneName: string;
   totalCents: number;
+  /** "Get order updates on Telegram" link (null: the bot isn't set up → no button) */
+  updatesUrl: string | null;
 };
 
 export function Checkout({ zones, minOrderCents, orderingEnabled }: { zones: Zone[]; minOrderCents: number; orderingEnabled: boolean }) {
@@ -128,6 +130,7 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
         subtotalCents,
         deliveryFeeCents: r.data!.deliveryFeeCents,
         totalCents: r.data!.totalCents,
+        updatesUrl: r.data!.updatesUrl,
       });
       clearCart();
     });
@@ -354,6 +357,19 @@ function ReceiptView({ receipt: r }: { receipt: Receipt }) {
           {t("orderNo")} <span className="font-mono font-semibold text-foreground">{r.orderNo}</span>
         </p>
       </div>
+
+      {/* customer taps Start on the shop's bot → status messages (confirmed, packing, shipped, delivered, cancelled) */}
+      {r.updatesUrl && (
+        <div className="flex flex-col gap-2 text-center">
+          <Button asChild className="h-12 rounded-full bg-telegram text-base text-white hover:bg-telegram/90">
+            <a href={r.updatesUrl} target="_blank" rel="noopener noreferrer">
+              <Send aria-hidden />
+              {t("tgUpdates")}
+            </a>
+          </Button>
+          <p className="text-xs text-muted-foreground">{t("tgUpdatesHint")}</p>
+        </div>
+      )}
 
       <section className="flex flex-col gap-3 rounded-2xl border p-4">
         <h2 className="font-semibold">{t("summary")}</h2>

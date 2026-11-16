@@ -35,6 +35,13 @@ export async function telegram<T>(method: string, body: object = {}): Promise<T>
   return data.result as T;
 }
 
+/** downloads a file the Bot API named (getFile → file_path); the token stays on the server */
+export async function telegramFile(path: string) {
+  const res = await fetch(`https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN?.trim()}/${path}`, { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new TelegramError(`HTTP ${res.status}`, res.status);
+  return res;
+}
+
 let me: Promise<{ id: number; username: string }> | null = null;
 /** the bot's own id + @username (asked once per server instance) */
 export function botInfo() {
