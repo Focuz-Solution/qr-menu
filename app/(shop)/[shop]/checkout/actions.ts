@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { getTranslations } from "next-intl/server";
@@ -13,7 +13,7 @@ import { isProvinceCode, PROVINCES } from "@/lib/provinces";
 import type { ErrorCode, Result } from "@/lib/result";
 import { formatPrice } from "@/lib/shop";
 import { shopSettings } from "@/lib/shop-settings";
-import { escapeHtml, hasBotToken, telegram, telegramOrderUrl, webhookUrl } from "@/lib/telegram";
+import { botInfo, escapeHtml, hasBotToken, telegram, telegramOrderUrl, webhookUrl } from "@/lib/telegram";
 import type { CheckoutInput } from "./types";
 
 // Public checkout (no login): everything the browser sends is checked again here; prices come from the database.
@@ -22,7 +22,23 @@ const RATE = { orders: 5, minutes: 10 }; // ponytail: per-device limit from the 
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
-export async function createOrder(input: CheckoutInput): Promise<Result<{ orderNo: string; totalCents: number; deliveryFeeCents: number; deliveryZoneName: string }>> {
+type Placed = {
+  orderNo: string; totalCents: number; deliveryFeeCents: number; deliveryZoneName: string;
+  /** receipt button "Get order updates on Telegram" (t.me/<bot>?start=<code>); null when the bot isn't set up */
+  updatesUrl: string | null;
+};
+
+/** t.me link that subscribes the customer to this order's status messages (lib/telegram-bot.ts handles the Start) */
+async function updatesUrl(code: string | null) {
+  if (!code || !hasBotToken()) return null;
+  try {
+    return `https://t.me/${(await botInfo()).username}?start=${code}`;
+  } catch {
+    return null; // Telegram unreachable: the receipt just has no button
+  }
+}
+
+export async function createOrder(input: CheckoutInput): Promise<Result<Placed>> {
   // ---- the form ----
   const fields: Record<string, ErrorCode> = {};
   const name = text(input.name, 80);
@@ -54,8 +70,11 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
 
   // ---- double tap: the same key → the order already made ----
   if (key) {
-    const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true } });
-    if (same) return { ok: true, data: same };
+    const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true, updatesCode: true } });
+    if (same) {
+      const { updatesCode, ...rest } = same;
+      return { ok: true, data: { ...rest, updatesUrl: await updatesUrl(updatesCode) } };
+    }
   }
 
   // ---- shop rules: settings, this device's recent orders, the products and the delivery zones in one round trip (all of this shop) ----
@@ -108,7 +127,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
   // ---- save: order number from the day's counter, in one transaction ----
   const now = new Date();
   const day = cambodiaDay(now);
-  let order: { id: string; orderNo: string };
+  let order: { id: string; orderNo: string; updatesCode: string | null };
   try {
     order = await prisma.$transaction(async (tx) => {
       const { value } = await tx.orderCounter.upsert({ where: { shopId_day: { shopId, day } }, create: { shopId, day, value: 1 }, update: { value: { increment: 1 } } });
@@ -131,27 +150,31 @@ export async function createOrder(input: CheckoutInput): Promise<Result<{ orderN
           totalCents,
           paymentMethod: payment,
           idempotencyKey: key || null,
+          updatesCode: randomBytes(18).toString("base64url"),
           ipHash,
           userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
           items: { create: orderLines },
           events: { create: { type: "created" } },
         },
-        select: { id: true, orderNo: true },
+        select: { id: true, orderNo: true, updatesCode: true },
       });
     });
   } catch (cause) {
     // two taps at the same moment with the same key: the other one saved it → return that order
     if (key && cause instanceof Prisma.PrismaClientKnownRequestError && cause.code === "P2002") {
-      const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true } });
-      if (same) return { ok: true, data: same };
+      const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true, updatesCode: true } });
+      if (same) {
+        const { updatesCode, ...rest } = same;
+        return { ok: true, data: { ...rest, updatesUrl: await updatesUrl(updatesCode) } };
+      }
     }
     throw cause;
   }
 
   // Telegram after the answer is sent: the customer sees the receipt without waiting for Telegram
   const saved = order;
-  after(() => notifyTelegram(shopId, saved.id, { ...saved, name, phoneRaw, province: province.km, address, landmark, mapUrl, note, payment, lines: orderLines, deliveryZoneName: zone.name, subtotalCents, deliveryFeeCents, totalCents }));
-  return { ok: true, data: { orderNo: order.orderNo, totalCents, deliveryFeeCents, deliveryZoneName: zone.name } };
+  after(() => notifyTelegram(shopId, saved.id, { ...saved, name, phone: phone!, phoneRaw, province: province.km, address, landmark, mapUrl, note, payment, lines: orderLines, deliveryZoneName: zone.name, subtotalCents, deliveryFeeCents, totalCents }));
+  return { ok: true, data: { orderNo: order.orderNo, totalCents, deliveryFeeCents, deliveryZoneName: zone.name, updatesUrl: await updatesUrl(order.updatesCode) } };
 }
 
 /** new order → the shop's Telegram group (if set up and on). Never fails the order: the result is logged as an order event. */
@@ -159,7 +182,7 @@ async function notifyTelegram(
   shopId: string,
   orderId: string,
   o: {
-    orderNo: string; name: string; phoneRaw: string; province: string; address: string; landmark: string; mapUrl: string; note: string;
+    orderNo: string; name: string; phone: string; phoneRaw: string; province: string; address: string; landmark: string; mapUrl: string; note: string;
     payment: "cod" | "bank_transfer"; lines: { name: string; variant: string | null; quantity: number; lineTotalCents: number }[];
     deliveryZoneName: string; subtotalCents: number; deliveryFeeCents: number; totalCents: number;
   },
@@ -214,15 +237,19 @@ async function notifyTelegram(
       text: message,
       parse_mode: "HTML",
       disable_web_page_preview: true,
-      // buttons only when Telegram can reach this site (https + a valid webhook secret); otherwise ✓ Confirm would do nothing
-      ...(dashboard && webhookUrl() && {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: buttons("previewConfirm"), callback_data: `c:${orderId}:${tg.chatId}` }, { text: buttons("previewCancel"), url: dashboard }],
-            [{ text: buttons("previewDashboard"), url: dashboard }],
-          ],
-        },
-      }),
+      reply_markup: {
+        inline_keyboard: [
+          // Confirm / Cancel / Dashboard only when Telegram can reach this site (https + a valid webhook secret); otherwise ✓ Confirm would do nothing
+          ...(dashboard && webhookUrl()
+            ? [
+                [{ text: buttons("previewConfirm"), callback_data: `c:${orderId}:${tg.chatId}` }, { text: buttons("previewCancel"), url: dashboard }],
+                [{ text: buttons("previewDashboard"), url: dashboard }],
+              ]
+            : []),
+          // opens a Telegram chat with the customer's phone (+855…); works when their number is on Telegram and findable
+          [{ text: `💬 ${buttons("chatCustomer")}`, url: `https://t.me/${o.phone}` }],
+        ],
+      },
       ...(tg.messageThreadId && { message_thread_id: tg.messageThreadId }),
     });
     await prisma.order.update({

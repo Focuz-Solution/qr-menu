@@ -37,6 +37,8 @@ export const toAdminOrder = (o: OrderRow): AdminOrder => ({
     customerName: o.customerName,
     customerPhone: o.customerPhone,
     customerTelegram: o.customerTelegram,
+    customerTelegramName: o.customerTelegramName,
+    telegramLinked: o.customerChatId !== null,
     provinceName: o.provinceName,
     districtName: o.districtName,
     communeName: o.communeName,

@@ -86,3 +86,14 @@ export function richToText(saved: string) {
   return doc ? blocksText(doc.content).join("\n") : saved;
 }
 export const richHasText = (doc: RichDoc) => blocksText(doc.content).some((line) => line.trim());
+
+export function cleanRichInput(raw: string) {
+  const text = raw.trim();
+  if (!text.startsWith("{")) return text;
+  try {
+    const doc = cleanRich(JSON.parse(text));
+    return doc && richHasText(doc) ? JSON.stringify(doc) : "";
+  } catch {
+    return "";
+  }
+}

@@ -1,4 +1,5 @@
 import { MapPin, Navigation, Phone } from "lucide-react";
+import { Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { FacebookCircleIcon, TelegramCircleIcon, TikTokIcon } from "@/components/icons";
 import { ShopLogo } from "@/components/ShopLogo";
@@ -27,10 +28,18 @@ export function Footer({ name, logo, links, contact }: { name: string; logo: str
   // phone (tap to call), address, map link — whichever are set
   const details = [
     contact.phone && (
-      <a href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-11 items-center gap-2 hover:text-foreground">
+      // one or more phones from Settings ("012 345 678, 088 888 888"), each tap to call: 012 345 678 | 088 888 888
+      <span className="inline-flex flex-wrap items-center justify-center gap-x-2">
         <Phone className="size-4 shrink-0" aria-hidden />
-        <span className="tabular-nums">{contact.phone}</span>
-      </a>
+        {contact.phone.split(",").map((p, i) => (
+          <Fragment key={i}>
+            {i > 0 && <span aria-hidden>|</span>}
+            <a href={`tel:${p.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-11 items-center tabular-nums hover:text-foreground">
+              {p.trim()}
+            </a>
+          </Fragment>
+        ))}
+      </span>
     ),
     contact.address && (
       <span className="inline-flex min-h-11 items-center gap-2 text-balance">

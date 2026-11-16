@@ -5,6 +5,7 @@ import { MenuProvider } from "@/components/MenuProvider";
 import { getMenuList } from "@/lib/menu";
 import { ShakeOnSubmit } from "@/components/ShakeOnSubmit";
 import { appUrl } from "@/lib/app-url";
+import { richToText } from "@/lib/rich-text";
 import { brandStyles } from "@/lib/brand-colors";
 import { ShopPathProvider } from "@/lib/shop-path";
 import { shopSettings } from "@/lib/shop-settings";
@@ -21,12 +22,14 @@ import "../../globals.css";
 
 /** title/description + link preview in the shop language */
 export async function shopMetadata(slug: string, base: string): Promise<Metadata> {
-  const { language: locale, name, logo } = await shopSettings(await shopBySlug(slug));
+  const { language: locale, name, logo, description } = await shopSettings(await shopBySlug(slug));
   const t = await getTranslations({ locale, namespace: "meta" });
   return {
     ...(appUrl() && { metadataBase: new URL(appUrl()!) }),
     title: { default: name, template: `%s | ${name}` },
-    description: t("description"),
+    // the shop's own text from Settings → Shop details, else the default sentence
+    // editor text → plain words on one line (previews show no formatting)
+    description: richToText(description).replace(/\s+/g, " ").trim() || t("description"),
     alternates: { canonical: base || "/" },
     // tab icon = the shop's logo (uploaded in Settings → Appearance, else public/logo.png)
     icons: { icon: logo, apple: logo },
