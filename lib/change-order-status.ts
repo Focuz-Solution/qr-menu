@@ -1,11 +1,15 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { OrderStatus } from "@/lib/generated/prisma/enums";
 import { NEXT_STATUS, STATUS_TIME } from "@/lib/order-status";
 import type { Result } from "@/lib/result";
+import { shopSettings } from "@/lib/shop-settings";
+import { hasBotToken, telegram, TelegramError } from "@/lib/telegram";
 
 /** moves one order of `shopId` to the next status (an order of another shop → notFound) */
 export async function changeOrderStatus(actorId: string, shopId: string, id: string, to: string, reason?: string): Promise<Result> {
@@ -44,5 +48,26 @@ export async function changeOrderStatus(actorId: string, shopId: string, id: str
 
   // ponytail: Telegram message update (outbox job) joins here in P6
   revalidatePath("/admin", "layout");
+  // the customer's Telegram (if they tapped "Get order updates"), after the answer: staff don't wait for Telegram
+  after(() => notifyCustomer(id, next, cancelReason));
   return { ok: true };
+}
+
+/** "✅ Your order #… is confirmed" → the customer's private chat with the bot. Never fails the status change. */
+async function notifyCustomer(orderId: string, status: OrderStatus, reason?: string) {
+  if (status === "new" || !hasBotToken()) return;
+  const order = await prisma.order.findUnique({ where: { id: orderId }, select: { orderNo: true, shopId: true, customerChatId: true } });
+  if (!order?.customerChatId) return;
+  const { language, name } = await shopSettings(order.shopId);
+  const t = await getTranslations({ locale: language, namespace: "checkout" });
+  const text = [t(`tgStatus.${status}`, { no: order.orderNo, shop: name }), status === "cancelled" && reason ? t("tgReason", { reason }) : null]
+    .filter(Boolean)
+    .join("\n");
+  try {
+    await telegram("sendMessage", { chat_id: order.customerChatId.toString(), text });
+  } catch (cause) {
+    // the customer blocked the bot (403): stop trying for this order
+    if (cause instanceof TelegramError && cause.code === 403) await prisma.order.update({ where: { id: orderId }, data: { customerChatId: null } }).catch(() => {});
+    else console.error("[orders] customer telegram failed:", cause);
+  }
 }

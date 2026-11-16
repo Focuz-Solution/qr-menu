@@ -2,17 +2,19 @@ import "server-only";
 import { getTranslations } from "next-intl/server";
 import { changeOrderStatus } from "@/lib/change-order-status";
 import { prisma } from "@/lib/db";
+import { shopSettings } from "@/lib/shop-settings";
 import { membershipPermissions } from "@/lib/staff-roles";
 import { botInfo, escapeHtml, telegram, telegramOrderUrl, type TelegramChat } from "@/lib/telegram";
 
 // Everything the bot receives (webhook POST /api/telegram, or getUpdates polling in local mode) goes through handleUpdate.
 // Only these updates do anything:
 //   • "/start <code>" in a group      → link that group to the shop that made the code (Connect button in Admin → Telegram)
+//   • "/start <code>" in a private chat → a customer asks for their order's status messages (receipt button)
 //   • group upgraded to a supergroup  → keep the link (new chat id)
 //   • bot removed from a group        → unlink that group
 //   • tap on ✓ Confirm under an order → confirm the order (staff with "orders.status" in that shop)
 
-type User = { id: number; is_bot?: boolean };
+type User = { id: number; is_bot?: boolean; first_name?: string; last_name?: string; username?: string };
 type Message = {
   message_id: number;
   message_thread_id?: number;
@@ -39,7 +41,22 @@ export async function handleUpdate(update: Update) {
     return;
   }
   const start = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{16,64})\s*$/.exec(message.text ?? "");
-  if (start && message.chat.type !== "private" && message.chat.type !== "channel") await linkGroup(start[1], message);
+  if (start && message.chat.type === "private") await subscribeCustomer(start[1], message.chat.id, message.from);
+  else if (start && message.chat.type !== "channel") await linkGroup(start[1], message);
+}
+
+/** receipt's "Get order updates on Telegram" → this chat gets the order's status messages (lib/change-order-status.ts) */
+async function subscribeCustomer(code: string, chatId: number, from?: User) {
+  const order = await prisma.order.findUnique({ where: { updatesCode: code }, select: { id: true, orderNo: true, shopId: true, customerChatId: true } });
+  // unknown code, or already taken by another Telegram account (a shared receipt link can't steal the updates)
+  if (!order || (order.customerChatId !== null && order.customerChatId !== BigInt(chatId))) return;
+  // their Telegram name + @username → shown on the order in Admin (photo: /admin/orders/<id>/telegram-photo)
+  const tgName = [from?.first_name, from?.last_name].filter(Boolean).join(" ").trim().slice(0, 100) || null;
+  const username = from?.username && /^\w{4,32}$/.test(from.username) ? `@${from.username}` : null;
+  await prisma.order.update({ where: { id: order.id }, data: { customerChatId: BigInt(chatId), customerTelegramName: tgName, customerTelegram: username } });
+  const { language, name } = await shopSettings(order.shopId);
+  const t = await getTranslations({ locale: language, namespace: "checkout" });
+  await telegram("sendMessage", { chat_id: chatId, text: t("tgSubscribed", { no: order.orderNo, shop: name }) }).catch(() => {});
 }
 
 async function linkGroup(code: string, message: Message) {

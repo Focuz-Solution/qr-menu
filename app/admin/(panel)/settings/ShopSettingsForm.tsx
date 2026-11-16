@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ExternalLink, ImagePlus, Link2, Loader2, Lock, Palette, Save, Store, Upload, X, type LucideIcon } from "lucide-react";
+import { Check, ExternalLink, ImagePlus, Link2, Loader2, Lock, Palette, Plus, Save, Store, Upload, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -18,6 +18,7 @@ import type { ErrorCode } from "@/lib/result";
 import { slugLiveError } from "@/lib/slug";
 import { uploadImage } from "@/lib/upload-image";
 import { cn } from "@/lib/utils";
+import { DescriptionEditor } from "../menu/DescriptionEditor";
 import { saveShopSettings } from "./actions";
 import { QrBrandContext } from "./QrSection";
 import type { ShopInput } from "./types";
@@ -115,6 +116,72 @@ function Field({
         className={cn("h-11", className)}
         {...props}
       />
+      {error && <p className="text-xs text-destructive">{te(error)}</p>}
+    </div>
+  );
+}
+
+/** shop phones: type one + "Add" (or Enter) → it becomes a chip with ✕ (up to 5); sent as one field "012 345 678, 088 888 888" */
+function PhoneList({ value, error }: { value: string; error?: ErrorCode }) {
+  const t = useTranslations("admin.settings");
+  const te = useTranslations("errors");
+  const [phones, setPhones] = useState(() => value.split(",").map((p) => p.trim()).filter(Boolean));
+  const [draft, setDraft] = useState("");
+  const full = phones.length >= 5;
+  function add() {
+    const p = draft.trim();
+    if (p && !phones.includes(p) && !full) setPhones([...phones, p]);
+    setDraft("");
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="contactPhone">
+        {t("contactPhone")} <Opt />
+      </Label>
+      {/* a number typed but not added yet is saved too */}
+      <input type="hidden" name="contactPhone" value={[...phones, draft.trim()].filter(Boolean).join(", ")} />
+      {!full && (
+        <div className="flex items-center gap-2">
+          <Input
+            id="contactPhone"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            // Enter adds the number instead of submitting the form
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            type="tel"
+            inputMode="tel"
+            maxLength={20}
+            placeholder="012 345 678"
+            aria-invalid={!!error || undefined}
+            className="h-11"
+          />
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={add} disabled={!draft.trim()}>
+            <Plus /> {t("addPhone")}
+          </Button>
+        </div>
+      )}
+      {phones.length > 0 && (
+        <ul className="flex flex-wrap gap-2 pt-1">
+          {phones.map((p) => (
+            <li key={p} className="inline-flex h-8 items-center gap-1 rounded-full bg-muted pr-1 pl-3 text-sm font-medium tabular-nums">
+              {p}
+              <button
+                type="button"
+                aria-label={`${t("removePhone")} ${p}`}
+                onClick={() => setPhones(phones.filter((x) => x !== p))}
+                className="relative grid size-6 place-items-center rounded-full text-muted-foreground outline-none after:absolute after:-inset-2.5 hover:bg-foreground/10 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <X className="size-3.5" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {error && <p className="text-xs text-destructive">{te(error)}</p>}
     </div>
   );
@@ -292,10 +359,17 @@ export function ShopSettingsForm({
             <SlugField value={values.slug} error={errors.slug} locked={slugLocked} host={host} />
             {/* typed as is, separator included (PB- → PB-251110-0001) */}
             <Field name="orderPrefix" value={values.orderPrefix} error={errors.orderPrefix} required maxLength={10} className="uppercase" />
-            <Field name="contactPhone" value={values.contactPhone} error={errors.contactPhone} type="tel" inputMode="tel" placeholder="012 345 678" />
+            <PhoneList value={values.contactPhone} error={errors.contactPhone} />
             <Field name="address" value={values.address} error={errors.address} maxLength={200} placeholder={t("addressPlaceholder")} />
             {/* the shop's location: a link copied from Google Maps (Share → Copy link) */}
             <Field name="mapUrl" value={values.mapUrl} error={errors.mapUrl} type="url" inputMode="url" maxLength={500} placeholder="https://maps.app.goo.gl/…" />
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <Label htmlFor="description">
+                {t("description")} <Opt />
+              </Label>
+              <DescriptionEditor id="description" name="description" label={t("description")} placeholder={t("descriptionPlaceholder")} defaultValue={values.description} alwaysOpen />
+              {errors.description && <p className="text-xs text-destructive">{te(errors.description)}</p>}
+            </div>
           </>
         )}
       </SectionForm>
