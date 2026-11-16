@@ -75,9 +75,6 @@
     "text": "The link may be wrong, or the page no longer exists. Open the shop's link or scan its QR code to visit it.",
     "shopText": "This product or page isn't here anymore. Take a look at what's in the shop now."
   },
-  "meta": {
-    "description": "Cosmetics and beauty products — see prices, sizes and shades, and order easily."
-  },
   "cart": {
     "less": "Decrease quantity",
     "more": "Increase quantity",
@@ -212,7 +209,8 @@
           "revenue": "Revenue this year"
         }
       },
-      "noStatusPermission": "Your role can't change order status."
+      "noStatusPermission": "Your role can't change order status.",
+      "call": "Call {phone}"
     },
     "menu": {
       "title": "Menu",
@@ -394,7 +392,6 @@
       "callbackDenied": "You cannot confirm this order.",
       "callbackStale": "This order status has already changed.",
       "callbackConfirmed": "Order confirmed.",
-      "confirmedBy": "Confirmed by {name}",
       "buttonAccess": "Order button access",
       "staffAccount": "Staff account",
       "telegramUserId": "Telegram user ID",
@@ -590,7 +587,7 @@
     "receiver": "Receiver",
     "name": "Name",
     "namePlaceholder": "Enter the receiver's name",
-    "phone": "Phone number",
+    "phone": "Telegram phone number",
     "deliverTo": "Deliver to",
     "province": "Province",
     "provincePlaceholder": "Choose a province",
@@ -624,18 +621,15 @@
     "orderNo": "Order number",
     "backToShop": "Back to the shop",
     "tgNew": "New order {no}",
-    "tgUnpaid": "Unpaid",
-    "tgUpdates": "Get order updates on Telegram",
-    "tgUpdatesHint": "Tap Start in Telegram — we'll message you when your order is confirmed, sent and delivered.",
-    "tgSubscribed": "🔔 Done! You'll get updates here for order {no} at {shop}.",
     "tgReason": "Reason: {reason}",
-    "tgStatus": {
-      "confirmed": "✅ Your order {no} at {shop} is confirmed.",
-      "packing": "📦 Your order {no} is being packed.",
-      "shipped": "🚚 Your order {no} is on the way.",
-      "delivered": "🎉 Your order {no} was delivered. Thank you for shopping at {shop}!",
-      "cancelled": "❌ Your order {no} at {shop} was cancelled."
-    }
+    "tgConnect": "Connect",
+    "tgConnected": "Telegram connected",
+    "tgDisconnect": "Disconnect Telegram",
+    "tgConnectedMsg": "✅ Telegram connected with {shop}! You will get your receipts and order status updates here.",
+    "tgThanks": "Thank you for your order!",
+    "tgReceiptFooter": "We will message you when the shop confirms your order.",
+    "tgConnectHint": "Get order updates, and the shop can contact you",
+    "tgConfirmed": "✅ Your order {no} is confirmed."
   },
   "errors": {
     "badPhone": "Enter a valid Cambodian phone number (e.g. 012 345 678)",
