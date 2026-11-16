@@ -142,12 +142,15 @@ function IconPicker({ label, disabled, onPick }: { label: string; disabled: bool
   );
 }
 
-type Props = { id: string; name: string; label: string; placeholder: string; defaultValue: string };
+type Props = { id: string; name: string; label: string; placeholder: string; defaultValue: string;
+  /** show the editor straight away (no "＋ Add description" button), without moving the cursor into it */
+  alwaysOpen?: boolean };
 
 /** no description yet: one "＋ Add description" button; tapping it opens the editor (cursor inside). Has text: editor straight away. */
 export function DescriptionEditor(props: Props) {
   const t = useTranslations("admin.menu");
   const [open, setOpen] = useState(!!props.defaultValue);
+  if (props.alwaysOpen) return <RichEditor {...props} autofocus={false} />;
   if (open) return <RichEditor {...props} autofocus={!props.defaultValue} />;
   return (
     <button

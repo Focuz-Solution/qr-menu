@@ -63,6 +63,7 @@ export default async function TelegramPage() {
               <span className="rounded-md bg-(--telegram-preview-action) p-2 text-(--telegram-preview-action-text)">{preview("previewConfirm")}</span>
               <span className="rounded-md bg-(--telegram-preview-action) p-2 text-(--telegram-preview-action-text)">{preview("previewCancel")}</span>
               <span className="col-span-2 rounded-md bg-(--telegram-preview-action) p-2 text-(--telegram-preview-action-text)">{preview("previewDashboard")}</span>
+              <span className="col-span-2 rounded-md bg-(--telegram-preview-action) p-2 text-(--telegram-preview-action-text)">💬 {preview("chatCustomer")}</span>
             </div>
           </div>
         </Card>

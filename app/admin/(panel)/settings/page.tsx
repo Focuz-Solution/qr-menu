@@ -40,6 +40,7 @@ export default async function ShopSettingsPage() {
     language: row?.language ?? "",
     layout: row?.layout ?? "scroll",
     notice: row?.notice ?? "",
+    description: row?.description ?? "",
   };
 
   // QR code: the shop's public address — the site from the env (APP_BASE_URL / Vercel), else the address the admin is open on
