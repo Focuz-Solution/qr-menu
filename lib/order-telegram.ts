@@ -1,6 +1,7 @@
 import "server-only";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/db";
+import { mapCoords } from "@/lib/orders";
 import { formatPrice } from "@/lib/shop";
 import { shopSettings } from "@/lib/shop-settings";
 import { escapeHtml, hasBotToken, telegram, telegramOrderUrl, webhookUrl } from "@/lib/telegram";
@@ -53,7 +54,8 @@ async function build(o: NonNullable<Awaited<ReturnType<typeof load>>>, chatId: b
       `📞 ${e(o.customerPhoneRaw)}`,
       `📍 ${e(o.provinceName)} — ${e(o.addressLine)}`,
       o.landmark ? `🏠 ${e(o.landmark)}` : null,
-      o.mapUrl ? `🗺 ${e(o.mapUrl)}` : null,
+      // "Open map" link + the coordinates in <code> (tap to copy in Telegram → paste in the Google Maps app)
+      o.mapUrl ? [`🗺 <a href="${e(o.mapUrl).replace(/"/g, "&quot;")}">${e(ta("orders.map"))}</a>`, mapCoords(o.mapUrl) && `<code>${mapCoords(o.mapUrl)}</code>`].filter(Boolean).join(" · ") : null,
       o.note ? `📝 ${e(o.note)}` : null,
       DIVIDER,
       ...items.slice(0, shown),
@@ -82,6 +84,8 @@ async function build(o: NonNullable<Awaited<ReturnType<typeof load>>>, chatId: b
           ? [[{ text: buttons("previewConfirm"), callback_data: `c:${o.id}:${chatId}` }, { text: buttons("previewCancel"), url: dashboard }]]
           : []),
         ...(dashboard ? [[{ text: buttons("previewDashboard"), url: dashboard }]] : []),
+        // the customer's pin: one tap opens Google Maps (the app on phones that have it)
+        ...(o.mapUrl ? [[{ text: `🗺 ${buttons("openMap")}`, url: o.mapUrl }]] : []),
         // chat with the customer: by @username when they connected Telegram (always works), else by phone
         [{ text: `💬 ${buttons("chatCustomer")}`, url: `https://t.me/${o.customerTelegram?.slice(1) ?? o.customerPhone}` }],
       ],

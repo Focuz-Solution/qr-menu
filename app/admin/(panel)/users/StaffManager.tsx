@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Plus, Store, Trash2, UserCheck, UserX, Wand2 } from "lucide-react";
+import { KeyRound, Loader2, Plus, Store, Trash2, UserCheck, UserX, Wand2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -400,7 +400,10 @@ function AddForm({ roles, isOwner, onDone }: { roles: RoleOption[]; isOwner: boo
       </div>
       <DialogFooter className="flex-row border-t px-6 py-4">
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onDone}>{t("cancel")}</Button>
-        <Button type="submit" className="h-11 flex-1" disabled={pending}>{t("save")}</Button>
+        <Button type="submit" className="h-11 flex-1" disabled={pending}>
+          {pending && <Loader2 className="animate-spin" aria-hidden />}
+          {t("save")}
+        </Button>
       </DialogFooter>
     </form>
   );
@@ -435,7 +438,10 @@ function ResetForm({ user, onDone }: { user: Staff; onDone: () => void }) {
       </div>
       <DialogFooter className="flex-row border-t px-6 py-4">
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onDone}>{t("cancel")}</Button>
-        <Button type="submit" className="h-11 flex-1" disabled={pending}>{t("save")}</Button>
+        <Button type="submit" className="h-11 flex-1" disabled={pending}>
+          {pending && <Loader2 className="animate-spin" aria-hidden />}
+          {t("save")}
+        </Button>
       </DialogFooter>
     </form>
   );
@@ -513,7 +519,10 @@ function ShopsForm({
       {error && <p role="alert" className="px-6 pb-2 text-sm text-destructive">{te(error)}</p>}
       <DialogFooter className="flex-row border-t px-6 py-4">
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onDone}>{t("cancel")}</Button>
-        <Button type="submit" className="h-11 flex-1" disabled={pending || !Object.keys(picked).length}>{t("save")}</Button>
+        <Button type="submit" className="h-11 flex-1" disabled={pending || !Object.keys(picked).length}>
+          {pending && <Loader2 className="animate-spin" aria-hidden />}
+          {t("save")}
+        </Button>
       </DialogFooter>
     </form>
   );

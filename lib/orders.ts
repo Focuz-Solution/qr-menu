@@ -14,6 +14,9 @@ export function zonesFor(zones: Zone[], provinceCode: string) {
 export const feeFor = (zone: Zone, subtotalCents: number) =>
   zone.freeOverCents != null && subtotalCents >= zone.freeOverCents ? 0 : zone.feeCents;
 
+/** "11.556400,104.928200" from the checkout map link (…/maps?q=<lat>,<lng>); null for an older pasted link */
+export const mapCoords = (url: string) => /[?&]q=(-?[\d.]+,-?[\d.]+)/.exec(url)?.[1] ?? null;
+
 /**
  * Cambodian phone → "+855…" (E.164), else null.
  * Accepts "012 345 678", "0123456789", "+855 12 345 678", "85512345678": 8–9 digits after the leading 0 / 855.

@@ -81,7 +81,7 @@ function IconPicker({ label, disabled, onPick }: { label: string; disabled: bool
           aria-label={label}
           title={label}
           className={cn(
-            "relative flex size-10 items-center justify-center rounded-md text-muted-foreground outline-none after:absolute after:-inset-0.5 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40",
+            "relative flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none after:absolute after:-inset-1.5 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40",
             open && "bg-muted text-foreground",
           )}
         >
@@ -207,11 +207,11 @@ function RichEditor({ id, name, label, placeholder, defaultValue, autofocus }: P
   return (
     // looks like the other text boxes: rounded border, ring on focus
     <div className="overflow-hidden rounded-xl border border-input bg-input/30 transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
-      {/* wraps to two rows on phones */}
-      <div role="toolbar" aria-label={label} className="flex flex-wrap items-center gap-0.5 border-b border-input px-1.5 py-1">
+      {/* one row: small buttons (bigger invisible tap area); too narrow (phones) → it scrolls sideways instead of wrapping */}
+      <div role="toolbar" aria-label={label} className="flex items-center gap-0.5 overflow-x-auto border-b border-input px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {GROUPS.map((group, g) => (
           <Fragment key={g}>
-            {g > 0 && <span className="mx-1 h-5 w-px bg-border" aria-hidden />}
+            {g > 0 && <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden />}
             {group.map(({ key, icon: Icon, active, run }) => {
               const s = state?.[key as keyof typeof state] as { on: boolean; can: boolean } | undefined;
               return (
@@ -227,7 +227,7 @@ function RichEditor({ id, name, label, placeholder, defaultValue, autofocus }: P
                   title={t(key)}
                   className={cn(
                     // 40px square + 2px invisible edge = 44px tap area
-                    "relative flex size-10 items-center justify-center rounded-md text-muted-foreground outline-none after:absolute after:-inset-0.5 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40",
+                    "relative flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none after:absolute after:-inset-1.5 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40",
                     s?.on && "bg-muted text-foreground",
                   )}
                 >
@@ -237,7 +237,7 @@ function RichEditor({ id, name, label, placeholder, defaultValue, autofocus }: P
             })}
           </Fragment>
         ))}
-        <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+        <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden />
         <IconPicker label={t("emoji")} disabled={!editor} onPick={(icon) => editor?.chain().focus().insertContent(icon).run()} />
       </div>
       <div className="relative">

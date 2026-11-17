@@ -108,11 +108,14 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
     label: String(v?.label ?? "").trim().slice(0, 80),
     image: String(v?.image ?? "").trim(),
     priceCents: toCents(String(v?.price ?? "")) ?? undefined,
+    code: String(v?.code ?? "").trim().slice(0, 40) || undefined,
   }));
+  // more photos (not tied to a variant): up to 10, and only when the product has no variants
+  const gallery = variants.length ? [] : (Array.isArray(input.gallery) ? input.gallery : []).slice(0, 10).map((u) => String(u ?? "").trim());
   if (variants.some((v) => !v.image)) fields.variants = "variantPhoto";
   else if (variants.some((v) => Number.isNaN(v.priceCents))) fields.variants = "badPrice";
-  // image rows: main photo first, then the variant photos (cart, checkout and photo clean-up read these rows)
-  const images = [...new Set([String(input.image ?? "").trim(), ...variants.map((v) => v.image)].filter(Boolean))];
+  // image rows: main photo first, then the more photos, then the variant photos (cart, checkout and photo clean-up read these rows)
+  const images = [...new Set([String(input.image ?? "").trim(), ...gallery, ...variants.map((v) => v.image)].filter(Boolean))];
 
   if (!name || name.length > 200) fields.name = "required";
   // description: the editor's JSON, cleaned to what the shop can show (lib/rich-text.ts); plain text is kept as is

@@ -18,11 +18,18 @@ export type AdminItem = {
   image: string | null;
   images: string[];
   /** as saved: price in cents, none = the product price */
-  variants: { label: string; image: string; priceCents?: number }[];
+  variants: { label: string; image: string; priceCents?: number; code?: string }[];
 };
 
 /** a style of the product (shade, size…): its own photo + name; the photo is also one of the product's image rows */
-export type VariantInput = { label: string; image: string; /** own price in dollars as typed, "" = the product price */ price: string };
+export type VariantInput = {
+  label: string;
+  image: string;
+  /** own price in dollars as typed, "" = the product price */
+  price: string;
+  /** the shop's own code for it (SKU), "" = none */
+  code: string;
+};
 
 /** product form as typed by the admin (prices in dollars, empty string = not set) */
 export type ItemInput = {
@@ -40,5 +47,7 @@ export type ItemInput = {
   description: string;
   /** main photo ("" = none) */
   image: string;
+  /** more photos of the product (not tied to a variant), in order */
+  gallery: string[];
   variants: VariantInput[];
 };
