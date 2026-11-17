@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import type { Zone } from "@/lib/orders";
 import { shopSettings } from "@/lib/shop-settings";
 import { shopBySlug } from "@/lib/shops";
+import { botId } from "@/lib/telegram";
 import { Checkout } from "./checkout/Checkout";
 
 // Shared by app.com/<shop>/… and the main address (see views.tsx).
@@ -39,5 +40,5 @@ export async function ShopCheckout({ shop }: { shop: string }) {
   const shopId = await shopBySlug(shop);
   if (!shopId) notFound();
   setRequestLocale((await shopSettings(shopId)).language);
-  return <Checkout {...await rules(shopId)} />;
+  return <Checkout {...await rules(shopId)} telegramBotId={botId()} />;
 }

@@ -1,12 +1,15 @@
 "use client";
 
 import { useShopPath, useShopSlug } from "@/lib/shop-path";
-import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Send, Trash2 } from "lucide-react";
+import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Send, Trash2, X } from "lucide-react";
 import Link from "next/link";
+import Script from "next/script";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState, useTransition } from "react";
 import { Opt, Req } from "@/components/FieldMark";
+import { TelegramCircleIcon } from "@/components/icons";
 import { Img } from "@/components/Img";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,12 +21,12 @@ import type { ErrorCode } from "@/lib/result";
 import { formatPrice, type Lang, pick, thumbUrl } from "@/lib/shop";
 import { cn } from "@/lib/utils";
 import { BackButton } from "../products/[slug]/BackButton";
-import { createOrder } from "./actions";
+import { createOrder, telegramConnected } from "./actions";
 import { ProvincePicker } from "./ProvincePicker";
-import type { CheckoutInput } from "./types";
+import type { CheckoutInput, TelegramUser } from "./types";
 
 type Details = Omit<CheckoutInput, "lines" | "key" | "shop">;
-const EMPTY: Details = { name: "", phone: "", provinceCode: "", deliveryZoneId: "", address: "", landmark: "", mapUrl: "", note: "", payment: "cod" };
+const EMPTY: Details = { name: "", phone: "", provinceCode: "", deliveryZoneId: "", address: "", landmark: "", mapUrl: "", note: "", payment: "cod", telegram: null };
 const SAVED = "checkout-details"; // ponytail: details were remembered before; now only removed (old phones)
 const money = (cents: number) => formatPrice(cents / 100);
 
@@ -35,11 +38,9 @@ type Receipt = {
   deliveryFeeCents: number;
   deliveryZoneName: string;
   totalCents: number;
-  /** "Get order updates on Telegram" link (null: the bot isn't set up → no button) */
-  updatesUrl: string | null;
 };
 
-export function Checkout({ zones, minOrderCents, orderingEnabled }: { zones: Zone[]; minOrderCents: number; orderingEnabled: boolean }) {
+export function Checkout({ zones, minOrderCents, orderingEnabled, telegramBotId }: { zones: Zone[]; minOrderCents: number; orderingEnabled: boolean; telegramBotId: string | null }) {
   const path = useShopPath();
   const t = useTranslations("checkout");
   const { items } = useCart();
@@ -64,13 +65,13 @@ export function Checkout({ zones, minOrderCents, orderingEnabled }: { zones: Zon
       ) : !orderingEnabled ? (
         <p className="rounded-2xl bg-secondary p-4 text-sm">{t("closed")}</p>
       ) : (
-        <CheckoutForm zones={zones} minOrderCents={minOrderCents} onDone={setReceipt} />
+        <CheckoutForm zones={zones} minOrderCents={minOrderCents} telegramBotId={telegramBotId} onDone={setReceipt} />
       )}
     </div>
   );
 }
 
-function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrderCents: number; onDone: (r: Receipt) => void }) {
+function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: Zone[]; minOrderCents: number; telegramBotId: string | null; onDone: (r: Receipt) => void }) {
   const path = useShopPath();
   const shopSlug = useShopSlug(); // the order goes to this shop (also when opened at the main address)
   const t = useTranslations("checkout");
@@ -81,8 +82,18 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
   const vname = (v: { label: string; n: number } | null) => (v ? v.label || tp("optionN", { n: v.n }) : "");
   const lang = useLocale() as Lang;
   const { items, total } = useCart();
-  // every order starts with an empty form (nothing is remembered on the phone)
-  const [d, setD] = useState<Details>(EMPTY);
+  // every order starts with an empty form; only a connected Telegram is remembered on the phone (per shop, 30 days).
+  // Safe to read here: the form only renders in the browser (on the server the cart is empty).
+  const [d, setD] = useState<Details>(() => ({ ...EMPTY, telegram: savedTelegram(shopSlug) }));
+  const setTelegram = (telegram: TelegramUser | null) => {
+    setD((x) => ({ ...x, telegram }));
+    // just connected → the bot says "✅ connected" in their Telegram (not when a remembered connection is loaded)
+    if (telegram) telegramConnected(shopSlug, telegram).catch(() => {});
+    try {
+      if (telegram) localStorage.setItem(TG_KEY(shopSlug), JSON.stringify(telegram));
+      else localStorage.removeItem(TG_KEY(shopSlug));
+    } catch {}
+  };
   const [fields, setFields] = useState<Record<string, ErrorCode>>({});
   const [error, setError] = useState<ErrorCode>();
   const [pending, start] = useTransition();
@@ -130,7 +141,6 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
         subtotalCents,
         deliveryFeeCents: r.data!.deliveryFeeCents,
         totalCents: r.data!.totalCents,
-        updatesUrl: r.data!.updatesUrl,
       });
       clearCart();
     });
@@ -169,6 +179,8 @@ function CheckoutForm({ zones, minOrderCents, onDone }: { zones: Zone[]; minOrde
               {err("phone")}
             </div>
           </div>
+          {/* optional: status messages on Telegram + the shop can chat with them (no button when the bot isn't set up) */}
+          {telegramBotId && <TelegramConnect botId={telegramBotId} user={d.telegram} onChange={setTelegram} />}
         </section>
 
         {/* where to deliver */}
@@ -358,19 +370,6 @@ function ReceiptView({ receipt: r }: { receipt: Receipt }) {
         </p>
       </div>
 
-      {/* customer taps Start on the shop's bot → status messages (confirmed, packing, shipped, delivered, cancelled) */}
-      {r.updatesUrl && (
-        <div className="flex flex-col gap-2 text-center">
-          <Button asChild className="h-12 rounded-full bg-telegram text-base text-white hover:bg-telegram/90">
-            <a href={r.updatesUrl} target="_blank" rel="noopener noreferrer">
-              <Send aria-hidden />
-              {t("tgUpdates")}
-            </a>
-          </Button>
-          <p className="text-xs text-muted-foreground">{t("tgUpdatesHint")}</p>
-        </div>
-      )}
-
       <section className="flex flex-col gap-3 rounded-2xl border p-4">
         <h2 className="font-semibold">{t("summary")}</h2>
         <ul className="flex flex-col gap-3">
@@ -418,6 +417,80 @@ function ReceiptView({ receipt: r }: { receipt: Receipt }) {
       <Button asChild className="h-12 rounded-full text-base">
         <Link href={path()}>{t("backToShop")}</Link>
       </Button>
+    </div>
+  );
+}
+
+// the connected Telegram, remembered per shop; same 30 days as the server accepts (verifyTelegramLogin in lib/telegram.ts)
+const TG_KEY = (shop: string) => `telegram:${shop}`;
+const TG_MAX_AGE = 30 * 86_400;
+
+function savedTelegram(shop: string): TelegramUser | null {
+  try {
+    const user = JSON.parse(localStorage.getItem(TG_KEY(shop)) ?? "null") as TelegramUser | null;
+    if (user && Date.now() / 1000 - user.auth_date < TG_MAX_AGE) return user;
+    localStorage.removeItem(TG_KEY(shop)); // too old (or broken): connect again
+  } catch {}
+  return null;
+}
+
+type TelegramLogin = { auth: (options: { bot_id: string; request_access?: "write"; lang?: string }, done: (user: TelegramUser | false) => void) => void };
+
+/**
+ * "Connect Telegram": Telegram's own login window (telegram.org script; the bot's domain is set with /setdomain in @BotFather).
+ * "write" = the customer lets the bot message them, so no Start in the bot is needed. The server checks Telegram's signature.
+ */
+function TelegramConnect({ botId, user, onChange }: { botId: string; user: TelegramUser | null; onChange: (u: TelegramUser | null) => void }) {
+  const t = useTranslations("checkout");
+  const lang = useLocale();
+  const [ready, setReady] = useState(false);
+  const name = user && [user.first_name, user.last_name].filter(Boolean).join(" ");
+
+  function connect() {
+    const login = (window as unknown as { Telegram?: { Login?: TelegramLogin } }).Telegram?.Login;
+    login?.auth({ bot_id: botId, request_access: "write", lang }, (u) => u && onChange(u));
+  }
+
+  // one row under name/phone, same shape before and after connecting: icon/photo · two lines of text · button
+  return (
+    <div className="flex items-center gap-3 border-t pt-4">
+      <Script src="https://telegram.org/js/telegram-widget.js?22" strategy="afterInteractive" onReady={() => setReady(true)} />
+      {user ? (
+        <Avatar className="size-10">
+          {user.photo_url && <AvatarImage src={user.photo_url} alt="" className="object-cover" />}
+          <AvatarFallback className="text-sm font-semibold">{Array.from(name ?? "")[0]?.toUpperCase()}</AvatarFallback>
+        </Avatar>
+      ) : (
+        <TelegramCircleIcon className="size-10 shrink-0 text-telegram" />
+      )}
+      <div className="min-w-0 flex-1">
+        {user ? (
+          <>
+            <p className="truncate text-sm font-medium">{[name, user.username && `@${user.username}`].filter(Boolean).join(" · ")}</p>
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+              <CheckCircle2 className="size-3.5 shrink-0 text-telegram" aria-hidden />
+              {t("tgConnected")}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-medium">
+              Telegram <Opt />
+            </p>
+            <p className="text-xs text-muted-foreground">{t("tgConnectHint")}</p>
+          </>
+        )}
+      </div>
+      {user ? (
+        <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 rounded-full" aria-label={t("tgDisconnect")} onClick={() => onChange(null)}>
+          <X aria-hidden />
+        </Button>
+      ) : (
+        <Button type="button" onClick={connect} disabled={!ready} className="relative h-9 shrink-0 rounded-full bg-telegram px-4 text-white after:absolute after:-inset-1 after:content-[''] hover:bg-telegram/90">
+          <Send aria-hidden />
+          {t("tgConnect")}
+        </Button>
+      )}
     </div>
   );
 }
