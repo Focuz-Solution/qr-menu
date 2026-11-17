@@ -185,17 +185,19 @@ export function TelegramSetup({ settings: s, botReady, staff }: { settings: Sett
 
         <Part title={t("buttonAccess")} done={staff.some((account) => account.telegramId)} blocked={!hasChat ? t("groupRequired") : undefined}>
           <p className="text-xs text-muted-foreground">{t("buttonAccessHint")}</p>
-          <form className="@container grid gap-2" onSubmit={(e) => {
+          <form className="@container grid gap-3" onSubmit={(e) => {
             e.preventDefault();
             const data = new FormData(e.currentTarget);
             setLinked(false);
             run(() => linkTelegramUser(String(data.get("staff") ?? ""), String(data.get("telegramId") ?? "")), () => setLinked(true));
           }}>
-            <div className="grid gap-2 @[32rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] @[32rem]:items-end">
+            {/* two fields side by side when there's room (inputs line up at the bottom), the button on its own row */}
+            <div className="grid gap-3 @[32rem]:grid-cols-2 @[32rem]:items-end">
               <div className="grid min-w-0 gap-2">
-                <Label htmlFor="telegram-staff">{t("staffAccount")} <Req /></Label>
+                {/* block: a long label wraps as text with "(optional)" after it, instead of splitting into columns */}
+                <Label htmlFor="telegram-staff" className="block leading-snug">{t("staffAccount")} <Req /></Label>
                 <Select name="staff" defaultValue={staff[0]?.id} required>
-                  <SelectTrigger id="telegram-staff" className="w-full">
+                  <SelectTrigger id="telegram-staff" className="h-9 w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -208,13 +210,18 @@ export function TelegramSetup({ settings: s, botReady, staff }: { settings: Sett
                 </Select>
               </div>
               <div className="grid min-w-0 gap-2">
-                <Label htmlFor="telegram-user-id">{t("telegramUserId")} <Opt /></Label>
+                <Label htmlFor="telegram-user-id" className="block leading-snug">{t("telegramUserId")} <Opt /></Label>
                 <Input id="telegram-user-id" name="telegramId" inputMode="numeric" maxLength={16} className="h-9" />
               </div>
-              <Button size="sm" className="w-fit" disabled={pending}>{t("saveLink")}</Button>
             </div>
             <p className="text-xs text-muted-foreground">{t("telegramUserHint")}</p>
-            {linked && <p role="status" className="text-xs text-ok-foreground">{t("linkSaved")}</p>}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="sm" disabled={pending}>
+                {pending && <Loader2 className="animate-spin" aria-hidden />}
+                {t("saveLink")}
+              </Button>
+              {linked && <p role="status" className="text-xs text-ok-foreground">{t("linkSaved")}</p>}
+            </div>
           </form>
         </Part>
       </Card>

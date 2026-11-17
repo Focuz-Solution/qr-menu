@@ -45,7 +45,8 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
   if (!phone) fields.phone = "badPhone";
   if (!isProvinceCode(provinceCode)) fields.province = "badProvince";
   if (!address) fields.address = "required";
-  if (mapUrl && !/^https:\/\/\S+$/.test(mapUrl)) fields.mapUrl = "badUrl";
+  // only the pin from the checkout map (MapPicker: https://www.google.com/maps?q=<lat>,<lng>)
+  if (mapUrl && !/^https:\/\/www\.google\.com\/maps\?q=-?\d{1,2}\.\d{1,6},-?\d{1,3}\.\d{1,6}$/.test(mapUrl)) fields.mapUrl = "badLocation";
   if (Object.keys(fields).length) return { ok: false, error: "invalid", fields };
 
   const lines = (Array.isArray(input.lines) ? input.lines : []).slice(0, MAX_LINES + 1);

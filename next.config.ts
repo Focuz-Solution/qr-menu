@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   images: { unoptimized: true },
   // basic security headers on every page: no framing by other sites (clickjacking on /admin), no MIME guessing,
-  // only the origin in the Referer sent to other sites, no camera/mic/location access
+  // only the origin in the Referer sent to other sites, no camera/mic; location only for this site (checkout map)
   async headers() {
     return [
       {
@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
         ],
       },
     ];

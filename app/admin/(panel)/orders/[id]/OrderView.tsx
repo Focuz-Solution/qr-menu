@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CircleCheck, Download, MapPin, MessageCircle, Phone } from "lucide-react";
+import { ArrowLeft, Check, CircleCheck, Copy, Download, MapPin, MessageCircle, Phone } from "lucide-react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { OrderStatus } from "@/lib/generated/prisma/enums";
 import { NEXT_STATUS } from "@/lib/order-status";
+import { mapCoords } from "@/lib/orders";
 import type { ErrorCode } from "@/lib/result";
 import { thumbUrl } from "@/lib/shop";
 import { setOrderStatus } from "../../order-actions";
@@ -26,6 +27,32 @@ function Box({ title, children, className }: { title: string; children: React.Re
       <h2 className="flex min-h-12 items-center border-b px-4 text-sm font-semibold md:px-5">{title}</h2>
       <div className="flex flex-col gap-3 p-4 md:p-5">{children}</div>
     </Card>
+  );
+}
+
+/**
+ * copies the customer's pin for the Google Maps app search box / a driver chat:
+ * "11.556400,104.928200" from the checkout map link; an older pasted link is copied as it is
+ */
+function CopyLocation({ url }: { url: string }) {
+  const t = useTranslations("admin.orders");
+  const [copied, setCopied] = useState(false);
+  const text = mapCoords(url) ?? url;
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() =>
+        navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        })
+      }
+    >
+      {copied ? <Check className="text-ok-foreground" aria-hidden /> : <Copy aria-hidden />}
+      {t(copied ? "copied" : "copyLocation")}
+    </Button>
   );
 }
 
@@ -116,7 +143,7 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
       <div className="grid gap-4 lg:grid-cols-[1fr_340px] lg:items-start">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {/* customer + where to deliver */}
-          <Box title={t("orders.customer")} className="order-1 min-w-0 lg:order-none [&>h2]:border-b-0 [&>div]:pt-1">
+          <Box title={t("orders.customer")} className="order-1 min-w-0 lg:order-0 [&>h2]:border-b-0 [&>div]:pt-1">
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-5">
               <div className="min-w-0">
                 {/* their Telegram photo (when they connected Telegram at checkout and it is public), else the first letter of the name */}
@@ -157,12 +184,15 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
                 <p className="text-sm wrap-break-word">{fullAddress(o)}</p>
                 {o.landmark && <p className="text-sm wrap-break-word text-muted-foreground">{o.landmark}</p>}
                 {o.mapUrl && (
-                  <Button variant="outline" size="sm" asChild className="mt-2">
-                    <a href={o.mapUrl} target="_blank" rel="noreferrer">
-                      <MapPin aria-hidden />
-                      {t("orders.map")}
-                    </a>
-                  </Button>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={o.mapUrl} target="_blank" rel="noreferrer">
+                        <MapPin aria-hidden />
+                        {t("orders.map")}
+                      </a>
+                    </Button>
+                    <CopyLocation url={o.mapUrl} />
+                  </div>
                 )}
               </div>
             </div>
@@ -174,12 +204,12 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
           </Box>
 
           {/* items + totals */}
-          <ItemsBox order={o} className="order-3 lg:order-none" />
+          <ItemsBox order={o} className="order-3 lg:order-0" />
         </div>
 
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {/* the next step(s) for this order */}
-          <Box title={t("orders.updateStatus")} className="order-2 min-w-0 lg:order-none">
+          <Box title={t("orders.updateStatus")} className="order-2 min-w-0 lg:order-0">
             <section className="flex flex-col gap-2">
               {o.status === "cancelled" && o.cancelReason && <p className="text-sm">{t("orders.cancelReason")}: {o.cancelReason}</p>}
               {next.length && !canChangeStatus ? (
@@ -223,7 +253,7 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
           </Box>
 
           {/* history */}
-          <Box title={t("orders.history")} className="order-4 min-w-0 lg:order-none">
+          <Box title={t("orders.history")} className="order-4 min-w-0 lg:order-0">
             <ol className="flex flex-col gap-2 border-l pl-4 text-sm">
               {o.events.map((e) => (
                 <li key={e.id} className="relative">
