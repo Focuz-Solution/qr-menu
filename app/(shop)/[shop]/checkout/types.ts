@@ -1,3 +1,6 @@
+/** Telegram Login's answer (core.telegram.org/widgets/login#receiving-authorization-data) */
+export type TelegramUser = { id: number; first_name: string; last_name?: string; username?: string; photo_url?: string; auth_date: number; hash: string };
+
 /** what the checkout page sends (everything is checked again on the server) */
 export type CheckoutInput = {
   /** the shop's address (app.com/<shop>/checkout) — the order goes to that shop */
@@ -15,4 +18,6 @@ export type CheckoutInput = {
   payment: "cod" | "bank_transfer";
   /** one per "Send order" attempt: a double tap gives the same order, not two */
   key: string;
+  /** "Connect Telegram": what Telegram Login returned (signed; the server checks it), null when not connected */
+  telegram: TelegramUser | null;
 };
