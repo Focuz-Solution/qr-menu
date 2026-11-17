@@ -231,14 +231,17 @@ function Section({ title, children }: { title?: React.ReactNode; children: React
   );
 }
 
-/** photo box: shows the photo (or an upload icon); tap to pick a new one */
-function PhotoPick({ id, url, busy, label, onFile }: { id?: string; url: string; busy: boolean; label: string; onFile: (file: File | undefined) => void }) {
+/** photo box: shows the photo (or an upload icon / `empty`); tap to pick a new one */
+function PhotoPick({ id, url, busy, label, onFile, empty, className }: { id?: string; url: string; busy: boolean; label: string; onFile: (file: File | undefined) => void; empty?: React.ReactNode; className?: string }) {
   return (
     // relative: keeps the hidden (sr-only, absolute) file input inside this box. Without it the input sits relative to the
     // dialog, and with many variants picking a photo scrolled the whole dialog frame to it → the dialog went blank white.
     <label
       title={label}
-      className="relative flex size-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+      className={cn(
+        "relative flex size-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+        className,
+      )}
     >
       <input
         id={id}
@@ -256,7 +259,7 @@ function PhotoPick({ id, url, busy, label, onFile }: { id?: string; url: string;
       ) : url ? (
         <Img src={thumbUrl(url)} alt="" sizes="80px" className="size-full" />
       ) : (
-        <ImagePlus className="size-7" strokeWidth={1.5} aria-hidden />
+        (empty ?? <ImagePlus className="size-7" strokeWidth={1.5} aria-hidden />)
       )}
     </label>
   );
@@ -673,18 +676,17 @@ function ItemForm({
   const [fields, setFields] = useState<Record<string, ErrorCode>>({});
   const [formError, setFormError] = useState<ErrorCode>();
   const dollars = (cents: number | null | undefined) => (cents == null ? "" : String(cents / 100));
-  // main photo + variants (each its own photo + name); photos upload as soon as picked and are saved with the product
-  const [photo, setPhoto] = useState(() => item?.images.find((u) => !item.variants.some((v) => v.image === u)) ?? "");
+  // main photo + more photos + variants (each its own photo, name, code, price); photos upload as soon as picked and are saved with the product
+  const isVariantPhoto = (u: string) => !!item?.variants.some((v) => v.image === u);
+  const [photo, setPhoto] = useState(() => item?.images.find((u) => !isVariantPhoto(u)) ?? "");
+  // the other photos that belong to no variant (older products kept them as unnamed variants; they come back here)
+  const [gallery, setGallery] = useState(() => (item?.images ?? []).filter((u) => u !== photo && !isVariantPhoto(u)));
   const [variants, setVariants] = useState(() =>
-    // old products: extra photos without a variant show up as unnamed variants
-    (item?.images ?? []).filter((u) => u !== photo).map((image) => {
-      const v = item?.variants.find((x) => x.image === image);
-      return { key: image, image, label: v?.label ?? "", price: dollars(v?.priceCents) };
-    }),
+    (item?.variants ?? []).map((v) => ({ key: v.image || crypto.randomUUID(), image: v.image, label: v.label, code: v.code ?? "", price: dollars(v.priceCents) })),
   );
   const [busy, setBusy] = useState<string[]>([]); // keys uploading: "main" or a variant key
   const uploading = busy.length > 0;
-  const setVariant = (key: string, patch: { image?: string; label?: string; price?: string }) =>
+  const setVariant = (key: string, patch: { image?: string; label?: string; code?: string; price?: string }) =>
     setVariants((all) => all.map((v) => (v.key === key ? { ...v, ...patch } : v)));
   // last upload's message under its own box ("main" or a variant): an error, or "4.2 MB → 210 KB" after shrinking
   const [upMsg, setUpMsg] = useState<{ key: string; error?: ErrorCode; size?: string }>();
@@ -730,7 +732,9 @@ function ItemForm({
       isVisible: f.get("isVisible") === "on",
       description: str("description"),
       image: photo,
-      variants: variants.map(({ label, image, price }) => ({ label, image, price })),
+      // with variants the product has no "more photos" (they're hidden, and left out here)
+      gallery: variants.length ? [] : gallery,
+      variants: variants.map(({ label, image, price, code }) => ({ label, image, price, code })),
     };
     start(async () => {
       const r = await saveItem(item?.id ?? null, input);
@@ -800,6 +804,37 @@ function ItemForm({
               </div>
             </div>
           </div>
+          {/* more photos: only for a product without variants (with variants, each variant brings its own photo) */}
+          {!variants.length && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="gallery-add">
+                {t("morePhotos")} <Opt />
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {gallery.map((url) => (
+                  <div key={url} className="relative size-16">
+                    <PhotoPick url={url} busy={busy.includes(url)} label={t("uploadPhoto")} onFile={(f) => upload(url, f, (next) => setGallery((all) => all.map((u) => (u === url ? next : u))))} />
+                    <RemoveButton label={t("removePhoto")} onClick={() => setGallery((all) => all.filter((u) => u !== url))} />
+                  </div>
+                ))}
+                {gallery.length < 10 && (
+                  <div className="size-16">
+                    <PhotoPick
+                      id="gallery-add"
+                      url=""
+                      busy={busy.includes("gallery")}
+                      label={t("addPhoto")}
+                      // "+" in a dashed box = add one more
+                      empty={<Plus className="size-6" aria-hidden />}
+                      className="border-dashed border-muted-foreground/40 bg-transparent text-muted-foreground hover:border-primary hover:bg-muted/40 hover:text-foreground" onFile={(f) => upload("gallery", f, (url) => setGallery((all) => (all.includes(url) ? all : [...all, url])))} />
+                  </div>
+              )}
+            </div>
+            {upMessage("gallery")}
+            {upMsg && gallery.includes(upMsg.key) && upMessage(upMsg.key)}
+            {err("images")}
+          </div>
+          )}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="description">{t("description")} <Opt /></Label>
             <DescriptionEditor id="description" name="description" label={t("description")} placeholder={t("descriptionPlaceholder")} defaultValue={item?.description ?? ""} />
@@ -881,7 +916,10 @@ function ItemForm({
               <>
                 <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground" aria-hidden>
                   <span className="w-11 shrink-0">{t("photoShort")} <Req /></span>
-                  <span className="min-w-0 flex-1">{t("variantName")} <Opt /></span>
+                  <span className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+                    <span>{t("variantName")} <Opt /></span>
+                    <span className="hidden sm:inline">{t("variantCode")} <Opt /></span>
+                  </span>
                   <span className="w-28 shrink-0">{t("price")} <Opt /></span>
                   <span className="w-11 shrink-0" />
                 </div>
@@ -892,14 +930,24 @@ function ItemForm({
                         <div className="size-11 shrink-0">
                           <PhotoPick url={v.image} busy={busy.includes(v.key)} label={t("uploadPhoto")} onFile={(f) => upload(v.key, f, (image) => setVariant(v.key, { image }))} />
                         </div>
-                        <Input
-                          value={v.label}
-                          onChange={(e) => setVariant(v.key, { label: e.target.value })}
-                          maxLength={80}
-                          placeholder={t("variantPlaceholder")}
-                          aria-label={t("variantName")}
-                          className="h-11 min-w-0 flex-1"
-                        />
+                        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+                          <Input
+                            value={v.label}
+                            onChange={(e) => setVariant(v.key, { label: e.target.value })}
+                            maxLength={80}
+                            placeholder={t("variantPlaceholder")}
+                            aria-label={t("variantName")}
+                            className="h-11 min-w-0"
+                          />
+                          <Input
+                            value={v.code}
+                            onChange={(e) => setVariant(v.key, { code: e.target.value })}
+                            maxLength={40}
+                            placeholder={t("variantCodePlaceholder")}
+                            aria-label={t("variantCode")}
+                            className="h-11 min-w-0"
+                          />
+                        </div>
                         {/* own price; empty = the product price (shown faded) */}
                         <div className="relative w-28 shrink-0">
                           <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-sm text-muted-foreground" aria-hidden>$</span>
@@ -935,11 +983,12 @@ function ItemForm({
                 "flex h-12 w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground outline-none hover:bg-muted/50 hover:text-foreground focus-visible:bg-muted/50",
                 variants.length > 0 && "border-t",
               )}
-              onClick={() => setVariants((all) => [...all, { key: crypto.randomUUID(), image: "", label: "", price: "" }])}
+              onClick={() => setVariants((all) => [...all, { key: crypto.randomUUID(), image: "", label: "", code: "", price: "" }])}
             >
               <Plus className="size-4" aria-hidden /> {t("addVariant")}
             </button>
           </div>
+          {variants.length > 0 && gallery.length > 0 && <p className="text-xs text-muted-foreground">{t("morePhotosDropped", { count: gallery.length })}</p>}
           {err("variants")}
         </Section>
 

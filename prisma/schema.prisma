@@ -222,6 +222,8 @@ model DeliveryZone {
   provinceCodes String[] @map("province_codes")
   feeCents      Int      @map("fee_cents")
   freeOverCents Int?     @map("free_over_cents")
+  isCourier     Boolean  @default(false) @map("is_courier")
+  courierLogo   String?  @map("courier_logo")
   eta           String   @default("")
   isActive      Boolean  @default(true) @map("is_active")
   sortOrder     Int      @default(0) @map("sort_order")
