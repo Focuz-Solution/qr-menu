@@ -9,7 +9,7 @@ export type AdminOrder = {
   customerName: string;
   customerPhone: string;
   customerTelegram: string | null;
-  /** Telegram name (first + last) when the customer tapped Start on the receipt's updates link */
+  /** Telegram name (first + last) when the customer connected Telegram at checkout */
   customerTelegramName: string | null;
   /** the customer gets status messages on Telegram (their photo: /admin/orders/<id>/telegram-photo) */
   telegramLinked: boolean;

@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { appUrl } from "@/lib/app-url";
 
 // Telegram Bot API over plain fetch (no package). One bot for the whole app: TELEGRAM_BOT_TOKEN (env, from @BotFather).
@@ -15,6 +16,33 @@ export class TelegramError extends Error {
 
 /** the bot is set up on the server (TELEGRAM_BOT_TOKEN) */
 export const hasBotToken = () => /^\d{5,}:[A-Za-z0-9_-]{30,}$/.test(process.env.TELEGRAM_BOT_TOKEN?.trim() ?? "");
+
+/** the bot's number (first part of the token) for checkout's "Connect Telegram" button; null when the bot isn't set up */
+export const botId = () => (hasBotToken() ? process.env.TELEGRAM_BOT_TOKEN!.trim().split(":")[0] : null);
+
+/**
+ * Checks what checkout's "Connect Telegram" (Telegram Login, core.telegram.org/widgets/login#checking-authorization) sent:
+ * signed by Telegram with our bot token, at most 30 days old (checkout remembers the connection on the phone that long).
+ * Anything else → null (the order is still placed, just not linked).
+ */
+export function verifyTelegramLogin(data: unknown): { chatId: bigint; name: string | null; username: string | null } | null {
+  if (!data || typeof data !== "object" || !hasBotToken()) return null;
+  const { hash, ...fields } = data as Record<string, unknown>;
+  const entries = Object.entries(fields);
+  if (typeof hash !== "string" || entries.length > 10 || !entries.every(([, v]) => typeof v === "string" || typeof v === "number")) return null;
+  const check = entries
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+  const secret = createHash("sha256").update(process.env.TELEGRAM_BOT_TOKEN!.trim()).digest();
+  const expected = Buffer.from(createHmac("sha256", secret).update(check).digest("hex"));
+  if (expected.length !== hash.length || !timingSafeEqual(expected, Buffer.from(hash))) return null;
+  if (!(Date.now() / 1000 - Number(fields.auth_date) < 30 * 86_400) || !/^\d{1,19}$/.test(String(fields.id))) return null;
+  const name = [fields.first_name, fields.last_name].filter(Boolean).join(" ").trim().slice(0, 100) || null;
+  const username = typeof fields.username === "string" && /^\w{4,32}$/.test(fields.username) ? `@${fields.username}` : null;
+  // a person's private chat with the bot has the same id as the person
+  return { chatId: BigInt(String(fields.id)), name, username };
+}
 
 export async function telegram<T>(method: string, body: object = {}): Promise<T> {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();

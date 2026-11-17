@@ -96,19 +96,30 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
           {t("orders.title")}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-2xl font-medium md:text-3xl">{o.orderNo}</h1>
-          <StatusPill status={o.status} />
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-heading text-2xl font-medium md:text-3xl">{o.orderNo}</h1>
+              <StatusPill status={o.status} />
+            </div>
+            <p className="text-sm text-muted-foreground">{format.dateTime(o.createdAt, { dateStyle: "medium", timeStyle: "short" })}</p>
+          </div>
+          {/* page action, top right (same place as other admin pages' main button) */}
+          <Button variant="outline" size="sm" className="ml-auto" onClick={printReceipt}>
+            <Download aria-hidden />
+            {t("orders.downloadReceipt")}
+          </Button>
         </div>
-        <p className="text-sm text-muted-foreground">{format.dateTime(o.createdAt, { dateStyle: "medium", timeStyle: "short" })}</p>
       </div>
 
+      {/* desktop: left = customer, items · right = status, history.
+          phones: one column in the order staff use it — customer, status, items, history ("contents" + order) */}
       <div className="grid gap-4 lg:grid-cols-[1fr_340px] lg:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {/* customer + where to deliver */}
-          <Box title={t("orders.customer")} className="[&>h2]:border-b-0 [&>div]:pt-1">
+          <Box title={t("orders.customer")} className="order-1 min-w-0 lg:order-none [&>h2]:border-b-0 [&>div]:pt-1">
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-5">
               <div className="min-w-0">
-                {/* their Telegram photo (when they tapped Start on the receipt and it is public), else the first letter of the name */}
+                {/* their Telegram photo (when they connected Telegram at checkout and it is public), else the first letter of the name */}
                 <div className="flex items-center gap-3">
                   <Avatar className="size-12">
                     {o.telegramLinked && <AvatarImage src={`/admin/orders/${o.id}/telegram-photo`} alt="" className="object-cover" />}
@@ -123,20 +134,36 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
                     )}
                   </div>
                 </div>
-                <a href={`tel:${o.customerPhone}`} className="inline-flex min-h-11 w-fit items-center gap-2 text-sm text-primary underline-offset-4 hover:underline">
-                  <Phone className="size-4 shrink-0" aria-hidden />
-                  {phone}
-                </a>
-                {/* chat with the customer on Telegram, next to the call link: by @username when known (always works), else by phone */}
-                <a href={`https://t.me/${o.customerTelegram?.slice(1) ?? o.customerPhone}`} target="_blank" rel="noopener noreferrer" className="ml-4 inline-flex min-h-11 w-fit items-center gap-2 text-sm text-primary underline-offset-4 hover:underline">
-                  <MessageCircle className="size-4 shrink-0" aria-hidden />
-                  {t("telegram.chatCustomer")}
-                </a>
+                {/* contact: the way that will work is the main (filled) button — Telegram when they connected it
+                    (by @username, always opens), else a phone call (Telegram by phone may not find them) */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button asChild size="sm" variant={o.customerTelegram ? "default" : "outline"} className={o.customerTelegram ? "bg-telegram text-white hover:bg-telegram/90" : ""}>
+                    <a href={`https://t.me/${o.customerTelegram?.slice(1) ?? o.customerPhone}`} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle aria-hidden />
+                      {t("telegram.chatCustomer")}
+                    </a>
+                  </Button>
+                  <Button asChild size="sm" variant={o.customerTelegram ? "outline" : "default"} className={o.customerTelegram ? "" : "order-first"}>
+                    <a href={`tel:${o.customerPhone}`} aria-label={t("orders.call", { phone })}>
+                      <Phone aria-hidden />
+                      {phone}
+                    </a>
+                  </Button>
+                </div>
               </div>
-              <div className="min-w-0 space-y-1">
+              {/* where to deliver: address, landmark and the map button together */}
+              <div className="min-w-0 space-y-1 border-t pt-3 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5">
                 <p className="text-xs font-semibold text-muted-foreground">{t("orders.address")}</p>
                 <p className="text-sm wrap-break-word">{fullAddress(o)}</p>
                 {o.landmark && <p className="text-sm wrap-break-word text-muted-foreground">{o.landmark}</p>}
+                {o.mapUrl && (
+                  <Button variant="outline" size="sm" asChild className="mt-2">
+                    <a href={o.mapUrl} target="_blank" rel="noreferrer">
+                      <MapPin aria-hidden />
+                      {t("orders.map")}
+                    </a>
+                  </Button>
+                )}
               </div>
             </div>
             {o.note && (
@@ -144,22 +171,16 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
                 {t("orders.note")}: {o.note}
               </p>
             )}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={printReceipt}>
-                <Download aria-hidden />
-                {t("orders.downloadReceipt")}
-              </Button>
-              {o.mapUrl && (
-                <Button variant="outline" size="sm" asChild>
-                  <a href={o.mapUrl} target="_blank" rel="noreferrer">
-                    <MapPin aria-hidden />
-                    {t("orders.map")}
-                  </a>
-                </Button>
-              )}
-            </div>
-            <section className="flex flex-col gap-2 pt-2">
-              <h3 className="text-sm font-semibold">{t("orders.updateStatus")}</h3>
+          </Box>
+
+          {/* items + totals */}
+          <ItemsBox order={o} className="order-3 lg:order-none" />
+        </div>
+
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+          {/* the next step(s) for this order */}
+          <Box title={t("orders.updateStatus")} className="order-2 min-w-0 lg:order-none">
+            <section className="flex flex-col gap-2">
               {o.status === "cancelled" && o.cancelReason && <p className="text-sm">{t("orders.cancelReason")}: {o.cancelReason}</p>}
               {next.length && !canChangeStatus ? (
                 <p className="text-sm text-muted-foreground">{t("orders.noStatusPermission")}</p>
@@ -201,44 +222,8 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
             </section>
           </Box>
 
-          {/* items + totals */}
-          <Box title={t("orders.items")}>
-            {o.items.map((i) => (
-              <div key={i.id} className="flex items-center gap-3">
-                {i.imageUrl ? (
-                  <Img src={thumbUrl(i.imageUrl)} alt={i.name} sizes="56px" className="size-14 shrink-0 rounded-lg" />
-                ) : (
-                  <div className="size-14 shrink-0 rounded-lg bg-foreground/5" />
-                )}
-                <p className="min-w-0 flex-1 text-sm leading-snug">
-                  <span className="line-clamp-2">{i.name}{i.variant && ` · ${i.variant}`}</span>
-                  <span className="text-muted-foreground tabular-nums">{money(i.unitPriceCents)} × {i.quantity}</span>
-                </p>
-                <p className="text-sm font-medium tabular-nums">{money(i.lineTotalCents)}</p>
-              </div>
-            ))}
-            <dl className="grid grid-cols-[1fr_auto] gap-y-1 border-t border-dashed pt-3 text-sm tabular-nums">
-              <dt className="text-muted-foreground">{t("orders.subtotal")}</dt>
-              <dd className="text-right">{money(o.subtotalCents)}</dd>
-              <dt className="text-muted-foreground">{t("orders.delivery")} ({o.deliveryZoneName})</dt>
-              <dd className="text-right">{o.deliveryFeeCents ? money(o.deliveryFeeCents) : t("orders.free")}</dd>
-              {o.discountCents > 0 && (
-                <>
-                  <dt className="text-muted-foreground">{t("orders.discount")}</dt>
-                  <dd className="text-right">−{money(o.discountCents)}</dd>
-                </>
-              )}
-              <dt className="border-t pt-2 font-semibold">{t("orders.total")}</dt>
-              <dd className="border-t pt-2 text-right font-semibold">{money(o.totalCents)}</dd>
-              <dt className="text-muted-foreground">{t("orders.payment")}</dt>
-              <dd className="text-right">{t(`orders.paymentMethods.${o.paymentMethod}`)} · {t(`orders.paymentStatuses.${o.paymentStatus}`)}</dd>
-            </dl>
-          </Box>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-4">
           {/* history */}
-          <Box title={t("orders.history")}>
+          <Box title={t("orders.history")} className="order-4 min-w-0 lg:order-none">
             <ol className="flex flex-col gap-2 border-l pl-4 text-sm">
               {o.events.map((e) => (
                 <li key={e.id} className="relative">
@@ -256,5 +241,44 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
         </div>
       </div>
     </>
+  );
+}
+
+/** what was ordered + totals and payment */
+function ItemsBox({ order: o, className }: { order: AdminOrder; className?: string }) {
+  const t = useTranslations("admin");
+  return (
+    <Box title={t("orders.items")} className={`min-w-0 ${className ?? ""}`}>
+      {o.items.map((i) => (
+        <div key={i.id} className="flex items-center gap-3">
+          {i.imageUrl ? (
+            <Img src={thumbUrl(i.imageUrl)} alt={i.name} sizes="56px" className="size-14 shrink-0 rounded-lg" />
+          ) : (
+            <div className="size-14 shrink-0 rounded-lg bg-foreground/5" />
+          )}
+          <p className="min-w-0 flex-1 text-sm leading-snug">
+            <span className="line-clamp-2">{i.name}{i.variant && ` · ${i.variant}`}</span>
+            <span className="text-muted-foreground tabular-nums">{money(i.unitPriceCents)} × {i.quantity}</span>
+          </p>
+          <p className="text-sm font-medium tabular-nums">{money(i.lineTotalCents)}</p>
+        </div>
+      ))}
+      <dl className="grid grid-cols-[1fr_auto] gap-y-1 border-t border-dashed pt-3 text-sm tabular-nums">
+        <dt className="text-muted-foreground">{t("orders.subtotal")}</dt>
+        <dd className="text-right">{money(o.subtotalCents)}</dd>
+        <dt className="text-muted-foreground">{t("orders.delivery")} ({o.deliveryZoneName})</dt>
+        <dd className="text-right">{o.deliveryFeeCents ? money(o.deliveryFeeCents) : t("orders.free")}</dd>
+        {o.discountCents > 0 && (
+          <>
+            <dt className="text-muted-foreground">{t("orders.discount")}</dt>
+            <dd className="text-right">−{money(o.discountCents)}</dd>
+          </>
+        )}
+        <dt className="border-t pt-2 font-semibold">{t("orders.total")}</dt>
+        <dd className="border-t pt-2 text-right font-semibold">{money(o.totalCents)}</dd>
+        <dt className="text-muted-foreground">{t("orders.payment")}</dt>
+        <dd className="text-right">{t(`orders.paymentMethods.${o.paymentMethod}`)} · {t(`orders.paymentStatuses.${o.paymentStatus}`)}</dd>
+      </dl>
+    </Box>
   );
 }
