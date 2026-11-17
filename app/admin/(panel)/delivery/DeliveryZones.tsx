@@ -1,7 +1,7 @@
 "use client";
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import Link from "next/link";
+import { Loader2, type LucideIcon, Pencil, Plus, Trash2 } from "lucide-react";
+import Link, { useLinkStatus } from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useOptimistic, useState, useTransition } from "react";
 import { Pager, paginate } from "@/components/Pager";
@@ -30,6 +30,12 @@ const compare: Record<SortKey, (a: AdminZone, b: AdminZone) => number> = {
   freeOver: (a, b) => (a.freeOverCents ?? Infinity) - (b.freeOverCents ?? Infinity),
   active: (a, b) => Number(a.isActive) - Number(b.isActive),
 };
+
+/** a link's icon that turns into a spinner while its page is loading (must sit inside the <Link>) */
+function LinkIcon({ icon: Icon }: { icon: LucideIcon }) {
+  const { pending } = useLinkStatus();
+  return pending ? <Loader2 className="animate-spin" aria-hidden /> : <Icon aria-hidden />;
+}
 
 export function DeliveryZones({ zones }: { zones: AdminZone[] }) {
   const t = useTranslations("admin.delivery");
@@ -66,7 +72,7 @@ export function DeliveryZones({ zones }: { zones: AdminZone[] }) {
         </div>
         <Button size="sm" asChild>
           <Link href="/admin/delivery/new">
-            <Plus aria-hidden />
+            <LinkIcon icon={Plus} />
             {t("add")}
           </Link>
         </Button>
@@ -123,7 +129,7 @@ export function DeliveryZones({ zones }: { zones: AdminZone[] }) {
                   <div className="flex items-center justify-end gap-0.5">
                     <Button asChild variant="ghost" size="icon-sm" className="rounded-md text-muted-foreground hover:text-foreground">
                       <Link href={`/admin/delivery/${z.id}`} aria-label={`${t("edit")}: ${z.name}`} title={t("edit")}>
-                        <Pencil aria-hidden />
+                        <LinkIcon icon={Pencil} />
                       </Link>
                     </Button>
                     <Button

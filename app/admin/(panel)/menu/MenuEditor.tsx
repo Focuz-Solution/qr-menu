@@ -1002,7 +1002,11 @@ function ItemForm({
           </Button>
         )}
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onClose}>{t("cancel")}</Button>
-        <Button type="submit" className="h-11 flex-1" disabled={pending || uploading}>{t("save")}</Button>
+        <Button type="submit" className="h-11 flex-1" disabled={pending || uploading}>
+          {/* saving (add or update): spinner in the button until the server answers */}
+          {pending && <Loader2 className="animate-spin" aria-hidden />}
+          {t("save")}
+        </Button>
       </DialogFooter>
     </form>
   );

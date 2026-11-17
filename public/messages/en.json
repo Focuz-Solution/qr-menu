@@ -326,7 +326,7 @@
       "name": "Name",
       "contact": "Phone or email",
       "namePlaceholder": "Enter name",
-      "contactPlaceholder": "e.g. 012 345 678 or name@gmail.com",
+      "contactPlaceholder": "Enter phone or email",
       "role": "Role",
       "password": "Password",
       "passwordHint": "At least 8 characters",
