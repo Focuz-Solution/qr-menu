@@ -3,6 +3,8 @@
 import { requireUser } from "@/lib/auth";
 import { revalidateShop } from "@/lib/revalidate-shop";
 import { prisma } from "@/lib/db";
+import { deleteImageIfUnused, imageKey } from "@/lib/r2";
+import { isPreset } from "./couriers";
 import { toCents } from "@/lib/money";
 import { isProvinceCode } from "@/lib/provinces";
 import type { ErrorCode, Result } from "@/lib/result";
@@ -31,8 +33,13 @@ export async function saveZone(id: string | null, input: ZoneInput): Promise<Res
 
   if (!name || name.length > 80) fields.name = "required";
   if (feeCents === null || Number.isNaN(feeCents)) fields.fee = "badPrice";
-  if (Number.isNaN(freeOverCents)) fields.freeOver = "badPrice";
+  // free from $X: only when there is a fee to waive, and more than $0
+  if (Number.isNaN(freeOverCents) || freeOverCents === 0) fields.freeOver = "badPrice";
   if (!provinceCodes.every(isProvinceCode)) fields.provinces = "invalid";
+  if (input.eta.trim().length > 60) fields.eta = "invalid";
+  // an added courier's logo: only our own uploaded photo address; ready-made couriers and shop delivery have none
+  const courierLogo = input.isCourier && !isPreset(name) && input.courierLogo ? input.courierLogo : null;
+  if (courierLogo && !imageKey(courierLogo)) fields.courierLogo = "badImage";
   if (Object.keys(fields).length) return { ok: false, error: "invalid", fields };
 
   if (input.isActive) {
@@ -44,7 +51,9 @@ export async function saveZone(id: string | null, input: ZoneInput): Promise<Res
     name,
     provinceCodes,
     feeCents: feeCents!,
-    freeOverCents,
+    freeOverCents: feeCents ? freeOverCents : null,
+    isCourier: !!input.isCourier,
+    courierLogo,
     eta: input.eta.trim(),
     isActive: input.isActive,
   };
@@ -54,6 +63,12 @@ export async function saveZone(id: string | null, input: ZoneInput): Promise<Res
   } else {
     const last = await prisma.deliveryZone.aggregate({ where: { shopId: shop.id }, _max: { sortOrder: true } });
     await prisma.deliveryZone.create({ data: { ...data, shopId: shop.id, sortOrder: (last._max.sortOrder ?? -1) + 1 } });
+  }
+  // one logo per courier: every zone of this courier shows the new one; the old picture goes when nothing uses it
+  if (input.isCourier && !isPreset(name)) {
+    const old = await prisma.deliveryZone.findMany({ where: { shopId: shop.id, isCourier: true, name, courierLogo: { not: courierLogo } }, select: { courierLogo: true } });
+    await prisma.deliveryZone.updateMany({ where: { shopId: shop.id, isCourier: true, name }, data: { courierLogo } });
+    for (const url of new Set(old.map((z) => z.courierLogo))) await deleteImageIfUnused(url);
   }
   await revalidateShop(shop.id); // admin list + this shop's checkout (delivery fees)
   return { ok: true };

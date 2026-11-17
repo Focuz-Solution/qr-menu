@@ -2,6 +2,7 @@
 
 import { useShopPath, useShopSlug } from "@/lib/shop-path";
 import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Send, Trash2, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Script from "next/script";
 import { useLocale, useTranslations } from "next-intl";
@@ -23,6 +24,9 @@ import { cn } from "@/lib/utils";
 import { BackButton } from "../products/[slug]/BackButton";
 import { createOrder, telegramConnected } from "./actions";
 import { ProvincePicker } from "./ProvincePicker";
+
+// the map (Leaflet) only loads in the browser
+const MapPicker = dynamic(() => import("./MapPicker").then((m) => m.MapPicker), { ssr: false });
 import type { CheckoutInput, TelegramUser } from "./types";
 
 type Details = Omit<CheckoutInput, "lines" | "key" | "shop">;
@@ -220,6 +224,10 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                       <span className="min-w-0 flex-1 wrap-break-word">
                         {option.name}
                         {option.eta && <span className="block text-xs text-muted-foreground">{t("eta", { eta: option.eta })}</span>}
+                        {/* not free yet: tell them how much more makes it free */}
+                        {fee > 0 && option.freeOverCents != null && (
+                          <span className="block text-xs text-primary">{t("freeMore", { amount: money(option.freeOverCents - subtotalCents) })}</span>
+                        )}
                       </span>
                       <span className="shrink-0 tabular-nums">{fee ? money(fee) : t("free")}</span>
                     </label>
@@ -234,16 +242,16 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
             <Textarea id="address" value={d.address} onChange={set("address")} aria-required rows={2} maxLength={300} autoComplete="street-address" placeholder={t("addressPlaceholder")} aria-invalid={!!fields.address || undefined} className="text-base md:text-sm" />
             {err("address")}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="landmark">{t("landmark")} <Opt /></Label>
-              <Input id="landmark" value={d.landmark} onChange={set("landmark")} maxLength={200} placeholder={t("landmarkPlaceholder")} className="h-11 text-base md:text-sm" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="mapUrl">{t("mapUrl")} <Opt /></Label>
-              <Input id="mapUrl" value={d.mapUrl} onChange={set("mapUrl")} type="url" inputMode="url" maxLength={500} placeholder="https://maps.app.goo.gl/…" aria-invalid={!!fields.mapUrl || undefined} className="h-11 text-base md:text-sm" />
-              {err("mapUrl")}
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="landmark">{t("landmark")} <Opt /></Label>
+            <Input id="landmark" value={d.landmark} onChange={set("landmark")} maxLength={200} placeholder={t("landmarkPlaceholder")} className="h-11 text-base md:text-sm" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label asChild>
+              <p>{t("mapUrl")} <Opt /></p>
+            </Label>
+            <MapPicker value={d.mapUrl} onChange={(mapUrl) => set("mapUrl")({ target: { value: mapUrl } })} />
+            {err("mapUrl")}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="note">{t("note")} <Opt /></Label>

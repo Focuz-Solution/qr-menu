@@ -6,6 +6,8 @@ export type AdminZone = {
   provinceCodes: string[];
   feeCents: number;
   freeOverCents: number | null;
+  isCourier: boolean;
+  courierLogo: string | null;
   eta: string;
   isActive: boolean;
 };
@@ -16,6 +18,9 @@ export type ZoneInput = {
   provinceCodes: string[];
   fee: string;
   freeOver: string;
+  isCourier: boolean;
+  /** uploaded logo of an added courier ("" = none) */
+  courierLogo: string;
   eta: string;
   isActive: boolean;
 };
