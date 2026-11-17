@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { MenuProvider } from "@/components/MenuProvider";
 import { getMenuList } from "@/lib/menu";
 import { ShakeOnSubmit } from "@/components/ShakeOnSubmit";
@@ -23,13 +23,12 @@ import "../../globals.css";
 /** title/description + link preview in the shop language */
 export async function shopMetadata(slug: string, base: string): Promise<Metadata> {
   const { language: locale, name, logo, description } = await shopSettings(await shopBySlug(slug));
-  const t = await getTranslations({ locale, namespace: "meta" });
   return {
     ...(appUrl() && { metadataBase: new URL(appUrl()!) }),
     title: { default: name, template: `%s | ${name}` },
-    // the shop's own text from Settings → Shop details, else the default sentence
+    // the shop's own text from Settings → Shop details; empty → no description (previews show only the name)
     // editor text → plain words on one line (previews show no formatting)
-    description: richToText(description).replace(/\s+/g, " ").trim() || t("description"),
+    description: richToText(description).replace(/\s+/g, " ").trim() || undefined,
     alternates: { canonical: base || "/" },
     // tab icon = the shop's logo (uploaded in Settings → Appearance, else public/logo.png)
     icons: { icon: logo, apple: logo },

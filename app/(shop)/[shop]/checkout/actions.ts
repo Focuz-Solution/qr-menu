@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { getTranslations } from "next-intl/server";
@@ -13,7 +13,8 @@ import { isProvinceCode, PROVINCES } from "@/lib/provinces";
 import type { ErrorCode, Result } from "@/lib/result";
 import { formatPrice } from "@/lib/shop";
 import { shopSettings } from "@/lib/shop-settings";
-import { botInfo, escapeHtml, hasBotToken, telegram, telegramOrderUrl, webhookUrl } from "@/lib/telegram";
+import { postOrderToGroup } from "@/lib/order-telegram";
+import { escapeHtml, telegram, verifyTelegramLogin } from "@/lib/telegram";
 import type { CheckoutInput } from "./types";
 
 // Public checkout (no login): everything the browser sends is checked again here; prices come from the database.
@@ -22,21 +23,7 @@ const RATE = { orders: 5, minutes: 10 }; // ponytail: per-device limit from the 
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
-type Placed = {
-  orderNo: string; totalCents: number; deliveryFeeCents: number; deliveryZoneName: string;
-  /** receipt button "Get order updates on Telegram" (t.me/<bot>?start=<code>); null when the bot isn't set up */
-  updatesUrl: string | null;
-};
-
-/** t.me link that subscribes the customer to this order's status messages (lib/telegram-bot.ts handles the Start) */
-async function updatesUrl(code: string | null) {
-  if (!code || !hasBotToken()) return null;
-  try {
-    return `https://t.me/${(await botInfo()).username}?start=${code}`;
-  } catch {
-    return null; // Telegram unreachable: the receipt just has no button
-  }
-}
+type Placed = { orderNo: string; totalCents: number; deliveryFeeCents: number; deliveryZoneName: string };
 
 export async function createOrder(input: CheckoutInput): Promise<Result<Placed>> {
   // ---- the form ----
@@ -51,12 +38,15 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
   const note = text(input.note, 500);
   const payment = input.payment === "bank_transfer" ? "bank_transfer" : "cod";
   const key = text(input.key, 64);
+  // "Connect Telegram" (optional): only Telegram's signed data counts; anything else → the order just isn't linked
+  const tg = verifyTelegramLogin(input.telegram);
 
   if (!name) fields.name = "required";
   if (!phone) fields.phone = "badPhone";
   if (!isProvinceCode(provinceCode)) fields.province = "badProvince";
   if (!address) fields.address = "required";
-  if (mapUrl && !/^https:\/\/\S+$/.test(mapUrl)) fields.mapUrl = "badUrl";
+  // only the pin from the checkout map (MapPicker: https://www.google.com/maps?q=<lat>,<lng>)
+  if (mapUrl && !/^https:\/\/www\.google\.com\/maps\?q=-?\d{1,2}\.\d{1,6},-?\d{1,3}\.\d{1,6}$/.test(mapUrl)) fields.mapUrl = "badLocation";
   if (Object.keys(fields).length) return { ok: false, error: "invalid", fields };
 
   const lines = (Array.isArray(input.lines) ? input.lines : []).slice(0, MAX_LINES + 1);
@@ -70,11 +60,8 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
 
   // ---- double tap: the same key → the order already made ----
   if (key) {
-    const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true, updatesCode: true } });
-    if (same) {
-      const { updatesCode, ...rest } = same;
-      return { ok: true, data: { ...rest, updatesUrl: await updatesUrl(updatesCode) } };
-    }
+    const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true } });
+    if (same) return { ok: true, data: same };
   }
 
   // ---- shop rules: settings, this device's recent orders, the products and the delivery zones in one round trip (all of this shop) ----
@@ -127,7 +114,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
   // ---- save: order number from the day's counter, in one transaction ----
   const now = new Date();
   const day = cambodiaDay(now);
-  let order: { id: string; orderNo: string; updatesCode: string | null };
+  let order: { id: string; orderNo: string };
   try {
     order = await prisma.$transaction(async (tx) => {
       const { value } = await tx.orderCounter.upsert({ where: { shopId_day: { shopId, day } }, create: { shopId, day, value: 1 }, update: { value: { increment: 1 } } });
@@ -150,114 +137,88 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
           totalCents,
           paymentMethod: payment,
           idempotencyKey: key || null,
-          updatesCode: randomBytes(18).toString("base64url"),
+          // their Telegram → status messages (lib/change-order-status.ts), name/photo + Chat in Admin
+          ...(tg && { customerChatId: tg.chatId, customerTelegramName: tg.name, customerTelegram: tg.username }),
           ipHash,
           userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
           items: { create: orderLines },
           events: { create: { type: "created" } },
         },
-        select: { id: true, orderNo: true, updatesCode: true },
+        select: { id: true, orderNo: true },
       });
     });
   } catch (cause) {
     // two taps at the same moment with the same key: the other one saved it → return that order
     if (key && cause instanceof Prisma.PrismaClientKnownRequestError && cause.code === "P2002") {
-      const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true, updatesCode: true } });
-      if (same) {
-        const { updatesCode, ...rest } = same;
-        return { ok: true, data: { ...rest, updatesUrl: await updatesUrl(updatesCode) } };
-      }
+      const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true } });
+      if (same) return { ok: true, data: same };
     }
     throw cause;
   }
 
   // Telegram after the answer is sent: the customer sees the receipt without waiting for Telegram
   const saved = order;
-  after(() => notifyTelegram(shopId, saved.id, { ...saved, name, phone: phone!, phoneRaw, province: province.km, address, landmark, mapUrl, note, payment, lines: orderLines, deliveryZoneName: zone.name, subtotalCents, deliveryFeeCents, totalCents }));
-  return { ok: true, data: { orderNo: order.orderNo, totalCents, deliveryFeeCents, deliveryZoneName: zone.name, updatesUrl: await updatesUrl(order.updatesCode) } };
+  after(() => postOrderToGroup(saved.id));
+  // one thank-you receipt per order (its own order number), to the customer's Telegram when they connected it
+  if (tg) after(() => receiptToCustomer(shopId, tg.chatId, { orderNo: saved.orderNo, payment, lines: orderLines, subtotalCents, deliveryFeeCents, totalCents }));
+  return { ok: true, data: { orderNo: order.orderNo, totalCents, deliveryFeeCents, deliveryZoneName: zone.name } };
 }
 
-/** new order → the shop's Telegram group (if set up and on). Never fails the order: the result is logged as an order event. */
-async function notifyTelegram(
+/**
+ * "✅ Telegram connected with <shop>" → the customer's chat with the bot, right after they tap Connect at checkout.
+ * Public (no login), sends nothing to anyone else: only Telegram's signed login of that same person, made in the last
+ * 10 minutes (a remembered or copied login can't be replayed to spam them). Writes nothing to the database.
+ */
+export async function telegramConnected(shop: string, login: unknown): Promise<Result> {
+  const tg = verifyTelegramLogin(login);
+  const shopId = typeof shop === "string" ? await shopBySlug(shop) : null;
+  const fresh = Date.now() / 1000 - Number((login as { auth_date?: unknown })?.auth_date) < 600;
+  if (!tg || !shopId || !fresh) return { ok: false, error: "invalid" };
+  const { language, name } = await shopSettings(shopId);
+  const t = await getTranslations({ locale: language, namespace: "checkout" });
+  try {
+    await telegram("sendMessage", { chat_id: tg.chatId.toString(), text: t("tgConnectedMsg", { shop: name }) });
+  } catch (cause) {
+    console.error("[checkout] telegram connected message failed:", cause);
+  }
+  return { ok: true };
+}
+
+/** "🙏 Thank you for your order!" + order number, items, totals, payment → the customer's Telegram. Never fails the order. */
+async function receiptToCustomer(
   shopId: string,
-  orderId: string,
-  o: {
-    orderNo: string; name: string; phone: string; phoneRaw: string; province: string; address: string; landmark: string; mapUrl: string; note: string;
-    payment: "cod" | "bank_transfer"; lines: { name: string; variant: string | null; quantity: number; lineTotalCents: number }[];
-    deliveryZoneName: string; subtotalCents: number; deliveryFeeCents: number; totalCents: number;
-  },
+  chatId: bigint,
+  o: { orderNo: string; payment: "cod" | "bank_transfer"; lines: { name: string; variant: string | null; quantity: number; lineTotalCents: number }[]; subtotalCents: number; deliveryFeeCents: number; totalCents: number },
 ) {
-  const tg = await prisma.telegramSettings.findUnique({ where: { shopId } });
-  if (!tg?.isEnabled || tg.chatId === null || !hasBotToken()) return;
-  const t = await getTranslations({ locale: (await shopSettings(shopId)).language, namespace: "checkout" });
+  const { language, name } = await shopSettings(shopId);
+  const t = await getTranslations({ locale: language, namespace: "checkout" });
   const money = (c: number) => formatPrice(c / 100);
   const e = escapeHtml;
-  // order time in Cambodia, e.g. 08/11/2026 14:32
-  const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Phnom_Penh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(new Date()).replace(",", "");
   const DIVIDER = "------------------------";
-  // the order number links to the order in Admin (only when the site has a public https address)
-  const dashboard = telegramOrderUrl(orderId);
-  const orderNo = dashboard ? `<a href="${dashboard}">#${e(o.orderNo)}</a>` : `#${e(o.orderNo)}`;
-  const NO = "\u0000"; // placeholder: the title is escaped first, then the (already safe) link goes in
-  // Telegram allows 4096 characters per message: a very long order shows its first items + "… +N"
-  // "2 × Lipstick (Red) · $24.00" — the variant name in brackets when there is one
+  // ponytail: first 30 items + "… +N" keeps it under Telegram's 4096 characters; the full list is in the shop's Admin
   const items = o.lines.map((l) => `${l.quantity} × ${e(l.name)}${l.variant ? ` (${e(l.variant)})` : ""} · ${money(l.lineTotalCents)}`);
-  const build = (shown: number) => [
-    `🛍 <b>${e(t("tgNew", { no: NO })).replace(NO, orderNo)}</b>`,
-    `🕒 ${time}`,
+  const text = [
+    `🙏 <b>${e(t("tgThanks"))}</b>`,
+    `🧾 ${e(t("orderNo"))}: <b>${e(o.orderNo)}</b>`,
+    `🏪 ${e(name)}`,
     DIVIDER,
-    `👤 ${e(o.name)}`,
-    `📞 ${e(o.phoneRaw)}`,
-    `📍 ${e(o.province)} — ${e(o.address)}`,
-    o.landmark ? `🏠 ${e(o.landmark)}` : null,
-    o.mapUrl ? `🗺 ${e(o.mapUrl)}` : null,
-    o.note ? `📝 ${e(o.note)}` : null,
-    DIVIDER,
-    ...items.slice(0, shown),
-    shown < items.length ? `… +${items.length - shown}` : null,
+    ...items.slice(0, 30),
+    items.length > 30 ? `… +${items.length - 30}` : null,
     DIVIDER,
     `${e(t("subtotal"))} · ${money(o.subtotalCents)}`,
     `${e(t("delivery"))} · ${o.deliveryFeeCents ? money(o.deliveryFeeCents) : e(t("free"))}`,
     `<b>${e(t("total"))} · ${money(o.totalCents)}</b>`,
-    `${e(t(o.payment === "cod" ? "payCod" : "payBank"))} · ${e(t("tgUnpaid"))}`,
-    "__________________________",
+    `💳 ${e(t(o.payment === "cod" ? "payCod" : "payBank"))}`,
+    DIVIDER,
+    e(t("tgReceiptFooter")),
   ]
-    .filter((line) => line !== null) // optional details left out
-    .join("\n");
-  let shown = items.length;
-  let message = build(shown);
-  while (message.length > 4096 && shown > 1) message = build(--shown);
-  message = message.slice(0, 4096);
-  const buttons = await getTranslations({ locale: "km", namespace: "admin.telegram" });
+    .filter((line) => line !== null)
+    .join("\n")
+    .slice(0, 4096);
   try {
-    const sent = await telegram<{ message_id: number }>("sendMessage", {
-      chat_id: tg.chatId.toString(),
-      text: message,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-      reply_markup: {
-        inline_keyboard: [
-          // Confirm / Cancel / Dashboard only when Telegram can reach this site (https + a valid webhook secret); otherwise ✓ Confirm would do nothing
-          ...(dashboard && webhookUrl()
-            ? [
-                [{ text: buttons("previewConfirm"), callback_data: `c:${orderId}:${tg.chatId}` }, { text: buttons("previewCancel"), url: dashboard }],
-                [{ text: buttons("previewDashboard"), url: dashboard }],
-              ]
-            : []),
-          // opens a Telegram chat with the customer's phone (+855…); works when their number is on Telegram and findable
-          [{ text: `💬 ${buttons("chatCustomer")}`, url: `https://t.me/${o.phone}` }],
-        ],
-      },
-      ...(tg.messageThreadId && { message_thread_id: tg.messageThreadId }),
-    });
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { telegramMessageId: BigInt(sent.message_id), events: { create: { type: "telegram_sent" } } },
-    });
+    await telegram("sendMessage", { chat_id: chatId.toString(), text, parse_mode: "HTML" });
   } catch (cause) {
-    console.error("[orders] telegram failed:", cause);
-    await prisma.orderEvent.create({ data: { orderId, type: "telegram_failed" } }).catch(() => {});
+    // logged (Railway → Logs) so a missing receipt can be explained; the order is already saved
+    console.error("[orders] customer receipt failed:", cause);
   }
 }

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { OrderStatus } from "@/lib/generated/prisma/enums";
 import { NEXT_STATUS, STATUS_TIME } from "@/lib/order-status";
+import { syncOrderInGroup } from "@/lib/order-telegram";
 import type { Result } from "@/lib/result";
 import { shopSettings } from "@/lib/shop-settings";
 import { hasBotToken, telegram, TelegramError } from "@/lib/telegram";
@@ -46,23 +47,25 @@ export async function changeOrderStatus(actorId: string, shopId: string, id: str
   });
   if (!moved) return { ok: false, error: "badTransition" };
 
-  // ponytail: Telegram message update (outbox job) joins here in P6
   revalidatePath("/admin", "layout");
-  // the customer's Telegram (if they tapped "Get order updates"), after the answer: staff don't wait for Telegram
-  after(() => notifyCustomer(id, next, cancelReason));
+  // after the answer (staff don't wait for Telegram): the group's order message shows the new status,
+  // and the customer's Telegram (if they connected it at checkout) hears only "confirmed" or "cancelled" — not every step
+  after(() => syncOrderInGroup(id));
+  if (next === "confirmed" || next === "cancelled") after(() => notifyCustomer(id, next, cancelReason));
   return { ok: true };
 }
 
-/** "✅ Your order #… is confirmed" → the customer's private chat with the bot. Never fails the status change. */
-async function notifyCustomer(orderId: string, status: OrderStatus, reason?: string) {
-  if (status === "new" || !hasBotToken()) return;
+/** "✅ Your order #… is confirmed" / "❌ … was cancelled" + reason → the customer's chat with the bot. Never fails the status change. */
+async function notifyCustomer(orderId: string, status: "confirmed" | "cancelled", reason?: string) {
+  if (!hasBotToken()) return;
   const order = await prisma.order.findUnique({ where: { id: orderId }, select: { orderNo: true, shopId: true, customerChatId: true } });
   if (!order?.customerChatId) return;
-  const { language, name } = await shopSettings(order.shopId);
+  const { language } = await shopSettings(order.shopId);
   const t = await getTranslations({ locale: language, namespace: "checkout" });
-  const text = [t(`tgStatus.${status}`, { no: order.orderNo, shop: name }), status === "cancelled" && reason ? t("tgReason", { reason }) : null]
-    .filter(Boolean)
-    .join("\n");
+  const text =
+    status === "confirmed"
+      ? t("tgConfirmed", { no: order.orderNo })
+      : [t("tgCancelled", { no: order.orderNo }), reason ? t("tgReason", { reason }) : null].filter(Boolean).join("\n");
   try {
     await telegram("sendMessage", { chat_id: order.customerChatId.toString(), text });
   } catch (cause) {
