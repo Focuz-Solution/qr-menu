@@ -126,6 +126,14 @@
 }
 
 
+/* shop header height: the category row pins right under it; 0 while the header is slid away (scrolling down, Header.tsx) */
+:root {
+  --shop-header: 72px;
+}
+:root[data-header-hidden] {
+  --shop-header: 0px;
+}
+
 /* English: Inter; Khmer words inside English pages fall back to Google Sans */
 html:lang(en) {
   --app-font: var(--font-inter), var(--font-google-sans), ui-sans-serif, system-ui, sans-serif;

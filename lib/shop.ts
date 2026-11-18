@@ -9,6 +9,8 @@ export const pick = (t: T, lang: string) => t[lang as Lang] || t.km;
 // size ("100 ml") or shade (hex)
 export type Variant = { label: string; hex?: string; price?: number; image?: string; };
 
+export type Size = { id: string; name: string; price?: number };
+
 /** a category on the shop (from Admin → Menu): its slug is the anchor id, the name is shown as is */
 export type ShopCategory = { slug: string; name: string };
 /** category slug */
@@ -25,6 +27,10 @@ export type Product = {
   /** extra photos for the detail-page gallery (main `image` is always first) */
   images?: string[];
   variants?: Variant[];
+  /** sizes it comes in (Admin → Sizes), in the shop's order; own price or the product price */
+  sizes?: Size[];
+  /** YouTube video id, shown under the description */
+  youtube?: string;
   description: T;
   howToUse?: T;
   ingredients?: string;
@@ -61,6 +67,11 @@ export function variantName(p: Product, image: string) {
   const i = list.findIndex((v) => v.image === image);
   return i < 0 ? null : { label: list[i].label, n: i + 1 };
 }
+
+/** the picked size; a product with sizes always has one (unknown / none picked → the first) */
+export const sizeOf = (p: Product, sizeId?: string) => p.sizes?.find((s) => s.id === sizeId) ?? p.sizes?.[0];
+/** what the customer pays for this photo + size: the size's own price, else the variant's, else the product price */
+export const priceFor = (p: Product, image: string, sizeId?: string) => sizeOf(p, sizeId)?.price ?? priceAt(p, image);
 
 export function discountPercent(p: { price: number; oldPrice?: number }) {
   return p.oldPrice && p.oldPrice > p.price

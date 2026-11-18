@@ -9,6 +9,7 @@ import { Badge } from "@/lib/generated/prisma/enums";
 import type { ErrorCode, Result } from "@/lib/result";
 import { deleteImageIfUnused, imageKey } from "@/lib/r2";
 import { cleanRichInput } from "@/lib/rich-text";
+import { youtubeId } from "@/lib/youtube";
 import type { ItemInput } from "./types";
 
 // Menu admin (plan/api.md → Menu, plan/business-rules.md 1–11). Owner/admin + staff only; every query is limited to the current shop.
@@ -110,28 +111,42 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
     priceCents: toCents(String(v?.price ?? "")) ?? undefined,
     code: String(v?.code ?? "").trim().slice(0, 40) || undefined,
   }));
-  // more photos (not tied to a variant): up to 10, and only when the product has no variants
-  const gallery = variants.length ? [] : (Array.isArray(input.gallery) ? input.gallery : []).slice(0, 10).map((u) => String(u ?? "").trim());
+  // ticked sizes (Admin → Sizes): own price optional, else the product price; checked against this shop's sizes below
+  const sizes = (Array.isArray(input.sizes) ? input.sizes : []).slice(0, 30).map((x) => ({
+    sizeId: String(x?.sizeId ?? ""),
+    priceCents: toCents(String(x?.price ?? "")),
+  }));
+  if (sizes.some((x) => Number.isNaN(x.priceCents))) fields.sizes = "badPrice";
+  // more photos (not tied to a variant): up to 10, kept with or without variants
+  const gallery = (Array.isArray(input.gallery) ? input.gallery : []).slice(0, 10).map((u) => String(u ?? "").trim());
   if (variants.some((v) => !v.image)) fields.variants = "variantPhoto";
   else if (variants.some((v) => Number.isNaN(v.priceCents))) fields.variants = "badPrice";
-  // image rows: main photo first, then the more photos, then the variant photos (cart, checkout and photo clean-up read these rows)
-  const images = [...new Set([String(input.image ?? "").trim(), ...gallery, ...variants.map((v) => v.image)].filter(Boolean))];
+  // image rows: main photo first, then the variant photos, then the more photos last (cart, checkout and photo clean-up read these rows)
+  const images = [...new Set([String(input.image ?? "").trim(), ...variants.map((v) => v.image), ...gallery].filter(Boolean))];
 
   if (!name || name.length > 200) fields.name = "required";
   // description: the editor's JSON, cleaned to what the shop can show (lib/rich-text.ts); plain text is kept as is
   const description = cleanRichInput(String(input.description ?? ""));
   if (description.length > 20000) fields.description = "invalid";
-  // the product being edited and the chosen category (both of this shop), in one round trip
-  const [current, category] = await Promise.all([
+  // a YouTube link (or nothing): only its video id is kept
+  const youtube = String(input.youtube ?? "").trim().slice(0, 300);
+  const video = youtube ? youtubeId(youtube) : null;
+  if (youtube && !video) fields.youtube = "badYoutube";
+  // the product being edited, the chosen category and the ticked sizes (all of this shop), in one round trip
+  const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+  const [current, category, okSizes] = await Promise.all([
     id ? prisma.item.findFirst({
       where: { id, shopId: shop.id, deletedAt: null },
       select: { categoryId: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
     }) : null,
     // not a uuid (e.g. no category picked) → "required", not a database error
-    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(input.categoryId)
+    uuid.test(input.categoryId)
       ? prisma.category.findFirst({ where: { id: input.categoryId, shopId: shop.id }, select: { id: true } })
       : null,
+    prisma.size.count({ where: { shopId: shop.id, id: { in: sizes.map((x) => x.sizeId).filter((x) => uuid.test(x)) } } }),
   ]);
+  // each ticked size once, and every one is this shop's
+  if (new Set(sizes.map((x) => x.sizeId)).size !== sizes.length || okSizes !== sizes.length) fields.sizes = "invalid";
   if (id && !current) return { ok: false, error: "notFound" };
   const oldImages = current?.images.map((i) => i.url) ?? [];
   if (images.some((u) => !oldImages.includes(u) && !imageKey(u))) fields.images = "badImage";
@@ -156,6 +171,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
     isVisible: input.isVisible,
     description,
     variants,
+    youtubeId: video,
   };
   const nextSort = async () =>
     ((await prisma.item.aggregate({ where: { shopId: shop.id, categoryId: input.categoryId }, _max: { sortOrder: true } }))._max.sortOrder ?? -1) + 1;
@@ -163,7 +179,11 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   if (!id) {
     const slug = await uniqueSlug(name, "item", (s) => prisma.item.findUnique({ where: { shopId_slug: { shopId: shop.id, slug: s } } }));
     const created = await prisma.item.create({
-      data: { ...data, shopId: shop.id, slug, sortOrder: await nextSort(), images: { create: images.map((url, i) => ({ url, sortOrder: i })) } },
+      data: {
+        ...data, shopId: shop.id, slug, sortOrder: await nextSort(),
+        images: { create: images.map((url, i) => ({ url, sortOrder: i })) },
+        sizes: { create: sizes },
+      },
     });
     await changed();
     return { ok: true, data: { id: created.id } };
@@ -177,6 +197,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
       ...(current?.categoryId !== input.categoryId && { sortOrder: await nextSort() }),
       // photos changed (added, removed, reordered) → rewrite the rows in the new order
       ...(images.join() !== oldImages.join() && { images: { deleteMany: {}, create: images.map((url, i) => ({ url, sortOrder: i })) } }),
+      sizes: { deleteMany: {}, create: sizes },
     },
   });
   // removed photos: delete the files, unless another product / logo (any shop) or an old order still shows one
