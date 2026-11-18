@@ -12,7 +12,9 @@
     "tab_sale": "Discount",
     "productCount": "{count, plural, one {# product} other {# products}}",
     "clearSearch": "Clear search",
-    "cart": "Cart"
+    "cart": "Cart",
+    "filterSize": "Filter by size",
+    "clearSize": "Clear"
   },
   "product": {
     "detailTitle": "Product details",
@@ -45,7 +47,8 @@
     "more": "Increase quantity",
     "option": "Option",
     "optionN": "Option {n}",
-    "video": "Video"
+    "video": "Video",
+    "playVideo": "Play video"
   },
   "footer": {
     "address": "Address",

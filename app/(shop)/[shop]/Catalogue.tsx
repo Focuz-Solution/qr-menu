@@ -1,13 +1,14 @@
 "use client";
 
-import { ChevronLeft, PackageOpen, Search, X } from "lucide-react";
+import { Check, ChevronLeft, PackageOpen, Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Img } from "@/components/Img";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { Product, ShopCategory } from "@/lib/shop";
+import type { Product, ShopCategory, Size } from "@/lib/shop";
 import type { ShopLayout } from "@/lib/shop-settings";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
@@ -43,6 +44,8 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
   const [active, setActive] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [q, setQ] = useState("");
+  // size filter per category (right end of its heading): category slug → ticked size ids (none = every product)
+  const [sizeSel, setSizeSel] = useState<Record<string, string[]>>({});
   const chipsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // a tapped chip stays active until its smooth scroll lands, so passing sections don't steal the highlight
@@ -65,6 +68,11 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
   const shown = products.filter(
     (p) => !needle || [p.name.km, p.name.en, p.brand ?? ""].some((s) => s.toLowerCase().includes(needle)),
   );
+  const clearFilters = () => {
+    setQ("");
+    setSizeSel({});
+  };
+
   // template "scroll": category chip row; a chip with no matching products is disabled
   const enabled = new Set(shown.map((p) => p.category));
   // template "filter", By category / By brand: the tapped tile (null = show the tiles)
@@ -80,9 +88,22 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
   const keep = (p: Product) =>
     !filter || tab === "all" || (tab === "sale" ? onSale(p) : brandTab ? p.brand === pick : p.category === pick);
   // one section per category, in chip order; only sections with products
+  // its size filter only narrows the grid (the section and its sizes stay, so it can be changed back)
   const sections = chips
-    .map((cat) => ({ cat, items: shown.filter((p) => p.category === cat && keep(p)) }))
+    .map((cat) => {
+      const all = shown.filter((p) => p.category === cat && keep(p));
+      const sel = sizeSel[cat] ?? [];
+      return {
+        cat,
+        sel,
+        // sizes the category's products come in, each once
+        sizes: [...new Map(all.flatMap((p) => p.sizes ?? []).map((z): [string, Size] => [z.id, z])).values()],
+        items: sel.length ? all.filter((p) => p.sizes?.some((z) => sel.includes(z.id))) : all,
+      };
+    })
     .filter((s) => s.items.length > 0);
+  // a picked category's section (its size filter goes on the back row)
+  const picked = pick && !brandTab ? sections.find((s) => s.cat === pick) : undefined;
   // which sections exist right now — the scroll-spy re-reads the page whenever this changes
   const sectionKey = sections.map((s) => s.cat).join();
 
@@ -117,8 +138,9 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
 
   return (
     <>
-      {/* search (when open) + category row stay pinned under the sticky header (72px: py-2 + 56px logo) */}
-      <div className="sticky top-[72px] z-10 -mx-4 bg-background/95 px-4 backdrop-blur">
+      {/* search (when open) + category row stay pinned under the sticky header (--shop-header: 72px = py-2 + 56px logo),
+          and slide up to the very top together with it while the header is hidden (scrolling down) */}
+      <div className="sticky top-(--shop-header) z-10 -mx-4 bg-background/95 px-4 backdrop-blur motion-safe:transition-[top] motion-safe:duration-300">
         {searching && (
           <div className="py-2">
             <div className="flex h-12 items-center rounded-xl border bg-background focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
@@ -219,7 +241,7 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
       {products.length > 0 && (tiles ? tiles.length === 0 : sections.length === 0) && (
         <div className="flex flex-col items-center gap-4 py-16 text-center">
           <p className="text-muted-foreground">{t("home.noProducts")}</p>
-          <Button variant="outline" className="h-11" onClick={() => setQ("")}>
+          <Button variant="outline" className="h-11" onClick={clearFilters}>
             {t("home.clearFilters")}
           </Button>
         </div>
@@ -253,32 +275,45 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
 
       {/* a tapped tile: back to the tiles + its name */}
       {pick && (
-        <button
-          type="button"
-          onClick={() => setActive(null)}
-          className="-ml-2 flex h-11 items-center gap-1 rounded-full pr-3 pl-1 text-lg font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <ChevronLeft className="size-6" aria-hidden />
-          {brandTab ? pick : nameOf(pick)}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActive(null)}
+            className="-ml-2 flex h-11 min-w-0 items-center gap-1 rounded-full pr-3 pl-1 text-lg font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <ChevronLeft className="size-6 shrink-0" aria-hidden />
+            <span className="truncate">{brandTab ? pick : nameOf(pick)}</span>
+          </button>
+          {/* a picked category: its size filter sits on this row, at the right (its own heading is hidden) */}
+          {!brandTab && picked && picked.sizes.length > 0 && (
+            <SizeFilter sizes={picked.sizes} value={picked.sel} onChange={(v) => setSizeSel((all) => ({ ...all, [pick]: v }))} />
+          )}
+        </div>
       )}
 
       <div className="space-y-10 pt-2">
-        {sections.map(({ cat, items }, i) => (
+        {sections.map(({ cat, items, sizes, sel }, i) => (
           <section
             key={cat}
             id={`cat-${cat}`}
             // ponytail: scroll-mt = header 72 + chips 68 (+ 64 with the search bar open); update if those change
             // (no forced height on the last section: a short last category just scrolls as far as the page goes)
-            className={searching ? "scroll-mt-[208px]" : "scroll-mt-[144px]"}
+            className={searching ? "scroll-mt-52" : "scroll-mt-36"}
           >
             {/* heading doubles as the divider: accent bar, title, then a hairline out to the edge */}
             {/* (not under a picked category: the back row above already names it) */}
-            <h2 className={cn("flex items-center gap-3 pb-4", filter && pick && !brandTab && "sr-only")}>
-              <span className="h-5 w-1 shrink-0 rounded-full bg-primary" aria-hidden />
-              <span className="text-lg font-semibold">{nameOf(cat)}</span>
-              <span className="h-px flex-1 bg-border" aria-hidden />
-            </h2>
+            {/* (a picked category: heading for screen readers only; its size filter is on the back row above) */}
+            <div className={cn("flex items-center gap-3 pb-4", filter && pick && !brandTab && "sr-only")}>
+              <h2 className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="h-5 w-1 shrink-0 rounded-full bg-primary" aria-hidden />
+                <span className="text-lg font-semibold">{nameOf(cat)}</span>
+                <span className="h-px flex-1 bg-border" aria-hidden />
+              </h2>
+              {/* right end of the line (both templates): size filter, when this category's products have sizes */}
+              {!(pick && !brandTab) && sizes.length > 0 && (
+                <SizeFilter sizes={sizes} value={sel} onChange={(v) => setSizeSel((all) => ({ ...all, [cat]: v }))} />
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-3 lg:grid-cols-4">
               {items.map((p, j) => (
                 // top row of the first section is above the fold — one of these is the LCP image
@@ -289,5 +324,54 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
         ))}
       </div>
     </>
+  );
+}
+
+/** a category's size filter: small pill at the end of its heading line; tick sizes to show only products in them */
+function SizeFilter({ sizes, value, onChange }: { sizes: Size[]; value: string[]; onChange: (ids: string[]) => void }) {
+  const t = useTranslations();
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("home.filterSize")}
+          className={cn(
+            "relative ml-auto flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm outline-none after:absolute after:-inset-y-1 after:inset-x-0 focus-visible:ring-3 focus-visible:ring-ring/50",
+            value.length ? "font-semibold text-primary" : "text-foreground",
+          )}
+        >
+          <SlidersHorizontal className="size-4" aria-hidden />
+          {/* the ticked size(s), else "Size" */}
+          <span className="max-w-28 truncate">{value.length ? sizes.filter((z) => value.includes(z.id)).map((z) => z.name).join(", ") : t("product.size")}</span>
+        </button>
+      </PopoverTrigger>
+      {/* flat box: thin border, no shadow */}
+      <PopoverContent align="end" className="w-64 gap-3 shadow-none ring-foreground/10">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-semibold">{t("home.filterSize")}</p>
+          {value.length > 0 && (
+            <button type="button" onClick={() => onChange([])} className="-my-2 h-9 rounded-full px-2 text-xs font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+              {t("home.clearSize")}
+            </button>
+          )}
+        </div>
+        <ToggleGroup type="multiple" value={value} onValueChange={onChange} className="flex flex-wrap justify-start gap-2" spacing={2}>
+          {sizes.map((z) => (
+            <ToggleGroupItem
+              key={z.id}
+              value={z.id}
+              className={cn(
+                "group relative h-9 gap-1 rounded-full bg-muted/60 px-3.5 text-sm font-normal shadow-none after:absolute after:-inset-y-1 after:inset-x-0 hover:bg-muted",
+                "data-[state=on]:bg-primary data-[state=on]:font-medium data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary",
+              )}
+            >
+              <Check className="hidden size-3.5 group-data-[state=on]:block" strokeWidth={2.5} aria-hidden />
+              {z.name}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </PopoverContent>
+    </Popover>
   );
 }

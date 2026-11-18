@@ -46,26 +46,8 @@ export function ProductView({ product: p }: { product: Product }) {
             </div>
           </div>
         }
-        video={
-          p.youtube && (
-            // the product's YouTube video (Admin → product → YouTube video): privacy-enhanced player, loads when scrolled near
-            // plain (no card background): title + player
-            <section className="space-y-2">
-              <h2 className="font-semibold">{t("video")}</h2>
-              <div className="aspect-video overflow-hidden rounded-2xl">
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${p.youtube}?rel=0`}
-                  title={`${t("video")}: ${pick(p.name, lang)}`}
-                  loading="lazy"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                  className="size-full border-0"
-                />
-              </div>
-            </section>
-          )
-        }
+        // the product's YouTube video (Admin → product → YouTube video): last slide of the photo gallery
+        video={p.youtube || undefined}
         footer={(image, sizeId) => <AddToCart slug={p.slug} image={image} sizeId={sizeId} disabled={!p.inStock} />}
         details={
           // always open: each section a soft grey card (title + text), no collapse arrow
