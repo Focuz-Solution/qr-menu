@@ -17,6 +17,7 @@ model Shop {
   memberships Membership[]
   sessions    Session[]
   categories  Category[]
+  sizes       Size[]
   items       Item[]
   zones       DeliveryZone[]
   orders      Order[]
@@ -189,7 +190,10 @@ model Item {
   isVisible      Boolean     @default(true) @map("is_visible")
   sortOrder      Int         @default(0) @map("sort_order")
   variants       Json        @default("[]")
+  /// YouTube video id (11 characters) shown on the product page; null = no video
+  youtubeId      String?     @map("youtube_id")
   images         ItemImage[]
+  sizes          ItemSize[]
   orderItems     OrderItem[]
   deletedAt      DateTime?   @map("deleted_at")
   createdAt      DateTime    @default(now()) @map("created_at")
@@ -198,6 +202,35 @@ model Item {
   @@unique([shopId, slug])
   @@index([categoryId, sortOrder])
   @@map("items")
+}
+
+/// a size the shop sells in ("30 ml", "M"), managed in Admin → Sizes; products pick theirs (ItemSize)
+model Size {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  shopId    String     @map("shop_id") @db.Uuid
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int        @default(0) @map("sort_order")
+  items     ItemSize[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@unique([shopId, name])
+  @@index([shopId, sortOrder])
+  @@map("sizes")
+}
+
+/// a size a product comes in, with its own price (null = the product price)
+model ItemSize {
+  itemId     String @map("item_id") @db.Uuid
+  item       Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  sizeId     String @map("size_id") @db.Uuid
+  size       Size   @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  priceCents Int?   @map("price_cents")
+
+  @@id([itemId, sizeId])
+  @@index([sizeId])
+  @@map("item_sizes")
 }
 
 model ItemImage {

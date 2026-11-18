@@ -5,8 +5,8 @@ export type TelegramUser = { id: string; name: string; username?: string; photo_
 export type CheckoutInput = {
   /** the shop's address (app.com/<shop>/checkout) — the order goes to that shop */
   shop: string;
-  /** cart lines: product slug, the photo picked (style), quantity */
-  lines: { slug: string; image: string; qty: number }[];
+  /** cart lines: product slug, the photo picked (style), the size id picked (Admin → Sizes), quantity */
+  lines: { slug: string; image: string; size?: string; qty: number }[];
   name: string;
   phone: string;
   provinceCode: string;
