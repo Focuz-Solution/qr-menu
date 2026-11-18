@@ -5,7 +5,7 @@ import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Send, Trash2, X
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Opt, Req } from "@/components/FieldMark";
 import { TelegramCircleIcon } from "@/components/icons";
 import { Img } from "@/components/Img";
@@ -91,6 +91,18 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
   // every order starts with an empty form; only a connected Telegram is remembered on the phone (per shop, 30 days).
   // Safe to read here: the form only renders in the browser (on the server the cart is empty).
   const [d, setD] = useState<Details>(() => ({ ...EMPTY, telegram: savedTelegram(shopSlug) }));
+  // the province guessed from the customer's network (app/api/region): pre-selected only while they haven't picked one,
+  // and only when a delivery zone covers it; no guess (or an error) → they pick it themselves
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch("/api/region", { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then(({ province }: { province: string | null }) => {
+        if (province && optionsFor(zones, province).length) setD((x) => (x.provinceCode ? x : { ...x, provinceCode: province, deliveryZoneId: "", payDriver: false }));
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [zones]);
   const setTelegram = (telegram: TelegramUser | null) => {
     setD((x) => ({ ...x, telegram }));
     try {
