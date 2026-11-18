@@ -48,7 +48,7 @@ export function ProductView({ product: p }: { product: Product }) {
         }
         // the product's YouTube video (Admin → product → YouTube video): last slide of the photo gallery
         video={p.youtube || undefined}
-        footer={(image, sizeId) => <AddToCart slug={p.slug} image={image} sizeId={sizeId} disabled={!p.inStock} />}
+        footer={(image, sizeId, askPick) => <AddToCart slug={p.slug} image={image} sizeId={sizeId} disabled={!p.inStock} askPick={askPick} />}
         details={
           // always open: each section a soft grey card (title + text), no collapse arrow
           // the sheet's own 12px gap separates it from the choices above (no extra top padding)
@@ -68,14 +68,16 @@ export function ProductView({ product: p }: { product: Product }) {
   );
 }
 
-// Adds the photo showing in the gallery + the size picked: another photo or size = its own cart line
-function AddToCart({ slug, image, sizeId, disabled }: { slug: string; image: string; sizeId?: string; disabled: boolean }) {
+// Adds the picked variant (else the photo showing) + the size picked: another variant or size = its own cart line.
+// No variant picked on a product with variants → tapping asks for one ("choose an option") instead of adding.
+// No photo showing (`null`: the video slide of a product without variants) → off until a photo shows.
+function AddToCart({ slug, image, sizeId, disabled, askPick }: { slug: string; image: string | undefined | null; sizeId?: string; disabled: boolean; askPick: () => void }) {
   const t = useTranslations("product");
-  const key = cartKey(slug, image, sizeId);
+  const key = cartKey(slug, image ?? "", sizeId);
   const qty = useCart().items.find((i) => i.key === key)?.qty ?? 0;
   return (
     <div className="flex gap-2 pt-2">
-      <Button size="lg" className="h-12 flex-1 rounded-full" disabled={disabled || qty > 0} onClick={() => addToCart(key)}>
+      <Button size="lg" className="h-12 flex-1 rounded-full" disabled={disabled || image === null || qty > 0} onClick={() => (image === undefined ? askPick() : image !== null && addToCart(key))}>
         <ShoppingBag className="size-5" aria-hidden />
         {t("addToBag")}
       </Button>
