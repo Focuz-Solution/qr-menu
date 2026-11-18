@@ -44,7 +44,8 @@
     "less": "បន្ថយចំនួន",
     "more": "បន្ថែមចំនួន",
     "option": "ជម្រើស",
-    "optionN": "ជម្រើសទី {n}"
+    "optionN": "ជម្រើសទី {n}",
+    "video": "វីដេអូ"
   },
   "footer": {
     "address": "អាសយដ្ឋាន",
@@ -114,7 +115,9 @@
       "delivery": "ការដឹកជញ្ជូន",
       "settings": "ការកំណត់",
       "users": "អ្នកប្រើប្រាស់",
-      "roles": "តួនាទី"
+      "roles": "តួនាទី",
+      "sizes": "ទំហំ",
+      "products": "ផលិតផល"
     },
     "status": {
       "all": "ទាំងអស់",
@@ -227,7 +230,7 @@
       "photo": "រូបភាពផលិតផល",
       "uploadPhoto": "បង្ហោះរូបភាព",
       "removePhoto": "ដកចេញ",
-      "photos": "រូបភាពផលិតផល",
+      "photos": "រូបភាព",
       "photoSize": "{before} → {after}",
       "name": "ឈ្មោះផលិតផល",
       "namePlaceholder": "បញ្ចូលឈ្មោះផលិតផល",
@@ -277,7 +280,6 @@
       "variantName": "ឈ្មោះជម្រើស",
       "variantPlaceholder": "បញ្ចូលឈ្មោះជម្រើស",
       "morePhotos": "រូបភាពបន្ថែម",
-      "morePhotosDropped": "ពេលមានវ៉ារ្យ៉ង់ វ៉ារ្យ៉ង់នីមួយៗមានរូបភាពផ្ទាល់ខ្លួន — រូបភាពបន្ថែម {count} នឹងត្រូវដកចេញ ពេលអ្នករក្សាទុក។",
       "addPhoto": "បន្ថែមរូបភាព",
       "variantCode": "កូដ",
       "variantCodePlaceholder": "ឧ. LS-01",
@@ -308,7 +310,16 @@
       "emoji_shop": "ហាង និងការដឹកជញ្ជូន",
       "emoji_marks": "សញ្ញា និងពណ៌",
       "emoji_arrows": "ព្រួញ និងលេខ",
-      "emoji_all": "រូបតំណាងទាំងអស់"
+      "emoji_all": "រូបតំណាងទាំងអស់",
+      "sizes": "ទំហំ",
+      "noSizes": "មិនទាន់មានទំហំទេ។",
+      "sizePrice": "តម្លៃសម្រាប់ {size}",
+      "sizePrices": "តម្លៃតាមទំហំ",
+      "sizeSearch": "ស្វែងរក ឬបន្ថែមទំហំ",
+      "addSize": "បន្ថែម “{name}”",
+      "sizeName": "ទំហំ",
+      "youtube": "វីដេអូ YouTube",
+      "youtubePlaceholder": "បិទភ្ជាប់តំណ YouTube"
     },
     "roles": {
       "owner": "ម្ចាស់ហាង",
@@ -604,6 +615,24 @@
           "edit": "ព័ត៌មានហាង រូបរាង តំណ និងឡូហ្គោ"
         }
       }
+    },
+    "sizes": {
+      "title": "ទំហំ",
+      "intro": "ទំហំដែលផលិតផលរបស់អ្នកមាន ដូចជា 30 ml ឬ M",
+      "add": "បន្ថែមទំហំ",
+      "rename": "ប្ដូរឈ្មោះទំហំ",
+      "delete": "លុបទំហំ",
+      "name": "ទំហំ",
+      "products": "ផលិតផល",
+      "actions": "សកម្មភាព",
+      "placeholder": "ឧ. 100 ml",
+      "hint": "អតិថិជនជ្រើសទំហំទាំងនេះនៅលើទំព័រផលិតផល។",
+      "empty": "មិនទាន់មានទំហំទេ។ បន្ថែមមួយ រួចធីកវានៅលើផលិតផល។",
+      "cancel": "បោះបង់",
+      "save": "រក្សាទុក",
+      "confirmDelete": "លុបទំហំ {name}? {count, plural, =0 {គ្មានផលិតផលណាប្រើវាទេ។} other {វានឹងត្រូវដកចេញពីផលិតផល # ។}}",
+      "quickPick": "ជ្រើសរហ័ស",
+      "suggestions": "S, M, L, XL, XXL, 30 ml, 50 ml, 100 ml, 200 ml, 500 ml"
     }
   },
   "lang": {
@@ -710,7 +739,9 @@
     "badMapUrl": "សូមបិទភ្ជាប់តំណពី Google Maps (ឧ. https://maps.app.goo.gl/…)",
     "shopsRequired": "សូមជ្រើសយ៉ាងហោចណាស់ហាងមួយ និងតួនាទីសម្រាប់ហាងនីមួយៗ។",
     "roleInUse": "នៅមានបុគ្គលិកមានតួនាទីនេះ។ សូមប្ដូរពួកគេទៅតួនាទីផ្សេងជាមុនសិន។",
-    "variantPhoto": "ជម្រើសនីមួយៗត្រូវមានរូបភាព"
+    "variantPhoto": "ជម្រើសនីមួយៗត្រូវមានរូបភាព",
+    "sizeTaken": "ទំហំនេះមានរួចហើយ",
+    "badYoutube": "សូមបិទភ្ជាប់តំណវីដេអូ YouTube (ឧ. https://youtu.be/…)"
   },
   "form": {
     "optional": "ស្រេចចិត្ត"

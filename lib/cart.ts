@@ -2,20 +2,23 @@
 
 import { useSyncExternalStore } from "react";
 import { useProducts } from "@/components/MenuProvider";
-import { priceAt, type Product, variantName } from "@/lib/shop";
+import { priceFor, type Product, sizeOf, variantName } from "@/lib/shop";
 
-// Cart = { "slug|photo": qty } in localStorage, shared by every component through useSyncExternalStore.
-// The photo is the gallery image picked when adding (each photo is a style), so one product can have several lines.
+// Cart = { "slug|photo|size": qty } in localStorage, shared by every component through useSyncExternalStore.
+// The photo is the gallery image picked when adding (each photo is a style) and the size its id (Admin → Sizes),
+// so one product can have several lines.
 type Cart = Record<string, number>;
 
-export const cartKey = (slug: string, image: string) => `${slug}|${image}`;
+export const cartKey = (slug: string, image: string, sizeId?: string) => (sizeId ? `${slug}|${image}|${sizeId}` : `${slug}|${image}`);
 // old carts saved just "slug" → main photo; null when the product is gone (deleted/hidden in Admin)
 function parseKey(key: string, products: Product[]) {
-  const [slug, image] = key.split("|");
+  const [slug, image, sizeId] = key.split("|");
   const product = products.find((p) => p.slug === slug);
   if (!product) return null;
   const photo = image || product.image;
-  return { product, image: photo, price: priceAt(product, photo), variant: variantName(product, photo) };
+  // a size deleted in Admin (or none in older carts) → the product's first size, the same one the checkout server uses
+  const size = sizeOf(product, sizeId);
+  return { product, image: photo, size, price: priceFor(product, photo, size?.id), variant: variantName(product, photo) };
 }
 
 // one cart per shop: "cart:<shop address>". The shop layout writes the shop on <html data-shop>, so the default
