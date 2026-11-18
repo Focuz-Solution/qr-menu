@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Expand, ImageOff, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Expand, ImageOff, Play, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Img } from "@/components/Img";
@@ -24,17 +24,35 @@ function useIsDesktop() {
   );
 }
 
+/** YouTube's own preview picture of a video (no player loaded): 480×360 for the slide, 120×90 for thumbnail strips */
+const videoThumb = (id: string, small = false) => `https://i.ytimg.com/vi/${id}/${small ? "default" : "hqdefault"}.jpg`;
+
+/** the video's thumbnail in a thumbnail strip: preview picture + small play mark */
+export function VideoThumb({ id, sizes }: { id: string; sizes: string }) {
+  return (
+    <span className="relative block size-full">
+      <Img src={videoThumb(id, true)} alt="" sizes={sizes} className="size-full bg-muted" />
+      <span className="absolute inset-0 grid place-items-center bg-foreground/25">
+        <Play className="size-4 fill-background text-background" aria-hidden />
+      </span>
+    </span>
+  );
+}
+
 // Phones: swipeable photo + dots. Desktop: vertical thumbnail column + photo that slides up/down.
-// `focus` = image to jump to.
+// `focus` = image to jump to. `video` (YouTube) = one more slide after the photos; its player loads only when tapped.
 export function Gallery({
   images,
   alt,
   focus,
   onIndexChange,
   jump,
+  video,
 }: {
   images: string[];
   alt: string;
+  /** the product's YouTube video id: the last slide */
+  video?: string;
   focus?: string;
   /** current photo index, for the thumbnail strip shown next to the title (phones) */
   onIndexChange?: (i: number) => void;
@@ -48,6 +66,10 @@ export function Gallery({
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   const [viewing, setViewing] = useState(false);
+  // the video slide's player is on (tapped play); swiping to another slide removes it, so the video stops
+  const [playing, setPlaying] = useState(false);
+  const slides = images.length + (video ? 1 : 0);
+  const onVideo = !!video && current === images.length;
   // shape (height / width) of each loaded photo; the box follows the photo on screen, so none looks zoomed in
   const [ratios, setRatios] = useState<Record<number, number>>({});
   const ratio = Math.min(1.5, Math.max(0.75, ratios[current] ?? ratios[0] ?? 1)); // clamped; square until loaded
@@ -56,6 +78,7 @@ export function Gallery({
     if (!api) return;
     const onSelect = () => {
       setCurrent(api.selectedScrollSnap());
+      setPlaying(false);
       onIndexChange?.(api.selectedScrollSnap());
     };
     api.on("select", onSelect);
@@ -81,7 +104,7 @@ export function Gallery({
   }, [current]);
 
   const fallback = <ImageOff className="absolute inset-0 m-auto size-12 text-muted-foreground/40" aria-hidden />;
-  const many = images.length > 1;
+  const many = slides > 1;
 
   return (
     <div className="relative md:flex md:gap-4">
@@ -119,6 +142,20 @@ export function Gallery({
                   <Img src={thumbUrl(src)} alt="" sizes="80px" className="size-full bg-muted" />
                 </button>
               ))}
+              {video && (
+                <button
+                  type="button"
+                  aria-label={t("video")}
+                  aria-current={onVideo}
+                  onClick={() => api?.scrollTo(images.length)}
+                  className={cn(
+                    "aspect-square w-full shrink-0 overflow-hidden rounded-lg border-2 bg-background transition-colors",
+                    onVideo ? "border-foreground" : "border-border hover:border-muted-foreground",
+                  )}
+                >
+                  <VideoThumb id={video} sizes="80px" />
+                </button>
+              )}
             </div>
             <Button
               variant="outline"
@@ -126,7 +163,7 @@ export function Gallery({
               className="size-11 rounded-full"
               aria-label={t("nextPhoto")}
               onClick={() => api?.scrollNext()}
-              disabled={current === images.length - 1}
+              disabled={current === slides - 1}
             >
               <ChevronDown className="size-5" aria-hidden />
             </Button>
@@ -159,19 +196,45 @@ export function Gallery({
               />
             </CarouselItem>
           ))}
+          {video && (
+            // same box as the photos (black behind the 16:9 player); the player loads only after play is tapped
+            <CarouselItem className="pt-0 pl-0 md:h-full">
+              <div className="relative aspect-(--photo-ratio) bg-foreground md:aspect-auto md:h-full">
+                {playing && onVideo ? (
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${video}?rel=0&autoplay=1&playsinline=1`}
+                    title={`${t("video")}: ${alt}`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    className="absolute inset-0 size-full border-0"
+                  />
+                ) : (
+                  <button type="button" onClick={() => setPlaying(true)} aria-label={t("playVideo")} className="group absolute inset-0">
+                    <Img src={videoThumb(video)} alt="" sizes="(min-width: 768px) 440px, 100vw" contain className="size-full bg-transparent" />
+                    <span className="absolute inset-0 m-auto grid size-16 place-items-center rounded-full bg-background/90 shadow-lg transition-transform group-hover:scale-105">
+                      <Play className="ml-1 size-7 fill-primary text-primary" aria-hidden />
+                    </span>
+                  </button>
+                )}
+              </div>
+            </CarouselItem>
+          )}
         </CarouselContent>
       </Carousel>
 
       {/* "view full" button: phones bottom-left above the white sheet; desktop bottom-right of the photo */}
-      <button
-        type="button"
-        onClick={() => setViewing(true)}
-        // small pill (24px); the invisible ::after ring grows the tap area to 44px
-        className="absolute bottom-8 left-4 flex h-6 md:right-3 md:bottom-3 md:left-auto items-center gap-1 rounded-full bg-background/80 px-2.5 text-[11px] font-medium text-foreground shadow-md ring-1 ring-foreground/5 backdrop-blur-md after:absolute after:-inset-2.5 after:content-[''] hover:bg-background"
-      >
-        <Expand className="size-3 text-primary" strokeWidth={2} aria-hidden />
-        {t("viewPhoto")}
-      </button>
+      {!onVideo && (
+        <button
+          type="button"
+          onClick={() => setViewing(true)}
+          // small pill (24px); the invisible ::after ring grows the tap area to 44px
+          className="absolute bottom-8 left-4 flex h-6 md:right-3 md:bottom-3 md:left-auto items-center gap-1 rounded-full bg-background/80 px-2.5 text-[11px] font-medium text-foreground shadow-md ring-1 ring-foreground/5 backdrop-blur-md after:absolute after:-inset-2.5 after:content-[''] hover:bg-background"
+        >
+          <Expand className="size-3 text-primary" strokeWidth={2} aria-hidden />
+          {t("viewPhoto")}
+        </button>
+      )}
       {viewing && (
         <Lightbox
           images={images}

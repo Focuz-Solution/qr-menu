@@ -27,10 +27,12 @@ const OIDC_ISSUER = "https://oauth.telegram.org";
 type Jwk = JsonWebKey & { kid?: string };
 let jwks: { keys: Jwk[]; at: number } | null = null;
 
-/** Telegram's public signing keys (cached 1 hour; fetched again when a token names a key we don't have — Telegram rotated) */
+/** Telegram's public signing keys (cached 1 hour; fetched again when a token names a key we don't have — Telegram rotated —
+ *  but at most once a minute, so tokens with made-up key ids can't make every request download the keys again) */
 async function telegramKey(kid: string | undefined) {
   const find = () => jwks?.keys.find((k) => !kid || k.kid === kid);
-  if (!jwks || Date.now() - jwks.at > 3_600_000 || !find()) {
+  const age = jwks ? Date.now() - jwks.at : Infinity;
+  if (age > 3_600_000 || (!find() && age > 60_000)) {
     const res = await fetch(`${OIDC_ISSUER}/.well-known/jwks.json`, { signal: AbortSignal.timeout(10_000) });
     const data = (await res.json().catch(() => null)) as { keys?: Jwk[] } | null;
     if (!res.ok || !Array.isArray(data?.keys)) throw new TelegramError(`JWKS HTTP ${res.status}`, res.status);

@@ -138,8 +138,9 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
 
   return (
     <>
-      {/* search (when open) + category row stay pinned under the sticky header (72px: py-2 + 56px logo) */}
-      <div className="sticky top-[72px] z-10 -mx-4 bg-background/95 px-4 backdrop-blur">
+      {/* search (when open) + category row stay pinned under the sticky header (--shop-header: 72px = py-2 + 56px logo),
+          and slide up to the very top together with it while the header is hidden (scrolling down) */}
+      <div className="sticky top-(--shop-header) z-10 -mx-4 bg-background/95 px-4 backdrop-blur motion-safe:transition-[top] motion-safe:duration-300">
         {searching && (
           <div className="py-2">
             <div className="flex h-12 items-center rounded-xl border bg-background focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
