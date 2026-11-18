@@ -62,7 +62,7 @@ async function build(o: NonNullable<Awaited<ReturnType<typeof load>>>, chatId: b
       shown < items.length ? `… +${items.length - shown}` : null,
       DIVIDER,
       `${e(t("subtotal"))} · ${money(o.subtotalCents)}`,
-      `${e(t("delivery"))} · ${o.deliveryFeeCents ? money(o.deliveryFeeCents) : e(t("free"))}`,
+      `${e(t("delivery"))} (${e(o.deliveryZoneName)}) · ${o.deliveryPayDriver ? e(ta("orders.payDriver")) : o.deliveryFeeCents ? money(o.deliveryFeeCents) : e(t("free"))}`,
       `<b>${e(t("total"))} · ${money(o.totalCents)}</b>`,
       `${e(t(o.paymentMethod === "cod" ? "payCod" : "payBank"))} · ${e(ta(`orders.paymentStatuses.${o.paymentStatus}`))}`,
       "__________________________",

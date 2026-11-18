@@ -79,7 +79,7 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
       ),
       "",
       `${t("orders.subtotal")}: ${money(o.subtotalCents)}`,
-      `${t("orders.delivery")}: ${money(o.deliveryFeeCents)}`,
+      `${t("orders.delivery")} (${o.deliveryZoneName}): ${o.deliveryPayDriver ? t("orders.payDriver") : money(o.deliveryFeeCents)}`,
       ...(o.discountCents > 0 ? [`${t("orders.discount")}: −${money(o.discountCents)}`] : []),
       `${t("orders.total")}: ${money(o.totalCents)}`,
       `${t("orders.payment")}: ${t(`orders.paymentMethods.${o.paymentMethod}`)} · ${t(`orders.paymentStatuses.${o.paymentStatus}`)}`,
@@ -297,7 +297,7 @@ function ItemsBox({ order: o, className }: { order: AdminOrder; className?: stri
         <dt className="text-muted-foreground">{t("orders.subtotal")}</dt>
         <dd className="text-right">{money(o.subtotalCents)}</dd>
         <dt className="text-muted-foreground">{t("orders.delivery")} ({o.deliveryZoneName})</dt>
-        <dd className="text-right">{o.deliveryFeeCents ? money(o.deliveryFeeCents) : t("orders.free")}</dd>
+        <dd className="text-right">{o.deliveryPayDriver ? t("orders.payDriver") : o.deliveryFeeCents ? money(o.deliveryFeeCents) : t("orders.free")}</dd>
         {o.discountCents > 0 && (
           <>
             <dt className="text-muted-foreground">{t("orders.discount")}</dt>

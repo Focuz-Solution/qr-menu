@@ -16,6 +16,8 @@ export type CheckoutInput = {
   mapUrl: string;
   note: string;
   payment: "cod" | "bank_transfer";
+  /** "I'll pay the driver myself" (only counts when the shop allows it for the carrier picked) */
+  payDriver: boolean;
   /** one per "Send order" attempt: a double tap gives the same order, not two */
   key: string;
   /** "Connect Telegram": the pass connectTelegram returned (the server checks its signature), null when not connected */

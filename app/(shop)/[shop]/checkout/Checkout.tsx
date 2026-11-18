@@ -11,11 +11,12 @@ import { TelegramCircleIcon } from "@/components/icons";
 import { Img } from "@/components/Img";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { clearCart, setQty, useCart } from "@/lib/cart";
-import { feeFor, zonesFor, type Zone } from "@/lib/orders";
+import { feeFor, nextStep, optionsFor, type Zone } from "@/lib/orders";
 import { PROVINCES } from "@/lib/provinces";
 import type { ErrorCode } from "@/lib/result";
 import { formatPrice, type Lang, pick, thumbUrl } from "@/lib/shop";
@@ -29,7 +30,7 @@ const MapPicker = dynamic(() => import("./MapPicker").then((m) => m.MapPicker), 
 import type { CheckoutInput, TelegramUser } from "./types";
 
 type Details = Omit<CheckoutInput, "lines" | "key" | "shop">;
-const EMPTY: Details = { name: "", phone: "", provinceCode: "", deliveryZoneId: "", address: "", landmark: "", mapUrl: "", note: "", payment: "cod", telegram: null };
+const EMPTY: Details = { name: "", phone: "", provinceCode: "", deliveryZoneId: "", address: "", landmark: "", mapUrl: "", note: "", payment: "cod", payDriver: false, telegram: null };
 const SAVED = "checkout-details"; // ponytail: details were remembered before; now only removed (old phones)
 const money = (cents: number) => formatPrice(cents / 100);
 
@@ -39,6 +40,7 @@ type Receipt = {
   lines: { key: string; name: string; image: string; qty: number; cents: number }[];
   subtotalCents: number;
   deliveryFeeCents: number;
+  deliveryPayDriver: boolean;
   deliveryZoneName: string;
   totalCents: number;
 };
@@ -113,9 +115,14 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
   };
 
   const subtotalCents = Math.round(total * 100);
-  const options = zonesFor(zones, d.provinceCode);
+  // the carriers covering the province (Shop delivery, Grab…); one → picked for them
+  const options = optionsFor(zones, d.provinceCode);
   const zone = options.length === 1 ? options[0] : options.find((option) => option.id === d.deliveryZoneId);
-  const deliveryFeeCents = zone ? feeFor(zone, subtotalCents) : 0;
+  const fullFeeCents = zone ? feeFor(zone, subtotalCents) : 0;
+  // "I'll pay the driver myself": only where the shop allows it and there is a fee; then no delivery fee in the order
+  const canPayDriver = !!zone?.isCourier && zone.payDriver && fullFeeCents > 0;
+  const payDriver = canPayDriver && d.payDriver;
+  const deliveryFeeCents = payDriver ? 0 : fullFeeCents;
   const noDelivery = !!d.provinceCode && !options.length; // province chosen, but no active delivery zone covers it
   const belowMin = minOrderCents > 0 && subtotalCents < minOrderCents;
   const err = (k: string) => fields[k] && <p className="text-xs text-destructive">{te(fields[k])}</p>;
@@ -126,7 +133,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
     setError(undefined);
     setFields({});
     start(async () => {
-      const r = await createOrder({ ...d, shop: shopSlug, deliveryZoneId: zone.id, lines: items.map((i) => ({ slug: i.product.slug, image: i.image, size: i.size?.id, qty: i.qty })), key: key.current });
+      const r = await createOrder({ ...d, shop: shopSlug, deliveryZoneId: zone.id, payDriver, lines: items.map((i) => ({ slug: i.product.slug, image: i.image, size: i.size?.id, qty: i.qty })), key: key.current });
       if (!r.ok) {
         setFields(r.fields ?? {});
         if (!r.fields) setError(r.error);
@@ -142,6 +149,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
         lines: items.map((i) => ({ key: i.key, name: [pick(i.product.name, lang), vname(i)].filter(Boolean).join(" · "), image: i.image, qty: i.qty, cents: Math.round(i.price * 100) * i.qty })),
         subtotalCents,
         deliveryFeeCents: r.data!.deliveryFeeCents,
+        deliveryPayDriver: r.data!.deliveryPayDriver,
         totalCents: r.data!.totalCents,
       });
       clearCart();
@@ -194,7 +202,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
               id="province"
               value={d.provinceCode}
               onChange={(provinceCode) => {
-                setD((x) => ({ ...x, provinceCode, deliveryZoneId: "" }));
+                setD((x) => ({ ...x, provinceCode, deliveryZoneId: "", payDriver: false }));
                 clear("province");
                 clear("deliveryZoneId");
               }}
@@ -207,24 +215,30 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                 <legend className="mb-2 text-sm font-medium">{t("deliveryService")} <Req /></legend>
                 {options.map((option) => {
                   const fee = feeFor(option, subtotalCents);
+                  // the next price step: "spend $12 more for free delivery" / "… for $1.00 delivery"
+                  const next = nextStep(option, subtotalCents);
                   return (
-                    <label key={option.id} className="flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm">
+                    <label key={option.id} className="flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm has-checked:border-primary">
                       <input
                         type="radio"
                         name="deliveryZoneId"
                         value={option.id}
                         checked={zone?.id === option.id}
                         onChange={() => {
-                          setD((current) => ({ ...current, deliveryZoneId: option.id }));
+                          setD((current) => ({ ...current, deliveryZoneId: option.id, payDriver: false }));
                           clear("deliveryZoneId");
                         }}
                       />
+                      {option.logo && <Img src={option.logo} alt="" sizes="32px" contain className="size-8 shrink-0 rounded-md bg-background" />}
                       <span className="min-w-0 flex-1 wrap-break-word">
                         {option.name}
                         {option.eta && <span className="block text-xs text-muted-foreground">{t("eta", { eta: option.eta })}</span>}
-                        {/* not free yet: tell them how much more makes it free */}
-                        {fee > 0 && option.freeOverCents != null && (
-                          <span className="block text-xs text-primary">{t("freeMore", { amount: money(option.freeOverCents - subtotalCents) })}</span>
+                        {next && (
+                          <span className="block text-xs text-primary">
+                            {next.feeCents
+                              ? t("cheaperMore", { amount: money(next.fromCents - subtotalCents), fee: money(next.feeCents) })
+                              : t("freeMore", { amount: money(next.fromCents - subtotalCents) })}
+                          </span>
                         )}
                       </span>
                       <span className="shrink-0 tabular-nums">{fee ? money(fee) : t("free")}</span>
@@ -232,6 +246,16 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                   );
                 })}
                 {err("deliveryZoneId")}
+                {/* the shop lets this carrier's fee be paid to the driver on arrival: the customer chooses */}
+                {canPayDriver && (
+                  <Label className="flex min-h-11 items-start gap-3 rounded-lg bg-muted/60 px-3 py-2.5 font-normal">
+                    <Checkbox className="mt-0.5" checked={d.payDriver} onCheckedChange={(on) => setD((x) => ({ ...x, payDriver: on === true }))} />
+                    <span>
+                      <span className="block text-sm font-medium">{t("payDriver")}</span>
+                      <span className="block text-xs text-muted-foreground">{t("payDriverHint")}</span>
+                    </span>
+                  </Label>
+                )}
               </fieldset>
             )}
           </div>
@@ -334,7 +358,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
           </div>
           <div className="flex justify-between text-muted-foreground">
             <dt>{t("delivery")}</dt>
-            <dd className="tabular-nums">{noDelivery ? t("notAvailable") : !zone ? t(d.provinceCode ? "chooseDeliveryService" : "chooseProvince") : deliveryFeeCents ? money(deliveryFeeCents) : t("free")}</dd>
+            <dd className="tabular-nums">{noDelivery ? t("notAvailable") : !zone ? t(d.provinceCode ? "chooseDeliveryService" : "chooseProvince") : payDriver ? t("payDriverShort") : deliveryFeeCents ? money(deliveryFeeCents) : t("free")}</dd>
           </div>
           <div className="flex items-baseline justify-between border-t pt-2">
             <dt className="font-medium">{t("total")}</dt>
@@ -397,7 +421,7 @@ function ReceiptView({ receipt: r }: { receipt: Receipt }) {
           </div>
           <div className="flex justify-between text-muted-foreground">
             <dt>{t("delivery")}</dt>
-            <dd className="tabular-nums">{r.deliveryFeeCents ? money(r.deliveryFeeCents) : t("free")}</dd>
+            <dd className="tabular-nums">{r.deliveryPayDriver ? t("payDriverShort") : r.deliveryFeeCents ? money(r.deliveryFeeCents) : t("free")}</dd>
           </div>
           <div className="flex items-baseline justify-between border-t pt-2">
             <dt className="font-medium">{t("total")}</dt>

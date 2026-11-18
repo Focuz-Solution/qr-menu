@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { prisma } from "@/lib/db";
+import { deliveryZones } from "@/lib/delivery";
 import type { Zone } from "@/lib/orders";
 import { shopSettings } from "@/lib/shop-settings";
 import { shopBySlug } from "@/lib/shops";
@@ -21,14 +22,11 @@ export async function checkoutMetadata(shop: string): Promise<Metadata> {
 async function rules(shopId: string): Promise<{ zones: Zone[]; minOrderCents: number; orderingEnabled: boolean }> {
   try {
     const [zones, s] = await Promise.all([
-      prisma.deliveryZone.findMany({
-        where: { shopId, isActive: true },
-        orderBy: { sortOrder: "asc" },
-        select: { id: true, name: true, provinceCodes: true, feeCents: true, freeOverCents: true, eta: true },
-      }),
+      deliveryZones(shopId, { activeOnly: true }),
       prisma.shopSettings.findUnique({ where: { shopId }, select: { minOrderCents: true, orderingEnabled: true } }),
     ]);
-    return { zones, minOrderCents: s?.minOrderCents ?? 0, orderingEnabled: s?.orderingEnabled ?? true };
+    // only what checkout needs: provinces + carriers
+    return { zones: zones.map(({ id, provinceCodes, carriers }) => ({ id, provinceCodes, carriers })), minOrderCents: s?.minOrderCents ?? 0, orderingEnabled: s?.orderingEnabled ?? true };
   } catch (cause) {
     // no database at build → server decides on send; with one, throw so Next keeps the last good page (not "no delivery")
     if (process.env.DATABASE_URL) throw cause;
