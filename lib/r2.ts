@@ -56,11 +56,12 @@ export async function deleteImage(url: string | null | undefined) {
  */
 export async function deleteImageIfUnused(url: string | null | undefined) {
   if (!imageKey(url)) return;
-  const [photos, logos, orders, couriers] = await Promise.all([
+  const [photos, logos, orders, couriers, carriers] = await Promise.all([
     prisma.itemImage.count({ where: { url: url! } }),
     prisma.shopSettings.count({ where: { logoUrl: url! } }),
     prisma.orderItem.count({ where: { imageUrl: url! } }),
     prisma.deliveryZone.count({ where: { courierLogo: url! } }),
+    prisma.deliveryCarrier.count({ where: { logo: url! } }),
   ]);
-  if (!photos && !logos && !orders && !couriers) await deleteImage(url);
+  if (!photos && !logos && !orders && !couriers && !carriers) await deleteImage(url);
 }

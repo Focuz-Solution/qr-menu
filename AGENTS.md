@@ -46,7 +46,7 @@ The agent only runs `npm run lint` and `npm run build`. No browser checks, test 
 - Out of scope — don't build: online payments, customer login/profile, wishlist, ratings/reviews, bottom nav bar, notifications, in-app QR scanner, desktop "open on phone" QR, Chinese language, dark mode.
 - Every user-facing string comes from `public/messages/*.json` (via `useTranslations` / `getTranslations`) or product `T` fields (via `pick`) — no hard-coded text in components.
 - Accessibility: `alt` on images, tap targets ≥ 44px, `aria-label` on icon-only buttons.
-- Forms: **every field label shows whether it is required or optional** — required: red `*` (`<Req />`), optional: `(ស្រេចចិត្ត)` / `(optional)` (`<Opt />`), both from `components/FieldMark.tsx`, placed after the label text. Required inputs also get `required` (or `aria-required` when the form uses `noValidate`). On/off switches and checkboxes get no mark. The server still validates every field.
+- Forms: **every field label shows whether it is required or optional** — required: red `*` (`<Req />`), optional: `(មិនបំពេញក៏បាន)` / `(optional)` (`<Opt />`), both from `components/FieldMark.tsx`, placed after the label text. Required inputs also get `required` (or `aria-required` when the form uses `noValidate`). On/off switches and checkboxes get no mark. The server still validates every field.
 
 ## Admin UI patterns
 Reference: `app/admin/(panel)/Orders.tsx`. New admin pages copy these so the UI stays consistent.
