@@ -12,7 +12,9 @@
     "tab_sale": "បញ្ចុះតម្លៃ",
     "productCount": "{count} ផលិតផល",
     "clearSearch": "សម្អាតការស្វែងរក",
-    "cart": "កន្ត្រក"
+    "cart": "កន្ត្រក",
+    "filterSize": "ត្រងតាមទំហំ",
+    "clearSize": "សម្អាត"
   },
   "product": {
     "detailTitle": "ព័ត៌មានផលិតផល",
