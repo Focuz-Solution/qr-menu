@@ -23,6 +23,8 @@ export type AdminOrder = {
   deliveryZoneName: string;
   subtotalCents: number;
   deliveryFeeCents: number;
+  /** the customer pays the delivery fee to the driver (not in the total) */
+  deliveryPayDriver: boolean;
   discountCents: number;
   totalCents: number;
   paymentMethod: PaymentMethod;
