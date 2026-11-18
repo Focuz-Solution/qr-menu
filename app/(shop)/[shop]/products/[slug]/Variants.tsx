@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
 import { Gallery, VideoThumb } from "./Gallery";
 
 // Photo on top, then a white sheet with the price. `header` and `details` are static parts rendered on the server.
-// Variant buttons (name only) jump the gallery to that variant's photo; the photo showing is what add-to-cart (`footer`) puts in the cart.
+// Variant buttons (name only) pick a variant and jump the gallery to its photo (swiping to a variant's photo picks it too).
+// The page opens on the main photo with no variant picked; with variants, add-to-cart (`footer`) needs one picked and
+// puts that one in the cart; without variants it puts the photo showing (off while the video slide shows).
 export function Variants({
   product: p,
   header,
@@ -19,8 +21,10 @@ export function Variants({
   product: Product;
   header: React.ReactNode;
   details: React.ReactNode;
-  /** gets the photo currently showing and the size picked (add-to-cart uses them) */
-  footer?: (image: string, sizeId?: string) => React.ReactNode;
+  /** gets the picked variant's photo (else the photo showing) and the size picked; undefined = a variant must be
+   *  picked first, then add-to-cart calls `askPick` (shows "choose an option" at the buttons) instead of adding;
+   *  null = no photo showing (the video slide, product without variants) → add-to-cart is off */
+  footer?: (image: string | undefined | null, sizeId: string | undefined, askPick: () => void) => React.ReactNode;
   /** the product's YouTube video id: the last slide of the photo gallery */
   video?: string;
 }) {
@@ -31,18 +35,31 @@ export function Variants({
   // photo = the last photo shown (what add-to-cart uses, also while the video slide shows); slide = what the gallery shows
   const [photo, setPhoto] = useState(0);
   const [slide, setSlide] = useState(0);
+  // variants with a photo (a variant is its photo); none picked until the customer taps one (or swipes to its photo)
+  const variants = (p.variants ?? []).filter((v) => v.image && images.includes(v.image));
+  const [picked, setPicked] = useState<string>();
+  // "Add to bag" tapped before picking: the option row shows a red hint until one is picked
+  const [needPick, setNeedPick] = useState(false);
+  const askPick = () => {
+    setNeedPick(true);
+    document.getElementById("product-options")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const onSlide = (i: number) => {
     setSlide(i);
     if (i < images.length) setPhoto(i);
+    // swiping to a variant's photo picks that variant; other photos (cover, extras) keep the one picked
+    if (variants.some((v) => v.image === images[i])) {
+      setPicked(images[i]);
+      setNeedPick(false);
+    }
   };
   const [jump, setJump] = useState<{ i: number }>();
   // the size picked (the first until the customer taps another) and the variant showing (if the photo is one);
   // the size's own price, else the variant's, replaces the product price (no sale price on it)
   const [sizeId, setSizeId] = useState(p.sizes?.[0]?.id);
   const size = sizeOf(p, sizeId);
-  const current = variantAt(p, images[photo]);
+  const current = variants.length ? variantAt(p, picked ?? "") : undefined;
   const own = size?.price ?? current?.price;
-  const variants = (p.variants ?? []).filter((v) => v.image && images.includes(v.image));
   // a variant without a name shows as "Option 2" (its place in the list)
   const nameOf = (v: { label: string; image?: string }) => v.label || t("optionN", { n: variants.findIndex((x) => x.image === v.image) + 1 });
   const stripRef = useRef<HTMLDivElement>(null);
@@ -114,20 +131,24 @@ export function Variants({
 
         {/* variants: "Option" title + one name button per variant; tapping shows its photo and price */}
         {variants.length > 0 && (
-          <div className="space-y-2 pt-1">
-            {/* title only: the chosen variant is the highlighted button */}
+          <div id="product-options" className="space-y-2 pt-1">
+            {/* title only: the chosen variant is the highlighted button; red hint when add-to-cart needs one */}
             <p className="text-sm text-muted-foreground">{t("option")}</p>
             <div role="radiogroup" aria-label={t("option")} className="flex flex-wrap gap-2">
               {variants.map((v) => {
                 const i = images.indexOf(v.image!);
-                const on = i === photo;
+                const on = v.image === picked;
                 return (
                   <button
                     key={v.image}
                     type="button"
                     role="radio"
                     aria-checked={on}
-                    onClick={() => setJump({ i })}
+                    onClick={() => {
+                      setPicked(v.image);
+                      setNeedPick(false);
+                      setJump({ i });
+                    }}
                     className={cn(
                       // 36px pill; the invisible after: edge keeps a 44px tap area
                       "relative flex h-9 items-center rounded-full border bg-background px-3.5 text-sm transition-colors outline-none after:absolute after:-inset-y-1 after:inset-x-0 focus-visible:ring-3 focus-visible:ring-ring/50",
@@ -139,6 +160,11 @@ export function Variants({
                 );
               })}
             </div>
+            {needPick && (
+              <p role="alert" className="text-sm text-destructive">
+                {t("chooseOption")}
+              </p>
+            )}
           </div>
         )}
 
@@ -170,7 +196,7 @@ export function Variants({
         )}
 
         {details}
-        {footer?.(images[photo], size?.id)}
+        {footer?.(variants.length ? picked : slide < images.length ? images[photo] : null, size?.id, askPick)}
       </div>
     </div>
   );
