@@ -49,7 +49,8 @@
     "option": "Option",
     "optionN": "Option {n}",
     "video": "Video",
-    "playVideo": "Play video"
+    "playVideo": "Play video",
+    "chooseOption": "Please choose an option"
   },
   "footer": {
     "address": "Address",
