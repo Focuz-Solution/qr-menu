@@ -75,7 +75,11 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
     // products: shown, not deleted, in a shown category, in stock — at today's price
     prisma.item.findMany({
       where: { shopId, slug: { in: slugs }, deletedAt: null, isVisible: true, category: { isVisible: true } },
-      select: { id: true, slug: true, name: true, priceCents: true, isAvailable: true, variants: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
+      select: { id: true, slug: true, name: true, priceCents: true, isAvailable: true, variants: true,
+        images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
+        // its sizes in the shop's order (the first is used when none / an unknown one was sent, like the cart does)
+        sizes: { orderBy: { size: { sortOrder: "asc" } }, select: { sizeId: true, priceCents: true, size: { select: { name: true } } } },
+      },
     }),
     prisma.deliveryZone.findMany({ where: { shopId, isActive: true }, orderBy: { sortOrder: "asc" } }),
   ]);
@@ -96,9 +100,12 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
     const withPhoto = (Array.isArray(item.variants) ? (item.variants as { label?: string; image?: string; priceCents?: number }[]) : []).filter((x) => x.image);
     const n = withPhoto.findIndex((x) => x.image === image);
     const v = n < 0 ? undefined : withPhoto[n];
-    // the variant's own price from the database (rule 8), else the product price
-    const unit = typeof v?.priceCents === "number" && v.priceCents >= 0 ? v.priceCents : item.priceCents;
-    return { itemId: item.id, name: item.name, variant: v ? v.label || tp("optionN", { n: n + 1 }) : null, imageUrl: image, unitPriceCents: unit, quantity: l.qty, lineTotalCents: unit * l.qty };
+    const size = item.sizes.find((s) => s.sizeId === l.size) ?? item.sizes[0];
+    // the size's own price, else the variant's (rule 8), else the product price — all from the database
+    const unit = size?.priceCents ?? (typeof v?.priceCents === "number" && v.priceCents >= 0 ? v.priceCents : item.priceCents);
+    // saved as one text "Rose · 100 ml" (Admin → Orders, Telegram and receipts show it as is)
+    const style = [v && (v.label || tp("optionN", { n: n + 1 })), size?.size.name].filter(Boolean).join(" · ") || null;
+    return { itemId: item.id, name: item.name, variant: style, imageUrl: image, unitPriceCents: unit, quantity: l.qty, lineTotalCents: unit * l.qty };
   });
   const subtotalCents = orderLines.reduce((n, l) => n + l.lineTotalCents, 0);
   if (settings?.minOrderCents && subtotalCents < settings.minOrderCents) return { ok: false, error: "minOrder" };

@@ -5,7 +5,7 @@ import type { AdminItem } from "./types";
 
 export default async function AdminMenuPage() {
   const { shop } = await requireUser("menu.edit");
-  const [categories, items] = await Promise.all([
+  const [categories, items, sizes] = await Promise.all([
     prisma.category.findMany({
       where: { shopId: shop.id },
       orderBy: { sortOrder: "asc" },
@@ -15,15 +15,18 @@ export default async function AdminMenuPage() {
       where: { shopId: shop.id, deletedAt: null },
       orderBy: { sortOrder: "asc" },
       select: {
-        id: true, slug: true, categoryId: true, name: true, brand: true, description: true, priceCents: true, compareAtCents: true, badge: true, isAvailable: true, isVisible: true, variants: true,
+        id: true, slug: true, categoryId: true, name: true, brand: true, description: true, priceCents: true, compareAtCents: true, badge: true, isAvailable: true, isVisible: true, variants: true, youtubeId: true,
         images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
+        sizes: { select: { sizeId: true, priceCents: true } },
       },
     }),
+    prisma.size.findMany({ where: { shopId: shop.id }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
   ]);
 
   return (
     <MenuEditor
       categories={categories}
+      sizes={sizes}
       items={items.map(({ images, variants, ...item }) => ({
         ...item,
         image: images[0]?.url ?? null,

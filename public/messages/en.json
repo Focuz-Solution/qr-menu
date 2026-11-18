@@ -12,7 +12,9 @@
     "tab_sale": "Discount",
     "productCount": "{count, plural, one {# product} other {# products}}",
     "clearSearch": "Clear search",
-    "cart": "Cart"
+    "cart": "Cart",
+    "filterSize": "Filter by size",
+    "clearSize": "Clear"
   },
   "product": {
     "detailTitle": "Product details",
@@ -44,7 +46,9 @@
     "less": "Decrease quantity",
     "more": "Increase quantity",
     "option": "Option",
-    "optionN": "Option {n}"
+    "optionN": "Option {n}",
+    "video": "Video",
+    "playVideo": "Play video"
   },
   "footer": {
     "address": "Address",
@@ -114,7 +118,9 @@
       "delivery": "Delivery",
       "settings": "Settings",
       "users": "Users",
-      "roles": "Roles"
+      "roles": "Roles",
+      "sizes": "Sizes",
+      "products": "Products"
     },
     "status": {
       "all": "All",
@@ -227,7 +233,7 @@
       "photo": "Product photo",
       "uploadPhoto": "Upload photo",
       "removePhoto": "Remove",
-      "photos": "Product photo",
+      "photos": "Photo",
       "photoSize": "{before} → {after}",
       "name": "Product name",
       "namePlaceholder": "Enter product name",
@@ -277,7 +283,6 @@
       "variantName": "Variant name",
       "variantPlaceholder": "Enter variant name",
       "morePhotos": "More photos",
-      "morePhotosDropped": "With variants, each variant has its own photo — the {count} more photos above will be removed when you save.",
       "addPhoto": "Add photo",
       "variantCode": "Code",
       "variantCodePlaceholder": "e.g. LS-01",
@@ -308,7 +313,16 @@
       "emoji_shop": "Shop & delivery",
       "emoji_marks": "Marks & colours",
       "emoji_arrows": "Arrows & numbers",
-      "emoji_all": "All icons"
+      "emoji_all": "All icons",
+      "sizes": "Sizes",
+      "noSizes": "No sizes yet.",
+      "sizePrice": "Price for {size}",
+      "sizePrices": "Size prices",
+      "sizeSearch": "Search or add a size",
+      "addSize": "Add “{name}”",
+      "sizeName": "Size",
+      "youtube": "YouTube video",
+      "youtubePlaceholder": "Paste a YouTube link"
     },
     "roles": {
       "owner": "Owner",
@@ -604,6 +618,24 @@
           "edit": "Shop details, appearance, links and logo"
         }
       }
+    },
+    "sizes": {
+      "title": "Sizes",
+      "intro": "Sizes your products come in, like 30 ml or M",
+      "add": "Add size",
+      "rename": "Rename size",
+      "delete": "Delete size",
+      "name": "Size",
+      "products": "Products",
+      "actions": "Actions",
+      "placeholder": "e.g. 100 ml",
+      "hint": "Customers choose from these sizes on the product page.",
+      "empty": "No sizes yet. Add one, then tick it on your products.",
+      "cancel": "Cancel",
+      "save": "Save",
+      "confirmDelete": "Delete size {name}? {count, plural, =0 {No product uses it.} one {It will be removed from # product.} other {It will be removed from # products.}}",
+      "quickPick": "Quick pick",
+      "suggestions": "S, M, L, XL, XXL, 30 ml, 50 ml, 100 ml, 200 ml, 500 ml"
     }
   },
   "lang": {
@@ -710,7 +742,9 @@
     "badMapUrl": "Paste a link from Google Maps (e.g. https://maps.app.goo.gl/…)",
     "shopsRequired": "Pick at least one shop and a role for each.",
     "roleInUse": "Some people still have this role. Move them to another role first.",
-    "variantPhoto": "Each variant needs a photo"
+    "variantPhoto": "Each variant needs a photo",
+    "sizeTaken": "This size already exists",
+    "badYoutube": "Paste a YouTube video link (e.g. https://youtu.be/…)"
   },
   "form": {
     "optional": "optional"

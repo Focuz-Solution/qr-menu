@@ -81,8 +81,9 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
   const te = useTranslations("errors");
   const tc = useTranslations("cart");
   const tp = useTranslations("product");
-  // variant name, or "Option 2" when the admin left it empty (same as the product page)
-  const vname = (v: { label: string; n: number } | null) => (v ? v.label || tp("optionN", { n: v.n }) : "");
+  // variant name ("Option 2" when the admin left it empty, same as the product page) + size: "Rose · 100 ml"
+  const vname = ({ variant: v, size }: { variant: { label: string; n: number } | null; size?: { name: string } }) =>
+    [v && (v.label || tp("optionN", { n: v.n })), size?.name].filter(Boolean).join(" · ");
   const lang = useLocale() as Lang;
   const { items, total } = useCart();
   // every order starts with an empty form; only a connected Telegram is remembered on the phone (per shop, 30 days).
@@ -125,7 +126,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
     setError(undefined);
     setFields({});
     start(async () => {
-      const r = await createOrder({ ...d, shop: shopSlug, deliveryZoneId: zone.id, lines: items.map((i) => ({ slug: i.product.slug, image: i.image, qty: i.qty })), key: key.current });
+      const r = await createOrder({ ...d, shop: shopSlug, deliveryZoneId: zone.id, lines: items.map((i) => ({ slug: i.product.slug, image: i.image, size: i.size?.id, qty: i.qty })), key: key.current });
       if (!r.ok) {
         setFields(r.fields ?? {});
         if (!r.fields) setError(r.error);
@@ -138,7 +139,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
         orderNo: r.data!.orderNo,
         details: d,
         deliveryZoneName: r.data!.deliveryZoneName,
-        lines: items.map((i) => ({ key: i.key, name: [pick(i.product.name, lang), vname(i.variant)].filter(Boolean).join(" · "), image: i.image, qty: i.qty, cents: Math.round(i.price * 100) * i.qty })),
+        lines: items.map((i) => ({ key: i.key, name: [pick(i.product.name, lang), vname(i)].filter(Boolean).join(" · "), image: i.image, qty: i.qty, cents: Math.round(i.price * 100) * i.qty })),
         subtotalCents,
         deliveryFeeCents: r.data!.deliveryFeeCents,
         totalCents: r.data!.totalCents,
@@ -303,7 +304,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="line-clamp-2 text-sm">{pick(i.product.name, lang)}</span>
                     {/* the picked variant: its own line, small, bold, in the shop colour */}
-                    {i.variant && <span className="text-xs font-semibold text-primary">{vname(i.variant)}</span>}
+                    {vname(i) && <span className="text-xs font-semibold text-primary">{vname(i)}</span>}
                   </span>
                   <span className="text-sm font-medium tabular-nums">{formatPrice(i.price * i.qty)}</span>
                 </div>

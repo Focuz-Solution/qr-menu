@@ -46,10 +46,13 @@ export function ProductView({ product: p }: { product: Product }) {
             </div>
           </div>
         }
-        footer={(image) => <AddToCart slug={p.slug} image={image} disabled={!p.inStock} />}
+        // the product's YouTube video (Admin → product → YouTube video): last slide of the photo gallery
+        video={p.youtube || undefined}
+        footer={(image, sizeId) => <AddToCart slug={p.slug} image={image} sizeId={sizeId} disabled={!p.inStock} />}
         details={
           // always open: each section a soft grey card (title + text), no collapse arrow
-          <div className="space-y-3 pt-2">
+          // the sheet's own 12px gap separates it from the choices above (no extra top padding)
+          <div className="space-y-3">
             {sections.map((s) => (
               <section key={s.key} className="space-y-2 rounded-2xl bg-muted/60 p-4">
                 <h2 className="font-semibold">{s.title}</h2>
@@ -65,10 +68,10 @@ export function ProductView({ product: p }: { product: Product }) {
   );
 }
 
-// Adds the photo showing in the gallery: switching thumbnails = a different style = its own cart line
-function AddToCart({ slug, image, disabled }: { slug: string; image: string; disabled: boolean }) {
+// Adds the photo showing in the gallery + the size picked: another photo or size = its own cart line
+function AddToCart({ slug, image, sizeId, disabled }: { slug: string; image: string; sizeId?: string; disabled: boolean }) {
   const t = useTranslations("product");
-  const key = cartKey(slug, image);
+  const key = cartKey(slug, image, sizeId);
   const qty = useCart().items.find((i) => i.key === key)?.qty ?? 0;
   return (
     <div className="flex gap-2 pt-2">
@@ -159,10 +162,24 @@ function RichBlocks({ blocks }: { blocks: RichBlock[] }) {
   });
 }
 
+// an empty line typed in the editor (no text, only spaces / line breaks)
+const blank = (b: RichBlock) => b.type === "paragraph" && !b.content?.some((n) => n.type === "text" && n.text.trim());
+
 function RichDescription({ doc }: { doc: RichDoc }) {
+  // empty lines at the start / end would show as blank space inside the card; the ones in between are kept
+  const from = doc.content.findIndex((b) => !blank(b));
+  const to = doc.content.findLastIndex((b) => !blank(b));
+  const blocks = from < 0 ? [] : doc.content.slice(from, to + 1);
+  // line breaks (Shift+Enter) / spaces at the very end of the last paragraph would add blank lines too
+  const last = blocks.at(-1);
+  if (last?.type === "paragraph" && last.content) {
+    const content = [...last.content];
+    while (content.length && (content.at(-1)!.type === "hardBreak" || !(content.at(-1) as { text: string }).text.trim())) content.pop();
+    blocks[blocks.length - 1] = { ...last, content };
+  }
   return (
     <div className="flex flex-col gap-1 whitespace-pre-wrap text-foreground/80">
-      <RichBlocks blocks={doc.content} />
+      <RichBlocks blocks={blocks} />
     </div>
   );
 }

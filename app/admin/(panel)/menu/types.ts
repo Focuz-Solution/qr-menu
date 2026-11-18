@@ -19,7 +19,14 @@ export type AdminItem = {
   images: string[];
   /** as saved: price in cents, none = the product price */
   variants: { label: string; image: string; priceCents?: number; code?: string }[];
+  /** YouTube video id, null = none */
+  youtubeId: string | null;
+  /** sizes it comes in (Admin → Sizes): own price in cents, null = the product price */
+  sizes: { sizeId: string; priceCents: number | null }[];
 };
+
+/** a size of the shop (Admin → Sizes) */
+export type AdminSize = { id: string; name: string };
 
 /** a style of the product (shade, size…): its own photo + name; the photo is also one of the product's image rows */
 export type VariantInput = {
@@ -50,4 +57,8 @@ export type ItemInput = {
   /** more photos of the product (not tied to a variant), in order */
   gallery: string[];
   variants: VariantInput[];
+  /** YouTube link as pasted ("" = no video) */
+  youtube: string;
+  /** ticked sizes: own price in dollars as typed, "" = the product price */
+  sizes: { sizeId: string; price: string }[];
 };

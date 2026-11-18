@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Check, EllipsisVertical, Languages, LogOut, Package, Plus, ReceiptText, Send, Settings, ShieldCheck, Truck, Users } from "lucide-react";
+import { ArrowLeftRight, Check, EllipsisVertical, Languages, LogOut, Package, Plus, ReceiptText, Ruler, Send, Settings, ShieldCheck, Truck, Users } from "lucide-react";
 import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -45,7 +45,10 @@ export function AdminShell({
   const nav = [
     // `perm`: shown only to people whose role has it (no perm = everyone in the shop); `owner`: the owner only
     { group: "sales" as const, href: "/admin/orders", match: "/admin/orders", label: t("nav.orders"), icon: ReceiptText, count: newOrders },
-    { group: "sales" as const, href: "/admin/menu", match: "/admin/menu", label: t("nav.menu"), icon: Package, perm: "menu.edit" as Permission },
+    // Menu = a title (desktop) with its pages under it; `sub`: indented under the title above
+    { group: "sales" as const, label: t("nav.menu"), icon: Package, perm: "menu.edit" as Permission, title: ["/admin/menu", "/admin/sizes"] },
+    { group: "sales" as const, href: "/admin/menu", match: "/admin/menu", label: t("nav.products"), icon: Package, perm: "menu.edit" as Permission, sub: true },
+    { group: "sales" as const, href: "/admin/sizes", match: "/admin/sizes", label: t("nav.sizes"), icon: Ruler, perm: "menu.edit" as Permission, sub: true },
     { group: "setup" as const, href: "/admin/delivery", match: "/admin/delivery", label: t("nav.delivery"), icon: Truck, perm: "delivery.manage" as Permission },
     { group: "setup" as const, href: "/admin/telegram", match: "/admin/telegram", label: t("telegram.title"), icon: Send, perm: "telegram.manage" as Permission },
     { group: "setup" as const, href: "/admin/users", match: "/admin/users", label: t("nav.users"), icon: Users, perm: "users.manage" as Permission },
@@ -63,15 +66,28 @@ export function AdminShell({
         </div>
 
         <nav aria-label={t("nav.label")} className="flex min-w-0 flex-1 gap-1 overflow-x-auto md:flex-none md:flex-col md:gap-0.5 md:overflow-visible">
-          {nav.map(({ group, href, match, label, icon: Icon, count }, i) => {
+          {nav.map(({ group, href, match, label, icon: Icon, count, title, sub }, i) => {
             // a section also covers its sub-pages (orders → one order)
-            const active = path === match || path.startsWith(`${match}/`);
+            const on = (m: string) => path === m || path.startsWith(`${m}/`);
+            const active = !!match && on(match);
             // group heading above the first item of each group (desktop only)
             const heading = group !== nav[i - 1]?.group && (
               <p className={cn("hidden px-2.5 pb-1 text-xs font-medium text-muted-foreground md:block", i > 0 && "md:pt-4")}>
                 {t(`nav.groups.${group}`)}
               </p>
             );
+            // a title row (not a link), desktop only: phones show its pages' icons instead
+            if (!href) {
+              return (
+                <Fragment key={label}>
+                  {heading}
+                  <p className={cn("hidden min-h-9 items-center gap-2.5 px-2.5 text-sm md:flex", title?.some(on) && "font-medium")}>
+                    <Icon className="size-4" aria-hidden />
+                    {label}
+                  </p>
+                </Fragment>
+              );
+            }
             return (
               <Fragment key={href}>
               {heading}
@@ -83,10 +99,13 @@ export function AdminShell({
                   "flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-sm text-foreground transition-colors hover:bg-foreground/5 md:min-h-9",
                   // selected: the shop's brand colour (Settings → Appearance) — light tint behind, coloured text + icon;
                   // no brand colour set → the default black, so it stays a soft grey
-                  active && "bg-primary/10 font-medium text-primary hover:bg-primary/15",
+                  // under its title (desktop): grey text, a thin light line under the title's icon (18px) that runs
+                  // through the 2px gaps, the pill 12px right of it
+                  sub && "relative md:ml-7.5 md:text-muted-foreground md:hover:text-foreground md:before:absolute md:before:-inset-y-px md:before:-left-3 md:before:w-px md:before:bg-border",
+                  active && "bg-primary/10 font-medium text-primary hover:bg-primary/15 md:text-primary md:hover:text-primary",
                 )}
               >
-                <Icon className="size-4" aria-hidden />
+                <Icon className={cn("size-4", sub && "md:hidden")} aria-hidden />
                 {/* phones: icons only (the top bar has no room for 5 labels) */}
                 <span className="hidden md:inline">{label}</span>
                 {!!count && (
