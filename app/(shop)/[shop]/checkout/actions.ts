@@ -14,7 +14,7 @@ import type { ErrorCode, Result } from "@/lib/result";
 import { formatPrice } from "@/lib/shop";
 import { shopSettings } from "@/lib/shop-settings";
 import { postOrderToGroup } from "@/lib/order-telegram";
-import { escapeHtml, telegram, verifyTelegramLogin } from "@/lib/telegram";
+import { escapeHtml, signTelegramPass, telegram, verifyTelegramIdToken, verifyTelegramLogin, type TelegramPass } from "@/lib/telegram";
 import type { CheckoutInput } from "./types";
 
 // Public checkout (no login): everything the browser sends is checked again here; prices come from the database.
@@ -165,23 +165,21 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
 }
 
 /**
- * "✅ Telegram connected with <shop>" → the customer's chat with the bot, right after they tap Connect at checkout.
- * Public (no login), sends nothing to anyone else: only Telegram's signed login of that same person, made in the last
- * 10 minutes (a remembered or copied login can't be replayed to spam them). Writes nothing to the database.
+ * "Connect Telegram": checks the id_token from Telegram's login window (signed by Telegram, for our bot, made in the
+ * last 10 minutes), says "✅ connected" to that same person, and returns a pass signed by us that checkout keeps
+ * 30 days and sends with each order. Public (no login), messages nobody else, writes nothing to the database.
  */
-export async function telegramConnected(shop: string, login: unknown): Promise<Result> {
-  const tg = verifyTelegramLogin(login);
-  const shopId = typeof shop === "string" ? await shopBySlug(shop) : null;
-  const fresh = Date.now() / 1000 - Number((login as { auth_date?: unknown })?.auth_date) < 600;
-  if (!tg || !shopId || !fresh) return { ok: false, error: "invalid" };
+export async function connectTelegram(shop: string, idToken: string): Promise<Result<TelegramPass>> {
+  const [user, shopId] = await Promise.all([verifyTelegramIdToken(idToken), typeof shop === "string" ? shopBySlug(shop) : null]);
+  if (!user || !shopId) return { ok: false, error: "invalid" };
   const { language, name } = await shopSettings(shopId);
   const t = await getTranslations({ locale: language, namespace: "checkout" });
   try {
-    await telegram("sendMessage", { chat_id: tg.chatId.toString(), text: t("tgConnectedMsg", { shop: name }) });
+    await telegram("sendMessage", { chat_id: user.id, text: t("tgConnectedMsg", { shop: name }) });
   } catch (cause) {
     console.error("[checkout] telegram connected message failed:", cause);
   }
-  return { ok: true };
+  return { ok: true, data: signTelegramPass(user) };
 }
 
 /** "🙏 Thank you for your order!" + order number, items, totals, payment → the customer's Telegram. Never fails the order. */

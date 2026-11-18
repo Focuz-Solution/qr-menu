@@ -4,7 +4,6 @@ import { useShopPath, useShopSlug } from "@/lib/shop-path";
 import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Send, Trash2, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import Script from "next/script";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState, useTransition } from "react";
 import { Opt, Req } from "@/components/FieldMark";
@@ -22,7 +21,7 @@ import type { ErrorCode } from "@/lib/result";
 import { formatPrice, type Lang, pick, thumbUrl } from "@/lib/shop";
 import { cn } from "@/lib/utils";
 import { BackButton } from "../products/[slug]/BackButton";
-import { createOrder, telegramConnected } from "./actions";
+import { connectTelegram, createOrder } from "./actions";
 import { ProvincePicker } from "./ProvincePicker";
 
 // the map (Leaflet) only loads in the browser
@@ -91,8 +90,6 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
   const [d, setD] = useState<Details>(() => ({ ...EMPTY, telegram: savedTelegram(shopSlug) }));
   const setTelegram = (telegram: TelegramUser | null) => {
     setD((x) => ({ ...x, telegram }));
-    // just connected → the bot says "✅ connected" in their Telegram (not when a remembered connection is loaded)
-    if (telegram) telegramConnected(shopSlug, telegram).catch(() => {});
     try {
       if (telegram) localStorage.setItem(TG_KEY(shopSlug), JSON.stringify(telegram));
       else localStorage.removeItem(TG_KEY(shopSlug));
@@ -184,7 +181,7 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
             </div>
           </div>
           {/* optional: status messages on Telegram + the shop can chat with them (no button when the bot isn't set up) */}
-          {telegramBotId && <TelegramConnect botId={telegramBotId} user={d.telegram} onChange={setTelegram} />}
+          {telegramBotId && <TelegramConnect botId={telegramBotId} shop={shopSlug} user={d.telegram} onChange={setTelegram} />}
         </section>
 
         {/* where to deliver */}
@@ -429,40 +426,90 @@ function ReceiptView({ receipt: r }: { receipt: Receipt }) {
   );
 }
 
-// the connected Telegram, remembered per shop; same 30 days as the server accepts (verifyTelegramLogin in lib/telegram.ts)
+// the connected Telegram, remembered per shop; same 30 days as the server accepts (verifyTelegramLogin in lib/telegram.ts).
+// An old-style connection (before OpenID login: no "sig") is dropped → connect again.
 const TG_KEY = (shop: string) => `telegram:${shop}`;
 const TG_MAX_AGE = 30 * 86_400;
 
 function savedTelegram(shop: string): TelegramUser | null {
   try {
     const user = JSON.parse(localStorage.getItem(TG_KEY(shop)) ?? "null") as TelegramUser | null;
-    if (user && Date.now() / 1000 - user.auth_date < TG_MAX_AGE) return user;
+    if (user && typeof user.sig === "string" && typeof user.id === "string" && Date.now() / 1000 - user.auth_date < TG_MAX_AGE) return user;
     localStorage.removeItem(TG_KEY(shop)); // too old (or broken): connect again
   } catch {}
   return null;
 }
 
-type TelegramLogin = { auth: (options: { bot_id: string; request_access?: "write"; lang?: string }, done: (user: TelegramUser | false) => void) => void };
+/**
+ * Opens Log In with Telegram (OpenID Connect) in a popup; the person confirms in their Telegram app and the popup
+ * posts back a signed id_token (null = closed/refused). Same request as Telegram's telegram-login.js, but with ONE
+ * redirect_uri for every shop (that script uses the current page, and BotFather wants each Redirect URI exactly).
+ * @BotFather → bot → Login Widget: Redirect URI `<site>/checkout`, Trusted Origin `<site>`.
+ */
+function telegramLogin(clientId: string, lang: string): Promise<string | null> {
+  const OIDC = "https://oauth.telegram.org";
+  const url = new URL(`${OIDC}/auth`);
+  url.search = new URLSearchParams({
+    response_type: "post_message",
+    client_id: clientId,
+    redirect_uri: `${location.origin}/checkout`,
+    // profile = name/username/photo; bot_access = the bot may message them (no Start in the bot needed)
+    scope: "openid profile telegram:bot_access",
+    lang,
+  }).toString();
+  const w = 550, h = 650;
+  const popup = window.open(url, "telegram_oidc_login", `width=${w},height=${h},left=${Math.max(0, (screen.width - w) / 2)},top=${Math.max(0, (screen.height - h) / 2)}`);
+  if (!popup) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (token: string | null) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", onMessage);
+      resolve(token);
+    };
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== OIDC || e.source !== popup) return;
+      let data: { event?: string; result?: unknown; error?: unknown } | null = null;
+      try {
+        data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+      } catch {}
+      if (data?.event === "auth_result") finish(typeof data.result === "string" && !data.error ? data.result : null);
+    }
+    window.addEventListener("message", onMessage);
+    const watch = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(watch);
+        // the token can arrive just before the popup closes itself
+        setTimeout(() => finish(null), 300);
+      }
+    }, 300);
+  });
+}
 
 /**
- * "Connect Telegram": Telegram's own login window (telegram.org script; the bot's domain is set with /setdomain in @BotFather).
- * "write" = the customer lets the bot message them, so no Start in the bot is needed. The server checks Telegram's signature.
+ * "Connect Telegram": Log In with Telegram (telegramLogin above); the server checks the id_token and returns our pass.
  */
-function TelegramConnect({ botId, user, onChange }: { botId: string; user: TelegramUser | null; onChange: (u: TelegramUser | null) => void }) {
+function TelegramConnect({ botId, shop, user, onChange }: { botId: string; shop: string; user: TelegramUser | null; onChange: (u: TelegramUser | null) => void }) {
   const t = useTranslations("checkout");
   const lang = useLocale();
-  const [ready, setReady] = useState(false);
-  const name = user && [user.first_name, user.last_name].filter(Boolean).join(" ");
+  const [busy, setBusy] = useState(false);
+  const name = user?.name;
 
-  function connect() {
-    const login = (window as unknown as { Telegram?: { Login?: TelegramLogin } }).Telegram?.Login;
-    login?.auth({ bot_id: botId, request_access: "write", lang }, (u) => u && onChange(u));
+  async function connect() {
+    const idToken = await telegramLogin(botId, lang);
+    if (!idToken) return; // closed or refused
+    setBusy(true);
+    try {
+      const res = await connectTelegram(shop, idToken);
+      if (res.ok && res.data) onChange(res.data);
+    } catch {}
+    setBusy(false);
   }
 
   // one row under name/phone, same shape before and after connecting: icon/photo · two lines of text · button
   return (
     <div className="flex items-center gap-3 border-t pt-4">
-      <Script src="https://telegram.org/js/telegram-widget.js?22" strategy="afterInteractive" onReady={() => setReady(true)} />
       {user ? (
         <Avatar className="size-10">
           {user.photo_url && <AvatarImage src={user.photo_url} alt="" className="object-cover" />}
@@ -494,8 +541,8 @@ function TelegramConnect({ botId, user, onChange }: { botId: string; user: Teleg
           <X aria-hidden />
         </Button>
       ) : (
-        <Button type="button" onClick={connect} disabled={!ready} className="relative h-9 shrink-0 rounded-full bg-telegram px-4 text-white after:absolute after:-inset-1 after:content-[''] hover:bg-telegram/90">
-          <Send aria-hidden />
+        <Button type="button" onClick={connect} disabled={busy} className="relative h-9 shrink-0 rounded-full bg-telegram px-4 text-white after:absolute after:-inset-1 after:content-[''] hover:bg-telegram/90">
+          {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
           {t("tgConnect")}
         </Button>
       )}
