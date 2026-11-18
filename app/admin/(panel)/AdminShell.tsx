@@ -101,7 +101,7 @@ export function AdminShell({
                   // no brand colour set → the default black, so it stays a soft grey
                   // under its title (desktop): grey text, a thin light line under the title's icon (18px) that runs
                   // through the 2px gaps, the pill 12px right of it
-                  sub && "relative md:ml-[1.875rem] md:text-muted-foreground md:hover:text-foreground md:before:absolute md:before:-inset-y-px md:before:-left-3 md:before:w-px md:before:bg-border",
+                  sub && "relative md:ml-7.5 md:text-muted-foreground md:hover:text-foreground md:before:absolute md:before:-inset-y-px md:before:-left-3 md:before:w-px md:before:bg-border",
                   active && "bg-primary/10 font-medium text-primary hover:bg-primary/15 md:text-primary md:hover:text-primary",
                 )}
               >

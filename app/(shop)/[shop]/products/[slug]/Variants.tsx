@@ -73,7 +73,7 @@ export function Variants({
           {images.length > 1 && (
             <div
               ref={stripRef}
-              className="relative mt-1 flex max-w-[45%] shrink-0 gap-1.5 overflow-x-auto [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+              className="relative mt-1 flex max-w-[45%] shrink-0 gap-1.5 overflow-x-auto scrollbar-none md:hidden [&::-webkit-scrollbar]:hidden"
             >
               {images.map((src, i) => (
                 <button
