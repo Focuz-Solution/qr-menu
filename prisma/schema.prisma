@@ -247,24 +247,54 @@ model ItemImage {
   @@map("item_images")
 }
 
+/// A delivery area (e.g. "Phnom Penh"): provinces + the carriers customers there can choose (Shop delivery, Grab…).
+/// Zones made before carriers existed have no carrier rows: their own fee fields below act as one carrier (lib/delivery.ts)
+/// until the zone is saved again from Admin → Delivery.
 model DeliveryZone {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  shopId        String   @map("shop_id") @db.Uuid
-  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  id            String            @id @default(uuid(7)) @db.Uuid
+  shopId        String            @map("shop_id") @db.Uuid
+  shop          Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
   name          String
-  provinceCodes String[] @map("province_codes")
-  feeCents      Int      @map("fee_cents")
-  freeOverCents Int?     @map("free_over_cents")
-  isCourier     Boolean  @default(false) @map("is_courier")
-  courierLogo   String?  @map("courier_logo")
-  eta           String   @default("")
-  isActive      Boolean  @default(true) @map("is_active")
-  sortOrder     Int      @default(0) @map("sort_order")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  provinceCodes String[]          @map("province_codes")
+  carriers      DeliveryCarrier[]
+  // ---- before carriers (one service per zone); cleared when the zone is saved with carriers ----
+  feeCents      Int               @default(0) @map("fee_cents")
+  freeOverCents Int?              @map("free_over_cents")
+  isCourier     Boolean           @default(false) @map("is_courier")
+  courierLogo   String?           @map("courier_logo")
+  eta           String            @default("")
+  // ----
+  isActive      Boolean           @default(true) @map("is_active")
+  sortOrder     Int               @default(0) @map("sort_order")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
 
   @@index([shopId, sortOrder])
   @@map("delivery_zones")
+}
+
+/// One way to deliver inside a zone: the shop's own delivery or a courier, with its price rules.
+model DeliveryCarrier {
+  id        String       @id @default(uuid(7)) @db.Uuid
+  zoneId    String       @map("zone_id") @db.Uuid
+  zone      DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  name      String
+  isCourier Boolean      @default(false) @map("is_courier")
+  /// uploaded logo of an added courier (ready-made couriers use their own file in public/couriers)
+  logo      String?
+  eta       String       @default("")
+  /// fee when no price step applies
+  feeCents  Int          @map("fee_cents")
+  /// price steps by order subtotal, lowest first: [{ "fromCents": 5000, "feeCents": 100 }, { "fromCents": 10000, "feeCents": 0 }]
+  feeSteps  Json         @default("[]") @map("fee_steps")
+  /// the customer may choose to pay the fee to the driver on arrival (then the order has no delivery fee)
+  payDriver Boolean      @default(false) @map("pay_driver")
+  sortOrder Int          @default(0) @map("sort_order")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@index([zoneId, sortOrder])
+  @@map("delivery_carriers")
 }
 
 enum OrderStatus {
@@ -313,6 +343,8 @@ model Order {
   deliveryZoneName     String        @map("delivery_zone_name")
   subtotalCents        Int           @map("subtotal_cents")
   deliveryFeeCents     Int           @map("delivery_fee_cents")
+  /// the customer pays the delivery fee to the driver on arrival (deliveryFeeCents is then 0)
+  deliveryPayDriver    Boolean       @default(false) @map("delivery_pay_driver")
   discountCents        Int           @default(0) @map("discount_cents")
   totalCents           Int           @map("total_cents")
   paymentMethod        PaymentMethod @default(cod) @map("payment_method")

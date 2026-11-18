@@ -8,7 +8,8 @@ import { clientIp } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { shopBySlug } from "@/lib/shops";
-import { cambodiaDay, feeFor, normalizePhone, orderNumber, zonesFor } from "@/lib/orders";
+import { deliveryZones } from "@/lib/delivery";
+import { cambodiaDay, feeFor, normalizePhone, optionsFor, orderNumber } from "@/lib/orders";
 import { isProvinceCode, PROVINCES } from "@/lib/provinces";
 import type { ErrorCode, Result } from "@/lib/result";
 import { formatPrice } from "@/lib/shop";
@@ -23,7 +24,7 @@ const RATE = { orders: 5, minutes: 10 }; // ponytail: per-device limit from the 
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
-type Placed = { orderNo: string; totalCents: number; deliveryFeeCents: number; deliveryZoneName: string };
+type Placed = { orderNo: string; totalCents: number; deliveryFeeCents: number; deliveryPayDriver: boolean; deliveryZoneName: string };
 
 export async function createOrder(input: CheckoutInput): Promise<Result<Placed>> {
   // ---- the form ----
@@ -60,7 +61,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
 
   // ---- double tap: the same key → the order already made ----
   if (key) {
-    const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true } });
+    const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryPayDriver: true, deliveryZoneName: true } });
     if (same) return { ok: true, data: same };
   }
 
@@ -81,7 +82,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
         sizes: { orderBy: { size: { sortOrder: "asc" } }, select: { sizeId: true, priceCents: true, size: { select: { name: true } } } },
       },
     }),
-    prisma.deliveryZone.findMany({ where: { shopId, isActive: true }, orderBy: { sortOrder: "asc" } }),
+    deliveryZones(shopId, { activeOnly: true }),
   ]);
   if (settings && !settings.orderingEnabled) return { ok: false, error: "orderingClosed" };
   if (recent >= RATE.orders) return { ok: false, error: "tooManyOrders" };
@@ -110,11 +111,16 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
   const subtotalCents = orderLines.reduce((n, l) => n + l.lineTotalCents, 0);
   if (settings?.minOrderCents && subtotalCents < settings.minOrderCents) return { ok: false, error: "minOrder" };
 
-  const options = zonesFor(zones, provinceCode);
+  const options = optionsFor(zones, provinceCode);
   if (!options.length) return { ok: false, error: "invalid", fields: { province: "badProvince" } };
+  // the carrier picked (Shop delivery, Grab…) among the ones covering this province
   const zone = options.find((option) => option.id === input.deliveryZoneId);
   if (!zone) return { ok: false, error: "invalid", fields: { deliveryZoneId: "invalid" } };
-  const deliveryFeeCents = feeFor(zone, subtotalCents);
+  // "I'll pay the driver myself": only when the shop allows it for this carrier; then the order has no delivery fee
+  const fullFeeCents = feeFor(zone, subtotalCents);
+  // couriers only: shop delivery is always charged in the order
+  const deliveryPayDriver = zone.isCourier && zone.payDriver && fullFeeCents > 0 && input.payDriver === true;
+  const deliveryFeeCents = deliveryPayDriver ? 0 : fullFeeCents;
   const totalCents = subtotalCents + deliveryFeeCents;
   const province = PROVINCES.find((p) => p.code === provinceCode)!;
 
@@ -141,6 +147,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
           deliveryZoneName: zone.name,
           subtotalCents,
           deliveryFeeCents,
+          deliveryPayDriver,
           totalCents,
           paymentMethod: payment,
           idempotencyKey: key || null,
@@ -157,7 +164,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
   } catch (cause) {
     // two taps at the same moment with the same key: the other one saved it → return that order
     if (key && cause instanceof Prisma.PrismaClientKnownRequestError && cause.code === "P2002") {
-      const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryZoneName: true } });
+      const same = await prisma.order.findFirst({ where: { idempotencyKey: key, shopId }, select: { orderNo: true, totalCents: true, deliveryFeeCents: true, deliveryPayDriver: true, deliveryZoneName: true } });
       if (same) return { ok: true, data: same };
     }
     throw cause;
@@ -167,8 +174,8 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
   const saved = order;
   after(() => postOrderToGroup(saved.id));
   // one thank-you receipt per order (its own order number), to the customer's Telegram when they connected it
-  if (tg) after(() => receiptToCustomer(shopId, tg.chatId, { orderNo: saved.orderNo, payment, lines: orderLines, subtotalCents, deliveryFeeCents, totalCents }));
-  return { ok: true, data: { orderNo: order.orderNo, totalCents, deliveryFeeCents, deliveryZoneName: zone.name } };
+  if (tg) after(() => receiptToCustomer(shopId, tg.chatId, { orderNo: saved.orderNo, payment, lines: orderLines, subtotalCents, deliveryFeeCents, deliveryPayDriver, totalCents }));
+  return { ok: true, data: { orderNo: order.orderNo, totalCents, deliveryFeeCents, deliveryPayDriver, deliveryZoneName: zone.name } };
 }
 
 /**
@@ -193,7 +200,7 @@ export async function connectTelegram(shop: string, idToken: string): Promise<Re
 async function receiptToCustomer(
   shopId: string,
   chatId: bigint,
-  o: { orderNo: string; payment: "cod" | "bank_transfer"; lines: { name: string; variant: string | null; quantity: number; lineTotalCents: number }[]; subtotalCents: number; deliveryFeeCents: number; totalCents: number },
+  o: { orderNo: string; payment: "cod" | "bank_transfer"; lines: { name: string; variant: string | null; quantity: number; lineTotalCents: number }[]; subtotalCents: number; deliveryFeeCents: number; deliveryPayDriver: boolean; totalCents: number },
 ) {
   const { language, name } = await shopSettings(shopId);
   const t = await getTranslations({ locale: language, namespace: "checkout" });
@@ -211,7 +218,7 @@ async function receiptToCustomer(
     items.length > 30 ? `… +${items.length - 30}` : null,
     DIVIDER,
     `${e(t("subtotal"))} · ${money(o.subtotalCents)}`,
-    `${e(t("delivery"))} · ${o.deliveryFeeCents ? money(o.deliveryFeeCents) : e(t("free"))}`,
+    `${e(t("delivery"))} · ${o.deliveryPayDriver ? e(t("payDriverShort")) : o.deliveryFeeCents ? money(o.deliveryFeeCents) : e(t("free"))}`,
     `<b>${e(t("total"))} · ${money(o.totalCents)}</b>`,
     `💳 ${e(t(o.payment === "cod" ? "payCod" : "payBank"))}`,
     DIVIDER,

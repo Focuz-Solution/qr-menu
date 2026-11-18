@@ -49,6 +49,7 @@ export const toAdminOrder = (o: OrderRow): AdminOrder => ({
     deliveryZoneName: o.deliveryZoneName,
     subtotalCents: o.subtotalCents,
     deliveryFeeCents: o.deliveryFeeCents,
+    deliveryPayDriver: o.deliveryPayDriver,
     discountCents: o.discountCents,
     totalCents: o.totalCents,
     paymentMethod: o.paymentMethod,

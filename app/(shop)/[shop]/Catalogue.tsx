@@ -342,8 +342,8 @@ function SizeFilter({ sizes, value, onChange }: { sizes: Size[]; value: string[]
           )}
         >
           <SlidersHorizontal className="size-4" aria-hidden />
-          {/* the ticked size(s), else "Size" */}
-          <span className="max-w-28 truncate">{value.length ? sizes.filter((z) => value.includes(z.id)).map((z) => z.name).join(", ") : t("product.size")}</span>
+          {/* the ticked size(s), else "Option" (km) / "Size" (en) */}
+          <span className="max-w-28 truncate">{value.length ? sizes.filter((z) => value.includes(z.id)).map((z) => z.name).join(", ") : t("home.filterSizeButton")}</span>
         </button>
       </PopoverTrigger>
       {/* flat box: thin border, no shadow */}

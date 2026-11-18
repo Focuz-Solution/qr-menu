@@ -21,13 +21,12 @@ import type { AdminZone } from "./types";
 const money = (cents: number) => formatPrice(cents / 100);
 
 const PAGE_SIZE = 20;
-type SortKey = "name" | "provinces" | "fee" | "freeOver" | "active";
+type SortKey = "name" | "provinces" | "carriers" | "active";
 const compare: Record<SortKey, (a: AdminZone, b: AdminZone) => number> = {
   name: (a, b) => a.name.localeCompare(b.name),
   // "all other provinces" (no codes) sorts last
   provinces: (a, b) => (a.provinceCodes.length || 99) - (b.provinceCodes.length || 99),
-  fee: (a, b) => a.feeCents - b.feeCents,
-  freeOver: (a, b) => (a.freeOverCents ?? Infinity) - (b.freeOverCents ?? Infinity),
+  carriers: (a, b) => a.carriers.length - b.carriers.length,
   active: (a, b) => Number(a.isActive) - Number(b.isActive),
 };
 
@@ -88,10 +87,9 @@ export function DeliveryZones({ zones }: { zones: AdminZone[] }) {
         <Table>
           <TableHeader className="bg-muted/50 [&_th]:h-11 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
             <TableRow className="hover:bg-transparent">
-              <SortHead k="name" sort={sort} onSort={onSort} className="w-[26%] pl-4">{t("name")}</SortHead>
-              <SortHead k="provinces" sort={sort} onSort={onSort} className="hidden w-[32%] md:table-cell">{t("provinces")}</SortHead>
-              <SortHead k="fee" sort={sort} onSort={onSort} className="w-[12%] text-right">{t("colFee")}</SortHead>
-              <SortHead k="freeOver" sort={sort} onSort={onSort} className="hidden w-[14%] text-right sm:table-cell">{t("colFreeOver")}</SortHead>
+              <SortHead k="name" sort={sort} onSort={onSort} className="w-[22%] pl-4">{t("name")}</SortHead>
+              <SortHead k="provinces" sort={sort} onSort={onSort} className="hidden w-[28%] md:table-cell">{t("provinces")}</SortHead>
+              <SortHead k="carriers" sort={sort} onSort={onSort} className="w-[30%]">{t("colCarriers")}</SortHead>
               <SortHead k="active" sort={sort} onSort={onSort} className="w-[10%]">{t("active")}</SortHead>
               <TableHead className="pr-4 text-right">{t("actions")}</TableHead>
             </TableRow>
@@ -101,14 +99,17 @@ export function DeliveryZones({ zones }: { zones: AdminZone[] }) {
               <TableRow key={z.id} className={cn("h-14", !z.isActive && "opacity-60")}>
                 <TableCell className="max-w-0 pl-4">
                   <p className="truncate font-medium">{z.name}</p>
-                  {z.eta && <p className="truncate text-xs text-muted-foreground">{z.eta}</p>}
+                  {/* phones: the provinces under the name (their column is hidden) */}
+                  <p className="truncate text-xs text-muted-foreground md:hidden">{provinceNames(z.provinceCodes)}</p>
                 </TableCell>
                 <TableCell className="hidden max-w-0 md:table-cell">
                   <p className="truncate text-muted-foreground">{provinceNames(z.provinceCodes)}</p>
                 </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">{z.feeCents ? money(z.feeCents) : t("free")}</TableCell>
-                <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
-                  {z.freeOverCents != null ? money(z.freeOverCents) : "—"}
+                {/* each option with its base fee: "Shop delivery $1.50 · Grab $2.50" */}
+                <TableCell className="max-w-0">
+                  <p className="truncate text-muted-foreground">
+                    {z.carriers.map((c) => `${c.name} ${c.feeCents ? money(c.feeCents) : t("free")}`).join(" · ")}
+                  </p>
                 </TableCell>
                 <TableCell>
                   <Switch
@@ -152,7 +153,7 @@ export function DeliveryZones({ zones }: { zones: AdminZone[] }) {
             ))}
             {!rows.length && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="py-12">
+                <TableCell colSpan={5} className="py-12">
                   <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
                     <p className="text-sm whitespace-normal">{t("empty")}</p>
                   </div>

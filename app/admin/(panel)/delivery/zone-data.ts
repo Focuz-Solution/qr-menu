@@ -1,19 +1,15 @@
 import "server-only";
-import { prisma } from "@/lib/db";
+import { deliveryZone, deliveryZones } from "@/lib/delivery";
 import { savedCouriers } from "./couriers";
 import type { AdminZone } from "./types";
 
-const select = { id: true, name: true, provinceCodes: true, feeCents: true, freeOverCents: true, isCourier: true, courierLogo: true, eta: true, isActive: true } as const;
+/** this shop's zones with their carriers (the list page) */
+export const shopZones = (shopId: string): Promise<AdminZone[]> => deliveryZones(shopId);
 
-/** this shop's zones (the list page) */
-export const shopZones = (shopId: string): Promise<AdminZone[]> =>
-  prisma.deliveryZone.findMany({ where: { shopId }, orderBy: { sortOrder: "asc" }, select });
+/** one zone of this shop, or null */
+export const shopZone = (shopId: string, id: string): Promise<AdminZone | null> => deliveryZone(shopId, id);
 
-/** couriers this shop added before, for the zone form */
+/** couriers this shop added before (with their uploaded logo), for the carrier picker */
 export async function shopCouriers(shopId: string) {
-  return savedCouriers(await prisma.deliveryZone.findMany({ where: { shopId, isCourier: true }, select: { name: true, isCourier: true, courierLogo: true } }));
+  return savedCouriers((await deliveryZones(shopId)).flatMap((z) => z.carriers));
 }
-
-/** one zone of this shop, or null (ids are uuids; anything else is not found) */
-export const shopZone = (shopId: string, id: string): Promise<AdminZone | null> =>
-  /^[0-9a-f-]{36}$/.test(id) ? prisma.deliveryZone.findFirst({ where: { id, shopId }, select }) : Promise.resolve(null);
