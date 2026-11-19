@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { OrderStatus } from "@/lib/generated/prisma/enums";
+import type { OrderStatus, PaymentStatus } from "@/lib/generated/prisma/enums";
 import { formatPrice } from "@/lib/shop";
 import { cn } from "@/lib/utils";
 import type { AdminOrder } from "./order-types";
@@ -22,6 +22,22 @@ export function StatusPill({ status }: { status: OrderStatus }) {
   const t = useTranslations("admin.status");
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap", pill[status])}>
+      <span className="size-1.5 rounded-full bg-current" aria-hidden />
+      {t(status)}
+    </span>
+  );
+}
+
+const payPill: Record<PaymentStatus, string> = {
+  unpaid: "bg-warn text-warn-foreground",
+  paid: "bg-ok text-ok-foreground",
+  refunded: "bg-muted text-muted-foreground",
+};
+
+export function PaymentPill({ status }: { status: PaymentStatus }) {
+  const t = useTranslations("admin.orders.paymentStatuses");
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap", payPill[status])}>
       <span className="size-1.5 rounded-full bg-current" aria-hidden />
       {t(status)}
     </span>
