@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, Check, CircleCheck, Copy, Download, MapPin, MessageCircle, Phone } from "lucide-react";
+import { ArrowLeft, Banknote, Check, Circle, CircleCheck, Landmark, Undo2, Copy, Download, MapPin, MessageCircle, Phone } from "lucide-react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { Req } from "@/components/FieldMark";
 import { Img } from "@/components/Img";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,14 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { OrderStatus } from "@/lib/generated/prisma/enums";
+import type { OrderStatus, PaymentStatus } from "@/lib/generated/prisma/enums";
 import { NEXT_STATUS } from "@/lib/order-status";
 import { mapCoords } from "@/lib/orders";
 import type { ErrorCode } from "@/lib/result";
 import { thumbUrl } from "@/lib/shop";
-import { setOrderStatus } from "../../order-actions";
+import { setOrderStatus, setPaymentStatus } from "../../order-actions";
 import type { AdminOrder } from "../../order-types";
 import { fullAddress, localPhone, money, StatusPill } from "../../order-ui";
+import { cn } from "@/lib/utils";
 
 /** card with a header row (same look as the other admin cards) */
 function Box({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
@@ -143,7 +144,7 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
       <div className="grid gap-4 lg:grid-cols-[1fr_340px] lg:items-start">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {/* customer + where to deliver */}
-          <Box title={t("orders.customer")} className="order-1 min-w-0 lg:order-0 [&>h2]:border-b-0 [&>div]:pt-1">
+          <Box title={t("orders.customer")} className="order-1 min-w-0 lg:order-0">
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-5">
               <div className="min-w-0">
                 {/* their Telegram photo (when they connected Telegram at checkout and it is public), else the first letter of the name */}
@@ -196,11 +197,11 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
                 )}
               </div>
             </div>
-            {o.note && (
-              <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">
-                {t("orders.note")}: {o.note}
-              </p>
-            )}
+            {/* the customer's note from checkout; always shown so staff know there is none */}
+            <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm wrap-break-word whitespace-pre-line">
+              <span className="font-medium">{t("orders.note")}:</span>{" "}
+              {o.note ?? <span className="text-muted-foreground">{t("orders.noNote")}</span>}
+            </p>
           </Box>
 
           {/* items + totals */}
@@ -252,6 +253,9 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
             </section>
           </Box>
 
+          {/* payment: Pending → Paid tree + its button */}
+          <PaymentBox order={o} canChange={canChangeStatus} className="order-3 min-w-0 lg:order-0" />
+
           {/* history */}
           <Box title={t("orders.history")} className="order-4 min-w-0 lg:order-0">
             <ol className="flex flex-col gap-2 border-l pl-4 text-sm">
@@ -262,7 +266,13 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
                     {format.dateTime(e.createdAt, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </span>
                   {" · "}
-                  {e.type === "created" ? t("orders.placed") : e.toStatus ? t(`status.${e.toStatus}`) : e.type}
+                  {e.type === "created"
+                    ? t("orders.placed")
+                    : e.toStatus
+                      ? t(`status.${e.toStatus}`)
+                      : e.payment
+                        ? t("orders.paymentChanged", { status: t(`orders.paymentStatuses.${e.payment}`) })
+                        : e.type}
                   {e.actor && <span className="text-muted-foreground"> · {e.actor}</span>}
                 </li>
               ))}
@@ -275,6 +285,85 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
 }
 
 /** what was ordered + totals and payment */
+/** payment as a small step tree: Pending → Paid (→ Refunded); one button moves it along, every change goes in the history */
+function PaymentBox({ order: o, canChange, className }: { order: AdminOrder; canChange: boolean; className?: string }) {
+  const t = useTranslations("admin");
+  const te = useTranslations("errors");
+  const format = useFormatter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<ErrorCode>();
+  const [status, setShown] = useOptimistic(o.paymentStatus);
+  const set = (to: PaymentStatus) =>
+    start(async () => {
+      setError(undefined);
+      setShown(to);
+      const r = await setPaymentStatus(o.id, to);
+      if (!r.ok) setError(r.error);
+    });
+  // when (and by whom) it last became this status: the newest matching history entry
+  const when = (s: PaymentStatus) => {
+    const e = o.events.findLast((x) => x.payment === s);
+    return e && `${format.dateTime(e.createdAt, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}${e.actor ? ` · ${e.actor}` : ""}`;
+  };
+  const steps: { s: PaymentStatus; done: boolean; at?: string | false }[] = [
+    { s: "unpaid", done: true, at: when("unpaid") || format.dateTime(o.createdAt, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) },
+    { s: "paid", done: status !== "unpaid", at: status !== "unpaid" && when("paid") },
+    ...(status === "refunded" ? [{ s: "refunded" as const, done: true, at: when("refunded") }] : []),
+  ];
+
+  return (
+    <Box title={t("orders.payment")} className={className}>
+      <p className="flex items-center gap-1.5 text-sm font-medium">
+        {o.paymentMethod === "cod" ? <Banknote className="size-4 text-muted-foreground" aria-hidden /> : <Landmark className="size-4 text-muted-foreground" aria-hidden />}
+        {t(`orders.paymentMethods.${o.paymentMethod}`)}
+      </p>
+      {/* the tree: a line down the left, one dot per step (done = ✓, still to come = empty circle) */}
+      <ol className="flex flex-col gap-4 border-l pl-4 text-sm">
+        {steps.map(({ s, done, at }) => (
+          <li key={s} className="relative">
+            {s === "refunded" ? (
+              <Undo2 className="absolute top-0.5 -left-6 size-4 bg-card text-destructive" aria-hidden />
+            ) : done ? (
+              <CircleCheck className="absolute top-0.5 -left-6 size-4 bg-card text-ok-foreground" aria-hidden />
+            ) : (
+              <Circle className="absolute top-0.5 -left-6 size-4 bg-card text-muted-foreground/50" aria-hidden />
+            )}
+            <p className={cn("font-medium", !done && "text-muted-foreground")}>{t(`orders.paymentStatuses.${s}`)}</p>
+            {at && <p className="text-xs text-muted-foreground tabular-nums">{at}</p>}
+          </li>
+        ))}
+      </ol>
+      {/* the next step: Pending → Mark as paid; Paid → Refund / Undo; Refunded → back to pending */}
+      {canChange && (
+        <div className="flex flex-wrap gap-2">
+          {status === "unpaid" && (
+            <Button size="sm" disabled={pending} onClick={() => set("paid")}>
+              <Check aria-hidden />
+              {t("orders.markPaid")}
+            </Button>
+          )}
+          {status === "paid" && (
+            <>
+              <Button variant="outline" size="sm" className="text-destructive" disabled={pending} onClick={() => set("refunded")}>
+                {t("orders.refund")}
+              </Button>
+              <Button variant="outline" size="sm" disabled={pending} onClick={() => set("unpaid")}>
+                {t("orders.undoPaid")}
+              </Button>
+            </>
+          )}
+          {status === "refunded" && (
+            <Button variant="outline" size="sm" disabled={pending} onClick={() => set("unpaid")}>
+              {t("orders.undoPaid")}
+            </Button>
+          )}
+        </div>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{te(error)}</p>}
+    </Box>
+  );
+}
+
 function ItemsBox({ order: o, className }: { order: AdminOrder; className?: string }) {
   const t = useTranslations("admin");
   return (
@@ -293,21 +382,37 @@ function ItemsBox({ order: o, className }: { order: AdminOrder; className?: stri
           <p className="text-sm font-medium tabular-nums">{money(i.lineTotalCents)}</p>
         </div>
       ))}
-      <dl className="grid grid-cols-[1fr_auto] gap-y-1 border-t border-dashed pt-3 text-sm tabular-nums">
-        <dt className="text-muted-foreground">{t("orders.subtotal")}</dt>
+      {/* totals: soft grey panel; labels left, amounts right; the total bigger under a dashed line */}
+      <dl className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-2.5 rounded-xl bg-muted/50 p-4 text-sm tabular-nums">
+        <dt className="text-muted-foreground">
+          {t("orders.subtotal")}
+          <span className="text-xs"> · {t("orders.itemsCount", { count: o.items.reduce((n, i) => n + i.quantity, 0) })}</span>
+        </dt>
         <dd className="text-right">{money(o.subtotalCents)}</dd>
-        <dt className="text-muted-foreground">{t("orders.delivery")} ({o.deliveryZoneName})</dt>
-        <dd className="text-right">{o.deliveryPayDriver ? t("orders.payDriver") : o.deliveryFeeCents ? money(o.deliveryFeeCents) : t("orders.free")}</dd>
+        <dt className="text-muted-foreground">
+          {t("orders.delivery")}
+          {/* the delivery service on its own small line */}
+          <span className="block text-xs">{o.deliveryZoneName}</span>
+        </dt>
+        <dd className={cn("text-right", !o.deliveryPayDriver && !o.deliveryFeeCents && "font-medium text-ok-foreground")}>
+          {o.deliveryPayDriver ? t("orders.payDriver") : o.deliveryFeeCents ? money(o.deliveryFeeCents) : t("orders.free")}
+        </dd>
         {o.discountCents > 0 && (
           <>
             <dt className="text-muted-foreground">{t("orders.discount")}</dt>
-            <dd className="text-right">−{money(o.discountCents)}</dd>
+            <dd className="text-right text-ok-foreground">−{money(o.discountCents)}</dd>
           </>
         )}
-        <dt className="border-t pt-2 font-semibold">{t("orders.total")}</dt>
-        <dd className="border-t pt-2 text-right font-semibold">{money(o.totalCents)}</dd>
         <dt className="text-muted-foreground">{t("orders.payment")}</dt>
-        <dd className="text-right">{t(`orders.paymentMethods.${o.paymentMethod}`)} · {t(`orders.paymentStatuses.${o.paymentStatus}`)}</dd>
+        <dd className="flex items-center justify-end gap-1.5 font-medium">
+          {o.paymentMethod === "cod" ? <Banknote className="size-4 text-muted-foreground" aria-hidden /> : <Landmark className="size-4 text-muted-foreground" aria-hidden />}
+          {t(`orders.paymentMethods.${o.paymentMethod}`)}
+        </dd>
+        {/* one row across both columns, so the dashed line runs unbroken (a <div> around dt + dd is allowed in <dl>) */}
+        <div className="col-span-2 mt-1 grid grid-cols-subgrid items-baseline border-t border-dashed pt-3">
+          <dt className="text-base font-semibold">{t("orders.total")}</dt>
+          <dd className="text-right text-lg font-semibold">{money(o.totalCents)}</dd>
+        </div>
       </dl>
     </Box>
   );

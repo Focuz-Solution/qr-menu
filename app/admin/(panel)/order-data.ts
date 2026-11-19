@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import type { PaymentStatus } from "@/lib/generated/prisma/enums";
 import type { AdminOrder, AdminOrderRow } from "./order-types";
 
 // What the Orders list and the order page load for each order, and how it's sent to the browser.
@@ -21,6 +22,7 @@ export const orderListSelect = {
   provinceName: true,
   totalCents: true,
   paymentMethod: true,
+  paymentStatus: true,
   items: { select: { quantity: true } },
 } satisfies Prisma.OrderSelect;
 
@@ -68,6 +70,8 @@ export const toAdminOrder = (o: OrderRow): AdminOrder => ({
       id: e.id,
       type: e.type,
       toStatus: e.toStatus,
+      // a payment change: the new payment status
+      payment: e.type === "payment" ? ((e.payload as { to?: PaymentStatus } | null)?.to ?? null) : null,
       createdAt: e.createdAt,
       actor: e.actorUser?.name ?? (e.actorTelegram as { username?: string } | null)?.username ?? null,
     })),
