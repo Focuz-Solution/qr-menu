@@ -235,7 +235,13 @@
       "markPaid": "Mark as paid",
       "refund": "Refund",
       "undoPaid": "Undo",
-      "noNote": "No note"
+      "noNote": "No note",
+      "statusHint": "Tap the next step to move the order forward.",
+      "moveTo": "Move to {status}",
+      "amountDue": "Amount to collect",
+      "amountPaid": "Amount paid",
+      "amountRefunded": "Amount refunded",
+      "plusDriver": "+ delivery fee paid to the driver"
     },
     "menu": {
       "title": "Menu",
