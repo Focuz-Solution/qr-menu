@@ -146,7 +146,8 @@
         "all": "All dates",
         "week": "This week",
         "month": "This month",
-        "year": "This year"
+        "year": "This year",
+        "custom": "Custom range…"
       },
       "delete": "Delete",
       "cancel": "Cancel",
@@ -197,7 +198,7 @@
         "bank_transfer": "Bank transfer"
       },
       "paymentStatuses": {
-        "unpaid": "Unpaid",
+        "unpaid": "Pending",
         "paid": "Paid",
         "refunded": "Refunded"
       },
@@ -217,10 +218,24 @@
         "year": {
           "orders": "Orders this year",
           "revenue": "Revenue this year"
+        },
+        "custom": {
+          "orders": "Orders in range",
+          "revenue": "Revenue in range"
         }
       },
       "noStatusPermission": "Your role can't change order status.",
-      "call": "Call {phone}"
+      "call": "Call {phone}",
+      "paymentStatus": "Payment status",
+      "paymentChanged": "Payment: {status}",
+      "from": "From",
+      "to": "To",
+      "loadingRange": "Loading…",
+      "clearRange": "Clear",
+      "markPaid": "Mark as paid",
+      "refund": "Refund",
+      "undoPaid": "Undo",
+      "noNote": "No note"
     },
     "menu": {
       "title": "Menu",
@@ -713,7 +728,8 @@
     "tgReceiptFooter": "We will message you when the shop confirms or cancels your order.",
     "tgConnectHint": "Get order updates, and the shop can contact you",
     "tgConfirmed": "✅ Your order {no} is confirmed.",
-    "tgCancelled": "❌ Your order {no} was cancelled."
+    "tgCancelled": "❌ Your order {no} was cancelled.",
+    "itemsCount": "{count, plural, one {# item} other {# items}}"
   },
   "errors": {
     "badPhone": "Enter a valid Cambodian phone number (e.g. 012 345 678)",

@@ -39,13 +39,13 @@ export type AdminOrder = {
     quantity: number;
     lineTotalCents: number;
   }[];
-  events: { id: string; type: string; toStatus: OrderStatus | null; createdAt: Date; actor: string | null }[];
+  events: { id: string; type: string; toStatus: OrderStatus | null; payment: PaymentStatus | null; createdAt: Date; actor: string | null }[];
 };
 
 /** one row of the Orders list: only what the table, search, sort and CSV report use (the order page loads the rest) */
 export type AdminOrderRow = Pick<
   AdminOrder,
-  "id" | "orderNo" | "status" | "createdAt" | "customerName" | "customerPhone" | "provinceName" | "totalCents" | "paymentMethod"
+  "id" | "orderNo" | "status" | "createdAt" | "customerName" | "customerPhone" | "provinceName" | "totalCents" | "paymentMethod" | "paymentStatus"
 > & { itemCount: number };
 
 export type OrderStats = {
@@ -56,7 +56,10 @@ export type OrderStats = {
   /** all-time count per status (tabs) */
   counts: Record<OrderStatus, number>;
   /** the summary cards when the date filter is This week / month / year (counted in the database, not just the loaded rows) */
-  periods: Record<"week" | "month" | "year", PeriodStats>;
+  periods: Record<"week" | "month" | "year", PeriodStats> & {
+    /** the custom date range (?from=…&to=…), when one is picked */
+    custom?: PeriodStats;
+  };
 };
 
 export type PeriodStats = { orders: number; revenueCents: number; toPack: number; shipping: number };
