@@ -107,8 +107,8 @@
   --best: oklch(0.93 0.08 85);
   --best-foreground: oklch(0.45 0.12 60);
   /* admin order status pills (bg + text) */
-  --info: #e5eef9;
-  --info-foreground: #2d5f9a;
+  --info: #dbeafe;
+  --info-foreground: #1d4ed8;
   --violet: #efe8f8;
   --violet-foreground: #6b4aa0;
   --warn: #fff0d6;

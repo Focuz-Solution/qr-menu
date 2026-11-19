@@ -3,6 +3,7 @@
 import { Download, Eye, Search, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import type { ErrorCode } from "@/lib/result";
@@ -15,15 +16,22 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { OrderStatus } from "@/lib/generated/prisma/enums";
+import type { OrderStatus, PaymentStatus } from "@/lib/generated/prisma/enums";
+import { cn } from "@/lib/utils";
 import { ORDER_STATUSES } from "@/lib/order-status";
-import { localPhone, money, StatusPill } from "./order-ui";
+import { localPhone, money, PaymentPill, StatusPill } from "./order-ui";
 import type { AdminOrderRow, OrderStats } from "./order-types";
 
 // ponytail: sort + paging in the browser (the page loads the newest 200 orders)
 const PAGE_SIZE = 20;
-const periods = ["all", "week", "month", "year"] as const;
+// underline tab (status + payment rows)
+const TAB =
+  "h-12 gap-2 rounded-none border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-transparent data-[state=on]:border-foreground data-[state=on]:bg-transparent data-[state=on]:text-foreground";
+// payment tabs: a dot in the payment pill's colour
+const PAY_DOT: Record<PaymentStatus, string> = { unpaid: "bg-warn-foreground", paid: "bg-ok-foreground", refunded: "bg-muted-foreground" };
+const periods = ["all", "week", "month", "year", "custom"] as const;
 type Period = (typeof periods)[number];
+type Preset = Exclude<Period, "custom">;
 type SortKey = "orderNo" | "createdAt" | "customerName" | "totalCents" | "status";
 const compare: Record<SortKey, (a: AdminOrderRow, b: AdminOrderRow) => number> = {
   orderNo: (a, b) => a.orderNo.localeCompare(b.orderNo),
@@ -34,7 +42,14 @@ const compare: Record<SortKey, (a: AdminOrderRow, b: AdminOrderRow) => number> =
 };
 
 
-export function Orders({ orders, stats, periodStarts, canDelete }: { orders: AdminOrderRow[]; stats: OrderStats; periodStarts: Record<Period, number>; canDelete: boolean }) {
+export function Orders({ orders, stats, periodStarts, range, canDelete }: {
+  orders: AdminOrderRow[];
+  stats: OrderStats;
+  periodStarts: Record<Preset, number>;
+  /** the custom date range the server loaded (?from=…&to=…), null = none */
+  range: { from: string; to: string } | null;
+  canDelete: boolean;
+}) {
   const t = useTranslations("admin");
   const format = useFormatter();
   const te = useTranslations("errors");
@@ -42,17 +57,40 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
   const [deleteError, setDeleteError] = useState<ErrorCode>();
   const [pending, start] = useTransition();
   const [tab, setTab] = useState<OrderStatus | "all">("all");
-  const [period, setPeriod] = useState<Period>("all");
+  // payment filter next to the status tabs (null = any)
+  const [pay, setPay] = useState<PaymentStatus | null>(null);
+  const [period, setPeriod] = useState<Period>(range ? "custom" : "all");
+  // Custom range: the two days as typed; both set → the server loads that range
+  const [from, setFrom] = useState(range?.from ?? "");
+  const [to, setTo] = useState(range?.to ?? "");
+  const router = useRouter();
+  const [loadingRange, startRange] = useTransition();
+  const applyRange = (f: string, tt: string) => {
+    if (!f || !tt || f > tt) return;
+    setPeriod("custom");
+    setPage(0);
+    startRange(() => router.push(`/admin/orders?from=${f}&to=${tt}`));
+  };
+  // back to All dates: empty boxes; a loaded range → load the newest orders again
+  const clearRange = () => {
+    setFrom("");
+    setTo("");
+    setPeriod("all");
+    setPage(0);
+    if (range) startRange(() => router.push("/admin/orders"));
+  };
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "createdAt", desc: true });
   const [page, setPage] = useState(0);
 
   const query = q.trim().toLowerCase();
   const digits = query.replace(/\D/g, "");
-  const periodOrders = orders.filter((order) => +order.createdAt >= periodStarts[period]);
+  // custom: the server already loaded only that range
+  const periodOrders = period === "custom" ? orders : orders.filter((order) => +order.createdAt >= periodStarts[period]);
   const shown = periodOrders.filter(
     (o) =>
       (tab === "all" || o.status === tab) &&
+      (!pay || o.paymentStatus === pay) &&
       (!query ||
         o.orderNo.toLowerCase().includes(query) ||
         o.customerName.toLowerCase().includes(query) ||
@@ -61,7 +99,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
   const sorted = shown.toSorted((a, b) => (sort.desc ? -1 : 1) * compare[sort.key](a, b));
   const { pages, current, rows } = paginate(sorted, page, PAGE_SIZE);
   function downloadReport() {
-    const columns = ["order", "time", "customer", "phone", "province", "items", "total", "status", "payment"] as const;
+    const columns = ["order", "time", "customer", "phone", "province", "items", "total", "status", "payment", "paymentStatus"] as const;
     const report = [
       columns.map((column) => t(`orders.${column}`)),
       ...sorted.map((order) => [
@@ -74,6 +112,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
         (order.totalCents / 100).toFixed(2),
         t(`status.${order.status}`),
         t(`orders.paymentMethods.${order.paymentMethod}`),
+        t(`orders.paymentStatuses.${order.paymentStatus}`),
       ]),
     ];
     const csv = report.map((row) => row.map((value) => {
@@ -84,7 +123,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
     const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = "orders-report.csv";
+    link.download = range ? `orders-report_${range.from}_${range.to}.csv` : "orders-report.csv";
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -96,11 +135,12 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
   const total = ORDER_STATUSES.reduce((n, s) => n + stats.counts[s], 0);
 
   // the summary cards follow the date filter: All dates → today + right now; a period → counted within it
-  const range = period === "all" ? null : period;
-  const p = range ? stats.periods[range] : null;
+  // (custom before its range is loaded = like All dates)
+  const span = period === "all" || (period === "custom" && !stats.periods.custom) ? null : period;
+  const p = span ? stats.periods[span]! : null;
   const cards = [
-    [range ? t(`orders.cards.${range}.orders`) : t("orders.today"), p ? p.orders : stats.today],
-    [range ? t(`orders.cards.${range}.revenue`) : t("orders.revenue"), money(p ? p.revenueCents : stats.revenueTodayCents)],
+    [span ? t(`orders.cards.${span}.orders`) : t("orders.today"), p ? p.orders : stats.today],
+    [span ? t(`orders.cards.${span}.revenue`) : t("orders.revenue"), money(p ? p.revenueCents : stats.revenueTodayCents)],
     [t("orders.toPack"), p ? p.toPack : stats.counts.confirmed + stats.counts.packing],
     [t("orders.shipping"), p ? p.shipping : stats.counts.shipped],
   ] as const;
@@ -140,7 +180,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
 
       {/* underline tabs: one swipeable row (scrollbar hidden); the inset shadow is the grey bottom line */}
       <div className="mb-3 flex items-center gap-2 shadow-[inset_0_-1px_0_var(--border)]">
-        <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ToggleGroup
             type="single"
             value={tab}
@@ -153,29 +193,87 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
               <ToggleGroupItem
                 key={s}
                 value={s}
-                className="h-12 gap-2 rounded-none border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-transparent data-[state=on]:border-foreground data-[state=on]:bg-transparent data-[state=on]:text-foreground"
+                className={TAB}
               >
                 {t(`status.${s}`)}
                 <span className="rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
-                  {period === "all"
+                  {span === null
                     ? (s === "all" ? total : stats.counts[s])
                     : (s === "all" ? periodOrders.length : periodOrders.filter((order) => order.status === s).length)}
                 </span>
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-        </div>
-        <Select value={period} onValueChange={(value) => { setPeriod(value as Period); setPage(0); }}>
-          <SelectTrigger aria-label={t("orders.reportPeriod")} className="shrink-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end">
-            {periods.map((value) => (
-              <SelectItem key={value} value={value}>{t(`orders.period.${value}`)}</SelectItem>
+          {/* after a thin divider: payment status, a second filter on top of the status tab (tap the active one again to drop it) */}
+          <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
+          <ToggleGroup
+            type="single"
+            value={pay ?? ""}
+            onValueChange={(v) => { setPay((v || null) as PaymentStatus | null); setPage(0); }}
+            aria-label={t("orders.paymentStatus")}
+            className="w-max"
+          >
+            {(["unpaid", "paid", "refunded"] as const).map((s) => (
+              <ToggleGroupItem key={s} value={s} className={TAB}>
+                <span className={cn("size-1.5 shrink-0 rounded-full", PAY_DOT[s])} aria-hidden />
+                {t(`orders.paymentStatuses.${s}`)}
+                <span className="rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
+                  {periodOrders.filter((order) => order.paymentStatus === s).length}
+                </span>
+              </ToggleGroupItem>
             ))}
-          </SelectContent>
-        </Select>
+          </ToggleGroup>
+        </div>
       </div>
+
+      {/* date filter row: From – To (Cambodia days, both included; loads once both are set), then the preset period */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">{t("orders.from")}</span>
+          <Input
+            type="date"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => { setFrom(e.target.value); applyRange(e.target.value, to); }}
+            aria-label={t("orders.from")}
+            className="h-8 w-auto px-3 text-sm md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-60"
+          />
+          <span className="text-muted-foreground">{t("orders.to")}</span>
+          <Input
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => { setTo(e.target.value); applyRange(from, e.target.value); }}
+            aria-label={t("orders.to")}
+            className="h-8 w-auto px-3 text-sm md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-60"
+          />
+          <Select
+            // dates typed in the boxes → no preset picked (shows "Report period")
+            value={period === "custom" ? "" : period}
+            onValueChange={(value) => {
+              setPeriod(value as Period);
+              setPage(0);
+              // a preset replaces the date boxes; leaving a loaded range loads the newest orders again
+              setFrom("");
+              setTo("");
+              if (range) startRange(() => router.push("/admin/orders"));
+            }}
+          >
+            <SelectTrigger size="sm" aria-label={t("orders.reportPeriod")} className="shrink-0">
+              <SelectValue placeholder={t("orders.reportPeriod")} />
+            </SelectTrigger>
+            <SelectContent align="start">
+              {periods.filter((value) => value !== "custom").map((value) => (
+                <SelectItem key={value} value={value}>{t(`orders.period.${value}`)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(from || to) && (
+            <Button type="button" variant="ghost" size="sm" onClick={clearRange}>
+              {t("orders.clearRange")}
+            </Button>
+          )}
+          {loadingRange && <span className="text-muted-foreground">{t("orders.loadingRange")}</span>}
+        </div>
 
       <Card className="gap-0 overflow-hidden py-0">
         <Table>
@@ -188,6 +286,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
               <TableHead className="hidden md:table-cell">{t("orders.province")}</TableHead>
               <TableHead className="hidden text-right lg:table-cell">{t("orders.items")}</TableHead>
               <SortHead k="totalCents" sort={sort} onSort={onSort} className="text-right">{t("orders.total")}</SortHead>
+              <TableHead className="hidden w-px sm:table-cell">{t("orders.paymentStatus")}</TableHead>
               <SortHead k="status" sort={sort} onSort={onSort} className="w-px">{t("orders.status")}</SortHead>
               <TableHead className="w-px pr-4 text-right">{t("orders.actions")}</TableHead>
             </TableRow>
@@ -206,6 +305,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
                   {t("orders.itemsCount", { count: o.itemCount })}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">{money(o.totalCents)}</TableCell>
+                <TableCell className="hidden sm:table-cell"><PaymentPill status={o.paymentStatus} /></TableCell>
                 <TableCell><StatusPill status={o.status} /></TableCell>
                 <TableCell className="pr-4 text-right">
                   <div className="flex justify-end">
@@ -235,7 +335,7 @@ export function Orders({ orders, stats, periodStarts, canDelete }: { orders: Adm
             ))}
             {!rows.length && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                   {orders.length ? t("orders.empty") : t("orders.noOrdersYet")}
                 </TableCell>
               </TableRow>

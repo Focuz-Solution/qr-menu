@@ -363,20 +363,16 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
             </li>
           ))}
         </ul>
-        <dl className="flex flex-col gap-1.5 border-t border-dashed pt-3 text-sm">
-          <div className="flex justify-between text-muted-foreground">
-            <dt>{t("subtotal")}</dt>
-            <dd className="tabular-nums">{money(subtotalCents)}</dd>
-          </div>
-          <div className="flex justify-between text-muted-foreground">
-            <dt>{t("delivery")}</dt>
-            <dd className="tabular-nums">{noDelivery ? t("notAvailable") : !zone ? t(d.provinceCode ? "chooseDeliveryService" : "chooseProvince") : payDriver ? t("payDriverShort") : deliveryFeeCents ? money(deliveryFeeCents) : t("free")}</dd>
-          </div>
-          <div className="flex items-baseline justify-between border-t pt-2">
-            <dt className="font-medium">{t("total")}</dt>
-            <dd className="text-xl font-bold text-primary tabular-nums">{money(subtotalCents + deliveryFeeCents)}</dd>
-          </div>
-        </dl>
+        <Totals
+          count={items.reduce((n, i) => n + i.qty, 0)}
+          subtotalCents={subtotalCents}
+          service={zone?.name}
+          // not known yet → a hint instead of an amount
+          delivery={noDelivery ? t("notAvailable") : !zone ? t(d.provinceCode ? "chooseDeliveryService" : "chooseProvince") : null}
+          payDriver={payDriver}
+          deliveryFeeCents={deliveryFeeCents}
+          totalCents={subtotalCents + deliveryFeeCents}
+        />
         {/* desktop: under the totals */}
         <div className="hidden flex-col gap-3 md:flex">{send}</div>
       </aside>
@@ -426,20 +422,15 @@ function ReceiptView({ receipt: r }: { receipt: Receipt }) {
             </li>
           ))}
         </ul>
-        <dl className="flex flex-col gap-1.5 border-t border-dashed pt-3 text-sm">
-          <div className="flex justify-between text-muted-foreground">
-            <dt>{t("subtotal")}</dt>
-            <dd className="tabular-nums">{money(r.subtotalCents)}</dd>
-          </div>
-          <div className="flex justify-between text-muted-foreground">
-            <dt>{t("delivery")}</dt>
-            <dd className="tabular-nums">{r.deliveryPayDriver ? t("payDriverShort") : r.deliveryFeeCents ? money(r.deliveryFeeCents) : t("free")}</dd>
-          </div>
-          <div className="flex items-baseline justify-between border-t pt-2">
-            <dt className="font-medium">{t("total")}</dt>
-            <dd className="text-xl font-bold text-primary tabular-nums">{money(r.totalCents)}</dd>
-          </div>
-        </dl>
+        <Totals
+          count={r.lines.reduce((n, l) => n + l.qty, 0)}
+          subtotalCents={r.subtotalCents}
+          service={r.deliveryZoneName}
+          delivery={null}
+          payDriver={!!r.deliveryPayDriver}
+          deliveryFeeCents={r.deliveryFeeCents}
+          totalCents={r.totalCents}
+        />
       </section>
 
       <section className="rounded-2xl border p-4">
@@ -584,5 +575,43 @@ function TelegramConnect({ botId, shop, user, onChange }: { botId: string; shop:
         </Button>
       )}
     </div>
+  );
+}
+
+/** the money part of the summary (checkout + receipt): soft grey panel — subtotal (· items), delivery (service on a
+ *  small line under it), then the total under a dashed line */
+function Totals({ count, subtotalCents, service, delivery, payDriver, deliveryFeeCents, totalCents }: {
+  count: number;
+  subtotalCents: number;
+  /** the delivery service picked (J&T Express…) */
+  service?: string;
+  /** a hint shown instead of the fee while it isn't known (choose a province first…), null = show the fee */
+  delivery: string | null;
+  payDriver: boolean;
+  deliveryFeeCents: number;
+  totalCents: number;
+}) {
+  const t = useTranslations("checkout");
+  const free = delivery === null && !payDriver && !deliveryFeeCents;
+  return (
+    <dl className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-2.5 rounded-xl bg-muted/60 p-4 text-sm tabular-nums">
+      <dt className="text-muted-foreground">
+        {t("subtotal")}
+        <span className="text-xs"> · {t("itemsCount", { count })}</span>
+      </dt>
+      <dd className="text-right">{money(subtotalCents)}</dd>
+      <dt className="text-muted-foreground">
+        {t("delivery")}
+        {service && delivery === null && <span className="block text-xs">{service}</span>}
+      </dt>
+      <dd className={cn("text-right", delivery !== null && "text-xs text-muted-foreground", free && "font-medium text-ok-foreground")}>
+        {delivery ?? (payDriver ? t("payDriverShort") : deliveryFeeCents ? money(deliveryFeeCents) : t("free"))}
+      </dd>
+      {/* one row across both columns, so the dashed line runs unbroken */}
+      <div className="col-span-2 mt-1 grid grid-cols-subgrid items-baseline border-t border-dashed pt-3">
+        <dt className="text-base font-semibold">{t("total")}</dt>
+        <dd className="text-right text-xl font-bold text-primary">{money(totalCents)}</dd>
+      </div>
+    </dl>
   );
 }
