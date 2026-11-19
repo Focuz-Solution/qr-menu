@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, Banknote, Check, Circle, CircleCheck, Landmark, Undo2, Copy, Download, MapPin, MessageCircle, Phone } from "lucide-react";
+import { ArrowLeft, Banknote, Check, CircleCheck, Clock, Copy, Download, Landmark, Loader2, MapPin, MessageCircle, Phone, Undo2, XCircle } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
 import { useOptimistic, useState, useTransition } from "react";
 import { Req } from "@/components/FieldMark";
@@ -18,14 +19,17 @@ import type { ErrorCode } from "@/lib/result";
 import { thumbUrl } from "@/lib/shop";
 import { setOrderStatus, setPaymentStatus } from "../../order-actions";
 import type { AdminOrder } from "../../order-types";
-import { fullAddress, localPhone, money, StatusPill } from "../../order-ui";
+import { fullAddress, localPhone, money, PaymentPill, StatusPill } from "../../order-ui";
 import { cn } from "@/lib/utils";
 
-/** card with a header row (same look as the other admin cards) */
-function Box({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+/** card with a header row (same look as the other admin cards); `action` sits at the right of the header */
+function Box({ title, action, children, className }: { title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <Card className={`gap-0 overflow-hidden py-0 ${className ?? ""}`}>
-      <h2 className="flex min-h-12 items-center border-b px-4 text-sm font-semibold md:px-5">{title}</h2>
+      <div className="flex min-h-12 items-center gap-2 border-b px-4 md:px-5">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {action && <div className="ml-auto">{action}</div>}
+      </div>
       <div className="flex flex-col gap-3 p-4 md:p-5">{children}</div>
     </Card>
   );
@@ -61,13 +65,8 @@ function CopyLocation({ url }: { url: string }) {
 /** `canChangeStatus` = the person's role has "orders.status" (else the next-step buttons are replaced by a note) */
 export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; canChangeStatus: boolean }) {
   const t = useTranslations("admin");
-  const te = useTranslations("errors");
   const format = useFormatter();
-  const [cancelling, setCancelling] = useState(false);
-  const [error, setError] = useState<ErrorCode>();
-  const [pending, start] = useTransition();
   const phone = localPhone(o.customerPhone);
-  const next = NEXT_STATUS[o.status];
 
   function printReceipt() {
     const lines = [
@@ -106,15 +105,6 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
     preview.print();
   }
 
-  function move(to: OrderStatus, reason?: string) {
-    setError(undefined);
-    start(async () => {
-      const r = await setOrderStatus(o.id, to, reason);
-      if (!r.ok) setError(r.fields?.reason ?? r.error);
-      else setCancelling(false);
-    });
-  }
-
   return (
     <>
       {/* header: back to the list, order number + status, date */}
@@ -139,8 +129,11 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
         </div>
       </div>
 
-      {/* desktop: left = customer, items · right = status, history.
-          phones: one column in the order staff use it — customer, status, items, history ("contents" + order) */}
+      {/* order status: full width progress bar; tap the next step to move the order */}
+      <StatusBox order={o} canChange={canChangeStatus} />
+
+      {/* desktop: left = customer, items · right = payment, history.
+          phones: one column in the order staff use it — customer, payment, items, history ("contents" + order) */}
       <div className="grid gap-4 lg:grid-cols-[1fr_340px] lg:items-start">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           {/* customer + where to deliver */}
@@ -209,52 +202,8 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
         </div>
 
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-          {/* the next step(s) for this order */}
-          <Box title={t("orders.updateStatus")} className="order-2 min-w-0 lg:order-0">
-            <section className="flex flex-col gap-2">
-              {o.status === "cancelled" && o.cancelReason && <p className="text-sm">{t("orders.cancelReason")}: {o.cancelReason}</p>}
-              {next.length && !canChangeStatus ? (
-                <p className="text-sm text-muted-foreground">{t("orders.noStatusPermission")}</p>
-              ) : next.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {next
-                    .filter((s) => s !== "cancelled")
-                    .map((s) => (
-                      <Button key={s} size="sm" disabled={pending} onClick={() => move(s)}>
-                        {t(`status.${s}`)}
-                      </Button>
-                    ))}
-                  {next.includes("cancelled") && !cancelling && (
-                    <Button variant="outline" size="sm" className="text-destructive" disabled={pending} onClick={() => setCancelling(true)}>
-                      {t("status.cancelled")}
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">{t("orders.noNext")}</p>
-              )}
-              {cancelling && (
-                <form
-                  className="flex flex-col gap-2 rounded-lg border p-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    move("cancelled", String(new FormData(e.currentTarget).get("reason") ?? ""));
-                  }}
-                >
-                  <Label htmlFor="reason">{t("orders.cancelReason")} <Req /></Label>
-                  <Textarea id="reason" name="reason" required maxLength={300} rows={2} placeholder={t("orders.cancelReasonHint")} />
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setCancelling(false)}>{t("orders.back")}</Button>
-                    <Button type="submit" variant="outline" size="sm" className="text-destructive" disabled={pending}>{t("orders.confirmCancel")}</Button>
-                  </div>
-                </form>
-              )}
-              {error && <p role="alert" className="text-sm text-destructive">{te(error)}</p>}
-            </section>
-          </Box>
-
-          {/* payment: Pending → Paid tree + its button */}
-          <PaymentBox order={o} canChange={canChangeStatus} className="order-3 min-w-0 lg:order-0" />
+          {/* payment: amount, method, Pending → Paid + its button */}
+          <PaymentBox order={o} canChange={canChangeStatus} className="order-2 min-w-0 lg:order-0" />
 
           {/* history */}
           <Box title={t("orders.history")} className="order-4 min-w-0 lg:order-0">
@@ -284,8 +233,157 @@ export function OrderView({ order: o, canChangeStatus }: { order: AdminOrder; ca
   );
 }
 
-/** what was ordered + totals and payment */
-/** payment as a small step tree: Pending → Paid (→ Refunded); one button moves it along, every change goes in the history */
+/** the normal path of an order; "cancelled" is shown apart (it can happen from new / confirmed / packing) */
+const FLOW = ["new", "confirmed", "packing", "shipped", "delivered"] as const satisfies OrderStatus[];
+const shortDate = { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } as const;
+
+/**
+ * order status as a progress bar: New → Confirmed → Packing → Shipped → Delivered.
+ * Done steps are green with ✓ and their time; the next step is a button (the server still only allows one step at a time);
+ * "Cancel order" sits in the card header and asks for a reason.
+ */
+function StatusBox({ order: o, canChange }: { order: AdminOrder; canChange: boolean }) {
+  const t = useTranslations("admin");
+  const te = useTranslations("errors");
+  const format = useFormatter();
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState<ErrorCode>();
+  const [pending, start] = useTransition();
+  const [target, setTarget] = useState<OrderStatus>();
+  const router = useRouter();
+  const next = NEXT_STATUS[o.status];
+  const cancelled = o.status === "cancelled";
+  // when the order reached a step: "new" = when it was placed, else the newest history entry for it
+  const reachedAt = (s: OrderStatus) => (s === "new" ? o.createdAt : o.events.findLast((e) => e.toStatus === s)?.createdAt);
+  // the furthest step reached (a cancelled order: the last step it got to before being cancelled)
+  const reached = cancelled ? Math.max(0, FLOW.findLastIndex((s) => reachedAt(s))) : FLOW.indexOf(o.status as (typeof FLOW)[number]);
+  const forward = next.filter((s) => s !== "cancelled");
+
+  function move(to: OrderStatus, reason?: string) {
+    setError(undefined);
+    setTarget(to);
+    start(async () => {
+      const r = await setOrderStatus(o.id, to, reason);
+      if (!r.ok) {
+        setError(r.fields?.reason ?? r.error);
+        // someone else already moved this order: reload it so the bar shows where it really is
+        if (r.error === "badTransition") router.refresh();
+      } else setCancelling(false);
+    });
+  }
+
+  return (
+    <Box
+      title={t("orders.updateStatus")}
+      className="mb-4 min-w-0"
+      action={
+        canChange &&
+        next.includes("cancelled") &&
+        !cancelling && (
+          <Button variant="outline" size="sm" className="text-destructive" disabled={pending} onClick={() => setCancelling(true)}>
+            <XCircle aria-hidden />
+            {t("orders.confirmCancel")}
+          </Button>
+        )
+      }
+    >
+      <ol className="grid grid-cols-5">
+        {FLOW.map((s, i) => {
+          const done = i <= reached;
+          const current = !cancelled && i === reached;
+          const isNext = canChange && forward.includes(s);
+          const at = done && reachedAt(s);
+          const inner = (
+            <>
+              <span
+                className={cn(
+                  "relative z-10 flex size-9 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
+                  done
+                    ? cancelled
+                      ? "border-muted-foreground/40 bg-muted text-muted-foreground"
+                      : "border-ok-foreground bg-ok-foreground text-background"
+                    : isNext
+                      ? "border-dashed border-foreground/50 bg-card text-foreground group-hover:border-solid group-hover:border-foreground group-hover:bg-foreground group-hover:text-background"
+                      : "border-border bg-card text-muted-foreground",
+                  current && "ring-4 ring-ok",
+                )}
+              >
+                {pending && target === s ? <Loader2 className="size-4 animate-spin" aria-hidden /> : done ? <Check className="size-4" aria-hidden /> : i + 1}
+              </span>
+              <span className={cn("text-xs font-medium md:text-sm", !done && !isNext && "text-muted-foreground", current && "font-semibold")}>{t(`status.${s}`)}</span>
+              {at && <span className="text-[11px] leading-tight text-muted-foreground tabular-nums md:text-xs">{format.dateTime(at, shortDate)}</span>}
+            </>
+          );
+          return (
+            <li key={s} className="relative flex flex-col items-center" aria-current={current ? "step" : undefined}>
+              {/* the line from the previous step to this one: green once this step is reached */}
+              {i > 0 && (
+                <span className={cn("absolute top-[17px] right-1/2 left-[-50%] h-0.5", done && !cancelled ? "bg-ok-foreground" : "bg-border")} aria-hidden />
+              )}
+              {isNext ? (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => move(s)}
+                  aria-label={t("orders.moveTo", { status: t(`status.${s}`) })}
+                  className="group flex min-h-11 cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1 text-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-wait"
+                >
+                  {inner}
+                </button>
+              ) : (
+                <div className="flex flex-col items-center gap-1.5 px-1 text-center">{inner}</div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      {cancelled ? (
+        <div className="flex gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <XCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p className="min-w-0 wrap-break-word">
+            <span className="font-semibold">{t("status.cancelled")}</span>
+            {reachedAt("cancelled") && <span className="tabular-nums"> · {format.dateTime(reachedAt("cancelled")!, shortDate)}</span>}
+            {o.cancelReason && <span className="block text-foreground">{t("orders.cancelReason")}: {o.cancelReason}</span>}
+          </p>
+        </div>
+      ) : next.length && !canChange ? (
+        <p className="text-center text-sm text-muted-foreground">{t("orders.noStatusPermission")}</p>
+      ) : forward.length ? (
+        <p className="text-center text-sm text-muted-foreground">{t("orders.statusHint")}</p>
+      ) : (
+        <p className="text-center text-sm text-muted-foreground">{t("orders.noNext")}</p>
+      )}
+
+      {cancelling && (
+        <form
+          className="flex flex-col gap-2 rounded-lg border p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            move("cancelled", String(new FormData(e.currentTarget).get("reason") ?? ""));
+          }}
+        >
+          <Label htmlFor="reason">{t("orders.cancelReason")} <Req /></Label>
+          <Textarea id="reason" name="reason" required maxLength={300} rows={2} placeholder={t("orders.cancelReasonHint")} />
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setCancelling(false)}>{t("orders.back")}</Button>
+            <Button type="submit" variant="outline" size="sm" className="text-destructive" disabled={pending}>{t("orders.confirmCancel")}</Button>
+          </div>
+        </form>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{te(error)}</p>}
+    </Box>
+  );
+}
+
+const payTone: Record<PaymentStatus, string> = {
+  unpaid: "bg-warn text-warn-foreground",
+  paid: "bg-ok text-ok-foreground",
+  refunded: "bg-muted text-muted-foreground",
+};
+const payAmountLabel = { unpaid: "amountDue", paid: "amountPaid", refunded: "amountRefunded" } as const;
+
+/** payment: the amount big in a coloured panel (amber = waiting, green = paid, grey = refunded), the method, when it changed, one button to move it along */
 function PaymentBox({ order: o, canChange, className }: { order: AdminOrder; canChange: boolean; className?: string }) {
   const t = useTranslations("admin");
   const te = useTranslations("errors");
@@ -300,60 +398,60 @@ function PaymentBox({ order: o, canChange, className }: { order: AdminOrder; can
       const r = await setPaymentStatus(o.id, to);
       if (!r.ok) setError(r.error);
     });
-  // when (and by whom) it last became this status: the newest matching history entry
-  const when = (s: PaymentStatus) => {
-    const e = o.events.findLast((x) => x.payment === s);
-    return e && `${format.dateTime(e.createdAt, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}${e.actor ? ` · ${e.actor}` : ""}`;
-  };
-  const steps: { s: PaymentStatus; done: boolean; at?: string | false }[] = [
-    { s: "unpaid", done: true, at: when("unpaid") || format.dateTime(o.createdAt, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) },
-    { s: "paid", done: status !== "unpaid", at: status !== "unpaid" && when("paid") },
-    ...(status === "refunded" ? [{ s: "refunded" as const, done: true, at: when("refunded") }] : []),
-  ];
+  // when (and by whom) it last became this status: the newest matching history entry (pending = since the order was placed)
+  const last = o.events.findLast((x) => x.payment === status);
+  const since = format.dateTime(last?.createdAt ?? o.createdAt, shortDate);
+  const Method = o.paymentMethod === "cod" ? Banknote : Landmark;
+  const StatusIcon = status === "paid" ? CircleCheck : status === "refunded" ? Undo2 : Clock;
 
   return (
-    <Box title={t("orders.payment")} className={className}>
-      <p className="flex items-center gap-1.5 text-sm font-medium">
-        {o.paymentMethod === "cod" ? <Banknote className="size-4 text-muted-foreground" aria-hidden /> : <Landmark className="size-4 text-muted-foreground" aria-hidden />}
-        {t(`orders.paymentMethods.${o.paymentMethod}`)}
+    <Box title={t("orders.payment")} action={<PaymentPill status={status} />} className={className}>
+      <div className={cn("rounded-xl p-4", payTone[status])}>
+        <p className="text-xs font-medium">{t(`orders.${payAmountLabel[status]}`)}</p>
+        <p className={cn("mt-0.5 text-3xl font-semibold tracking-tight text-foreground tabular-nums", status === "refunded" && "text-muted-foreground")}>
+          {money(o.totalCents)}
+        </p>
+        {o.deliveryPayDriver && <p className="mt-0.5 text-xs">{t("orders.plusDriver")}</p>}
+        <div className="mt-3 flex items-center gap-2 border-t border-current/15 pt-3 text-sm text-foreground">
+          <span className="flex size-8 items-center justify-center rounded-full bg-card">
+            <Method className="size-4 text-muted-foreground" aria-hidden />
+          </span>
+          <span className="font-medium">{t(`orders.paymentMethods.${o.paymentMethod}`)}</span>
+        </div>
+      </div>
+
+      {/* what happened last: "Paid · 19 Nov, 10:21 · Dara" */}
+      <p className="flex items-center gap-1.5 text-sm">
+        <StatusIcon className={cn("size-4 shrink-0", status === "paid" ? "text-ok-foreground" : status === "refunded" ? "text-destructive" : "text-warn-foreground")} aria-hidden />
+        <span className="font-medium">{t(`orders.paymentStatuses.${status}`)}</span>
+        <span className="min-w-0 truncate text-muted-foreground tabular-nums">
+          · {since}
+          {last?.actor && ` · ${last.actor}`}
+        </span>
       </p>
-      {/* the tree: a line down the left, one dot per step (done = ✓, still to come = empty circle) */}
-      <ol className="flex flex-col gap-4 border-l pl-4 text-sm">
-        {steps.map(({ s, done, at }) => (
-          <li key={s} className="relative">
-            {s === "refunded" ? (
-              <Undo2 className="absolute top-0.5 -left-6 size-4 bg-card text-destructive" aria-hidden />
-            ) : done ? (
-              <CircleCheck className="absolute top-0.5 -left-6 size-4 bg-card text-ok-foreground" aria-hidden />
-            ) : (
-              <Circle className="absolute top-0.5 -left-6 size-4 bg-card text-muted-foreground/50" aria-hidden />
-            )}
-            <p className={cn("font-medium", !done && "text-muted-foreground")}>{t(`orders.paymentStatuses.${s}`)}</p>
-            {at && <p className="text-xs text-muted-foreground tabular-nums">{at}</p>}
-          </li>
-        ))}
-      </ol>
+
       {/* the next step: Pending → Mark as paid; Paid → Refund / Undo; Refunded → back to pending */}
       {canChange && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2">
           {status === "unpaid" && (
-            <Button size="sm" disabled={pending} onClick={() => set("paid")}>
+            <Button className="w-full" disabled={pending} onClick={() => set("paid")}>
               <Check aria-hidden />
               {t("orders.markPaid")}
             </Button>
           )}
           {status === "paid" && (
             <>
-              <Button variant="outline" size="sm" className="text-destructive" disabled={pending} onClick={() => set("refunded")}>
-                {t("orders.refund")}
-              </Button>
-              <Button variant="outline" size="sm" disabled={pending} onClick={() => set("unpaid")}>
+              <Button variant="outline" size="sm" className="flex-1" disabled={pending} onClick={() => set("unpaid")}>
                 {t("orders.undoPaid")}
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1 text-destructive" disabled={pending} onClick={() => set("refunded")}>
+                <Undo2 aria-hidden />
+                {t("orders.refund")}
               </Button>
             </>
           )}
           {status === "refunded" && (
-            <Button variant="outline" size="sm" disabled={pending} onClick={() => set("unpaid")}>
+            <Button variant="outline" size="sm" className="w-full" disabled={pending} onClick={() => set("unpaid")}>
               {t("orders.undoPaid")}
             </Button>
           )}
@@ -364,6 +462,7 @@ function PaymentBox({ order: o, canChange, className }: { order: AdminOrder; can
   );
 }
 
+/** what was ordered + totals */
 function ItemsBox({ order: o, className }: { order: AdminOrder; className?: string }) {
   const t = useTranslations("admin");
   return (
