@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
+import { GripVertical, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { Img } from "@/components/Img";
@@ -17,7 +17,8 @@ import { formatPrice, thumbUrl } from "@/lib/shop";
 import type { ErrorCode } from "@/lib/result";
 import { formatBytes } from "@/lib/compress-image";
 import { uploadImage } from "@/lib/upload-image";
-import { cn, latinDigits } from "@/lib/utils";
+import { useFlip } from "@/lib/use-flip";
+import { cn, dragLifted, dragRow, latinDigits } from "@/lib/utils";
 import { saveItem } from "./actions";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { SizePicker } from "./SizePicker";
@@ -107,7 +108,8 @@ export function ItemForm({
   // the other photos that belong to no variant (older products kept them as unnamed variants; they come back here)
   const [gallery, setGallery] = useState(() => (item?.images ?? []).filter((u) => u !== photo && !isVariantPhoto(u)));
   const [variants, setVariants] = useState(() =>
-    (item?.variants ?? []).map((v) => ({ key: v.image || crypto.randomUUID(), image: v.image, label: v.label, code: v.code ?? "", price: dollars(v.priceCents) })),
+    // key = the row's own id (two variants may share a photo, so not the photo): drag, upload messages and React rows use it
+    (item?.variants ?? []).map((v, i) => ({ key: `saved-${i}`, image: v.image, label: v.label, code: v.code ?? "", price: dollars(v.priceCents) })),
   );
   const [sizePrices, setSizePrices] = useState<Record<string, string>>(() =>
     Object.fromEntries((item?.sizes ?? []).map((x) => [x.sizeId, dollars(x.priceCents)])),
@@ -122,6 +124,19 @@ export function ItemForm({
   const uploading = busy.length > 0;
   const setVariant = (key: string, patch: { image?: string; label?: string; code?: string; price?: string }) =>
     setVariants((all) => all.map((v) => (v.key === key ? { ...v, ...patch } : v)));
+  // drag ⠿ to reorder the variants (same handle as categories / products); the new order is saved with the product,
+  // and the shop shows the variants in this order
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  // the other variants slide to their new place while one is dragged
+  const variantList = useFlip<HTMLUListElement>("data-variant", variants.map((v) => v.key).join(), dragKey);
+  const moveVariant = (key: string, to: number) =>
+    setVariants((all) => {
+      const from = all.findIndex((v) => v.key === key);
+      if (from < 0 || to < 0 || to >= all.length || from === to) return all;
+      const next = [...all];
+      next.splice(to, 0, ...next.splice(from, 1));
+      return next;
+    });
   // last upload's message under its own box ("main" or a variant): an error, or "4.2 MB → 210 KB" after shrinking
   const [upMsg, setUpMsg] = useState<{ key: string; error?: ErrorCode; size?: string }>();
   const upload = (key: string, file: File | undefined, done: (url: string) => void) => {
@@ -376,6 +391,7 @@ export function ItemForm({
             {variants.length > 0 && (
               <>
                 <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground" aria-hidden>
+                  {variants.length > 1 && <span className="-mr-1 w-7 shrink-0" />}
                   <span className="w-11 shrink-0">{t("photoShort")} <Req /></span>
                   <span className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
                     <span>{t("variantName")} <Opt /></span>
@@ -384,10 +400,41 @@ export function ItemForm({
                   <span className="w-28 shrink-0">{t("price")} <Opt /></span>
                   <span className="w-11 shrink-0" />
                 </div>
-                <ul className="divide-y">
-                  {variants.map((v) => (
-                    <li key={v.key} className="flex flex-col gap-1 px-3 py-2">
+                <ul ref={variantList} className="divide-y">
+                  {variants.map((v, i) => (
+                    <li
+                      key={v.key}
+                      data-variant={v.key}
+                      className={cn("flex flex-col gap-1 px-3 py-2", dragRow, dragKey === v.key && dragLifted)}
+                    >
                       <div className="flex items-center gap-2">
+                        {/* drag handle: mouse + touch via pointer events, keyboard via ↑/↓ */}
+                        {variants.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={t("reorder", { name: v.label.trim() || `${t("variants")} ${i + 1}` })}
+                            className="-mr-1 flex h-11 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
+                            onPointerDown={(e) => {
+                              e.currentTarget.setPointerCapture(e.pointerId);
+                              setDragKey(v.key);
+                            }}
+                            onPointerMove={(e) => {
+                              if (dragKey !== v.key) return;
+                              const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-variant]")?.dataset.variant;
+                              if (over && over !== v.key) moveVariant(v.key, variants.findIndex((x) => x.key === over));
+                            }}
+                            onPointerUp={() => setDragKey(null)}
+                            onPointerCancel={() => setDragKey(null)}
+                            onKeyDown={(e) => {
+                              const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+                              if (!d) return;
+                              e.preventDefault();
+                              moveVariant(v.key, i + d);
+                            }}
+                          >
+                            <GripVertical className="size-4" aria-hidden />
+                          </button>
+                        )}
                         <div className="size-11 shrink-0">
                           <PhotoPick url={v.image} busy={busy.includes(v.key)} label={t("uploadPhoto")} onFile={(f) => upload(v.key, f, (image) => setVariant(v.key, { image }))} />
                         </div>
