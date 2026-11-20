@@ -241,7 +241,8 @@
       "amountDue": "Amount to collect",
       "amountPaid": "Amount paid",
       "amountRefunded": "Amount refunded",
-      "plusDriver": "+ delivery fee paid to the driver"
+      "plusDriver": "+ delivery fee paid to the driver",
+      "datePlaceholder": "dd/mm/yyyy"
     },
     "menu": {
       "title": "Menu",

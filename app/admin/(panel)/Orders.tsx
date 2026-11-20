@@ -20,6 +20,7 @@ import type { OrderStatus, PaymentStatus } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { ORDER_STATUSES } from "@/lib/order-status";
 import { localPhone, money, PaymentPill, StatusPill } from "./order-ui";
+import { DateField } from "./DateField";
 import type { AdminOrderRow, OrderStats } from "./order-types";
 
 // ponytail: sort + paging in the browser (the page loads the newest 200 orders)
@@ -59,23 +60,25 @@ export function Orders({ orders, stats, periodStarts, range, canDelete }: {
   const [tab, setTab] = useState<OrderStatus | "all">("all");
   // payment filter next to the status tabs (null = any)
   const [pay, setPay] = useState<PaymentStatus | null>(null);
-  const [period, setPeriod] = useState<Period>(range ? "custom" : "all");
+  // opens on This week (a custom range in the address wins)
+  const [period, setPeriod] = useState<Period>(range ? "custom" : "week");
   // Custom range: the two days as typed; both set → the server loads that range
   const [from, setFrom] = useState(range?.from ?? "");
   const [to, setTo] = useState(range?.to ?? "");
   const router = useRouter();
   const [loadingRange, startRange] = useTransition();
+  // the admin picks both days (nothing is filled in for them); the range loads once both are set
   const applyRange = (f: string, tt: string) => {
     if (!f || !tt || f > tt) return;
     setPeriod("custom");
     setPage(0);
     startRange(() => router.push(`/admin/orders?from=${f}&to=${tt}`));
   };
-  // back to All dates: empty boxes; a loaded range → load the newest orders again
+  // back to the default (This week): empty boxes; a loaded range → load the newest orders again
   const clearRange = () => {
     setFrom("");
     setTo("");
-    setPeriod("all");
+    setPeriod("week");
     setPage(0);
     if (range) startRange(() => router.push("/admin/orders"));
   };
@@ -226,26 +229,8 @@ export function Orders({ orders, stats, periodStarts, range, canDelete }: {
         </div>
       </div>
 
-      {/* date filter row: From – To (Cambodia days, both included; loads once both are set), then the preset period */}
+      {/* date filter row: preset period first, then From – To (Cambodia days, both included; loads once both are set) */}
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted-foreground">{t("orders.from")}</span>
-          <Input
-            type="date"
-            value={from}
-            max={to || undefined}
-            onChange={(e) => { setFrom(e.target.value); applyRange(e.target.value, to); }}
-            aria-label={t("orders.from")}
-            className="h-8 w-auto px-3 text-sm md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-60"
-          />
-          <span className="text-muted-foreground">{t("orders.to")}</span>
-          <Input
-            type="date"
-            value={to}
-            min={from || undefined}
-            onChange={(e) => { setTo(e.target.value); applyRange(from, e.target.value); }}
-            aria-label={t("orders.to")}
-            className="h-8 w-auto px-3 text-sm md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-60"
-          />
           <Select
             // dates typed in the boxes → no preset picked (shows "Report period")
             value={period === "custom" ? "" : period}
@@ -267,6 +252,20 @@ export function Orders({ orders, stats, periodStarts, range, canDelete }: {
               ))}
             </SelectContent>
           </Select>
+          <span className="ml-1 text-muted-foreground">{t("orders.from")}</span>
+          <DateField
+            value={from}
+            max={to || undefined}
+            onChange={(v) => { setFrom(v); applyRange(v, to); }}
+            label={t("orders.from")}
+          />
+          <span className="text-muted-foreground">{t("orders.to")}</span>
+          <DateField
+            value={to}
+            min={from || undefined}
+            onChange={(v) => { setTo(v); applyRange(from, v); }}
+            label={t("orders.to")}
+          />
           {(from || to) && (
             <Button type="button" variant="ghost" size="sm" onClick={clearRange}>
               {t("orders.clearRange")}
