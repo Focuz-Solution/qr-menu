@@ -55,8 +55,8 @@ export type OrderStats = {
   revenueTodayCents: number;
   /** all-time count per status (tabs) */
   counts: Record<OrderStatus, number>;
-  /** the summary cards when the date filter is This week / month / year (counted in the database, not just the loaded rows) */
-  periods: Record<"week" | "month" | "year", PeriodStats> & {
+  /** the summary cards when the date filter is Today / Yesterday / This week / month / year (counted in the database, not just the loaded rows) */
+  periods: Record<"today" | "yesterday" | "week" | "month" | "year", PeriodStats> & {
     /** the custom date range (?from=…&to=…), when one is picked */
     custom?: PeriodStats;
   };

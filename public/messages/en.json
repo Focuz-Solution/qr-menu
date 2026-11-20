@@ -144,6 +144,8 @@
       "reportPeriod": "Report period",
       "period": {
         "all": "All dates",
+        "today": "Today",
+        "yesterday": "Yesterday",
         "week": "This week",
         "month": "This month",
         "year": "This year",
@@ -207,6 +209,14 @@
       "confirmCancel": "Cancel order",
       "back": "Back",
       "cards": {
+        "today": {
+          "orders": "Orders today",
+          "revenue": "Revenue today"
+        },
+        "yesterday": {
+          "orders": "Orders yesterday",
+          "revenue": "Revenue yesterday"
+        },
         "week": {
           "orders": "Orders this week",
           "revenue": "Revenue this week"

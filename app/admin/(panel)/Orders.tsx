@@ -30,7 +30,7 @@ const TAB =
   "h-12 gap-2 rounded-none border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-transparent data-[state=on]:border-foreground data-[state=on]:bg-transparent data-[state=on]:text-foreground";
 // payment tabs: a dot in the payment pill's colour
 const PAY_DOT: Record<PaymentStatus, string> = { unpaid: "bg-warn-foreground", paid: "bg-ok-foreground", refunded: "bg-muted-foreground" };
-const periods = ["all", "week", "month", "year", "custom"] as const;
+const periods = ["all", "today", "yesterday", "week", "month", "year", "custom"] as const;
 type Period = (typeof periods)[number];
 type Preset = Exclude<Period, "custom">;
 type SortKey = "orderNo" | "createdAt" | "customerName" | "totalCents" | "status";
@@ -60,8 +60,8 @@ export function Orders({ orders, stats, periodStarts, range, canDelete }: {
   const [tab, setTab] = useState<OrderStatus | "all">("all");
   // payment filter next to the status tabs (null = any)
   const [pay, setPay] = useState<PaymentStatus | null>(null);
-  // opens on This week (a custom range in the address wins)
-  const [period, setPeriod] = useState<Period>(range ? "custom" : "week");
+  // opens on Today (a custom range in the address wins)
+  const [period, setPeriod] = useState<Period>(range ? "custom" : "today");
   // Custom range: the two days as typed; both set → the server loads that range
   const [from, setFrom] = useState(range?.from ?? "");
   const [to, setTo] = useState(range?.to ?? "");
@@ -74,11 +74,11 @@ export function Orders({ orders, stats, periodStarts, range, canDelete }: {
     setPage(0);
     startRange(() => router.push(`/admin/orders?from=${f}&to=${tt}`));
   };
-  // back to the default (This week): empty boxes; a loaded range → load the newest orders again
+  // back to the default (Today): empty boxes; a loaded range → load the newest orders again
   const clearRange = () => {
     setFrom("");
     setTo("");
-    setPeriod("week");
+    setPeriod("today");
     setPage(0);
     if (range) startRange(() => router.push("/admin/orders"));
   };
@@ -89,7 +89,11 @@ export function Orders({ orders, stats, periodStarts, range, canDelete }: {
   const query = q.trim().toLowerCase();
   const digits = query.replace(/\D/g, "");
   // custom: the server already loaded only that range
-  const periodOrders = period === "custom" ? orders : orders.filter((order) => +order.createdAt >= periodStarts[period]);
+  // a preset: since its start (Yesterday also stops where today starts)
+  const periodOrders =
+    period === "custom"
+      ? orders
+      : orders.filter((order) => +order.createdAt >= periodStarts[period] && (period !== "yesterday" || +order.createdAt < periodStarts.today));
   const shown = periodOrders.filter(
     (o) =>
       (tab === "all" || o.status === tab) &&
