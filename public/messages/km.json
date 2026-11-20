@@ -241,7 +241,8 @@
       "amountDue": "ចំនួនត្រូវប្រមូល",
       "amountPaid": "ចំនួនបានបង់",
       "amountRefunded": "ចំនួនបានសងវិញ",
-      "plusDriver": "+ ថ្លៃដឹកបង់ឱ្យអ្នកដឹក"
+      "plusDriver": "+ ថ្លៃដឹកបង់ឱ្យអ្នកដឹក",
+      "datePlaceholder": "dd/mm/yyyy"
     },
     "menu": {
       "title": "ម៉ឺនុយ",
