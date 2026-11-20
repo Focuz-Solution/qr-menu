@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatPrice, thumbUrl } from "@/lib/shop";
-import { cn } from "@/lib/utils";
+import { useFlip } from "@/lib/use-flip";
+import { cn, dragLifted, dragRow } from "@/lib/utils";
 import type { AdminItem } from "./types";
 
 const money = (cents: number) => formatPrice(cents / 100);
@@ -66,6 +67,8 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
     setDragOrder(null);
   };
   const { pages, current, rows } = paginate(sorted, page, PAGE_SIZE);
+  // the other rows slide to their new place while one is dragged
+  const body = useFlip<HTMLTableSectionElement>("data-item", rows.map((i) => i.id).join(), dragId);
   const onSort = (key: SortKey) => {
     setSort((s) => (s.key !== key ? { key, desc: true } : s.desc ? { key, desc: false } : { key: "order", desc: false }));
     setPage(0);
@@ -84,15 +87,16 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
             <TableHead className="pr-4 text-right">{t("actions")}</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody ref={body}>
           {rows.map((item) => (
             <TableRow
               key={item.id}
               data-item={item.id}
               className={cn(
                 "h-16 hover:bg-transparent",
-                (!item.isAvailable || !item.isVisible) && "opacity-60",
-                dragId === item.id && "relative z-10 bg-background opacity-100 shadow-md",
+                dragRow,
+                (!item.isAvailable || !item.isVisible) && dragId !== item.id && "opacity-60",
+                dragId === item.id && dragLifted,
               )}
             >
               {/* drag handle (shop order only): mouse + touch via pointer events (saved on release), keyboard via ↑/↓ */}
