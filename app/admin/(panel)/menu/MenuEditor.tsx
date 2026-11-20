@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import type { ErrorCode, Result } from "@/lib/result";
-import { cn } from "@/lib/utils";
+import { useFlip } from "@/lib/use-flip";
+import { cn, dragLifted, dragRow } from "@/lib/utils";
 import { createCategory, deleteCategory, deleteItem, reorderCategories, reorderItems, setItemFlags, updateCategory } from "./actions";
 import { ItemForm } from "./ItemForm";
 import { ProductTable } from "./ProductTable";
@@ -51,6 +52,8 @@ export function MenuEditor({ categories, items, sizes }: { categories: AdminCate
   const panel = useRef<HTMLDivElement>(null);
 
   const shownCats = dragOrder ? dragOrder.map((id) => cats.find((c) => c.id === id)!) : cats;
+  // the other categories slide to their new place while one is dragged
+  const catList = useFlip<HTMLUListElement>("data-cat", shownCats.map((c) => c.id).join(), dragId);
   const cat = cats.find((c) => c.id === catId) ?? cats[0];
   const catItems = cat ? list.filter((i) => i.categoryId === cat.id) : [];
   const countOf = (id: string) => list.filter((i) => i.categoryId === id).length;
@@ -122,7 +125,7 @@ export function MenuEditor({ categories, items, sizes }: { categories: AdminCate
             </Button>
           </div>
 
-          <ul aria-label={t("categories")} className="divide-y">
+          <ul ref={catList} aria-label={t("categories")} className="divide-y">
             {shownCats.map((c, i) => {
               const selected = c.id === cat?.id;
               return (
@@ -131,8 +134,9 @@ export function MenuEditor({ categories, items, sizes }: { categories: AdminCate
                   data-cat={c.id}
                   className={cn(
                     "flex items-stretch",
-                    selected && "bg-foreground/5 shadow-[inset_3px_0_0_var(--color-foreground)]",
-                    dragId === c.id && "relative z-10 bg-background shadow-md",
+                    dragRow,
+                    selected && dragId !== c.id && "bg-foreground/5 shadow-[inset_3px_0_0_var(--color-foreground)]",
+                    dragId === c.id && dragLifted,
                   )}
                 >
                   {renamingId === c.id ? (
