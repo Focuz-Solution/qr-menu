@@ -32,6 +32,9 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
   const year = localToday.getUTCFullYear();
   const periodStarts = {
     all: 0,
+    today: +today,
+    // yesterday also ends where today starts (the list and the cards stop there)
+    yesterday: +today - DAY,
     week: +today - ((localToday.getUTCDay() + 6) % 7) * DAY,
     month: Date.UTC(year, localToday.getUTCMonth(), 1) - KH_OFFSET,
     year: Date.UTC(year, 0, 1) - KH_OFFSET,
@@ -54,7 +57,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
     };
   };
 
-  const [rows, byStatus, todayCount, todayRevenue, week, month, yearStats, custom] = await Promise.all([
+  const [rows, byStatus, todayStats, yesterday, week, month, yearStats, custom] = await Promise.all([
     prisma.order.findMany({
       // a custom range loads that range's orders (so older ones are found too), else the newest
       where: { shopId: user.shop.id, ...(range && { createdAt: { gte: new Date(rangeFrom), lt: new Date(rangeTo) } }) },
@@ -64,8 +67,8 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
       select: orderListSelect,
     }),
     prisma.order.groupBy({ by: ["status"], where: { shopId: user.shop.id }, _count: { _all: true } }),
-    prisma.order.count({ where: { shopId: user.shop.id, createdAt: { gte: today } } }),
-    prisma.order.aggregate({ where: { shopId: user.shop.id, createdAt: { gte: today }, status: { not: "cancelled" } }, _sum: { totalCents: true } }),
+    periodStats(periodStarts.today),
+    periodStats(periodStarts.yesterday, periodStarts.today),
     periodStats(periodStarts.week),
     periodStats(periodStarts.month),
     periodStats(periodStarts.year),
@@ -75,12 +78,12 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
   const orders: AdminOrderRow[] = rows.map(toAdminOrderRow);
 
   const stats: OrderStats = {
-    today: todayCount,
-    revenueTodayCents: todayRevenue._sum.totalCents ?? 0,
+    today: todayStats.orders,
+    revenueTodayCents: todayStats.revenueCents,
     counts: Object.fromEntries(
       ORDER_STATUSES.map((s) => [s, byStatus.find((b) => b.status === s)?._count._all ?? 0]),
     ) as OrderStats["counts"],
-    periods: { week, month, year: yearStats, custom },
+    periods: { today: todayStats, yesterday, week, month, year: yearStats, custom },
   };
 
   // keyed by the range: a new range starts the list fresh (page 1, its own tab counts)
