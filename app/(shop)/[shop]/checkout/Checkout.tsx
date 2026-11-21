@@ -19,7 +19,7 @@ import { clearCart, setQty, useCart } from "@/lib/cart";
 import { feeFor, nextStep, optionsFor, type Zone } from "@/lib/orders";
 import { PROVINCES } from "@/lib/provinces";
 import type { ErrorCode } from "@/lib/result";
-import { formatPrice, type Lang, pick, thumbUrl } from "@/lib/shop";
+import { formatPrice, type Lang, pick, thumbUrl, unitPrice, wholesaleSteps } from "@/lib/shop";
 import { cn } from "@/lib/utils";
 import { BackButton } from "../products/[slug]/BackButton";
 import { connectTelegram, createOrder } from "./actions";
@@ -341,8 +341,13 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                     <span className="line-clamp-2 text-sm">{pick(i.product.name, lang)}</span>
                     {/* the picked variant: its own line, small, bold, in the shop colour */}
                     {vname(i) && <span className="text-xs font-semibold text-primary">{vname(i)}</span>}
+                    <WholesaleNote line={i} />
                   </span>
-                  <span className="text-sm font-medium tabular-nums">{formatPrice(i.price * i.qty)}</span>
+                  <span className="flex flex-col items-end">
+                    {/* wholesale step reached: the normal total crossed out above the lower one */}
+                    {i.price < i.fullPrice && <span className="text-xs text-muted-foreground line-through tabular-nums">{formatPrice(i.fullPrice * i.qty)}</span>}
+                    <span className="text-sm font-medium tabular-nums">{formatPrice(i.price * i.qty)}</span>
+                  </span>
                 </div>
                 {/* quantity: − stops at 1; the bin removes the line */}
                 <div className="flex items-center justify-between">
@@ -575,6 +580,20 @@ function TelegramConnect({ botId, shop, user, onChange }: { botId: string; shop:
         </Button>
       )}
     </div>
+  );
+}
+
+/** under a cart line: "Wholesale price · $40.50 each" once a step is reached, and/or "Buy 30+ for $36.00 each" for the next one */
+function WholesaleNote({ line }: { line: ReturnType<typeof useCart>["items"][number] }) {
+  const t = useTranslations("checkout");
+  const { product, image, size, qty, price, fullPrice } = line;
+  const next = wholesaleSteps(product, image).find((s) => s.minQty > qty);
+  if (price >= fullPrice && !next) return null;
+  return (
+    <>
+      {price < fullPrice && <span className="text-xs font-medium text-ok-foreground">{t("wholesaleNow", { price: formatPrice(price) })}</span>}
+      {next && <span className="text-xs text-muted-foreground">{t("wholesaleNext", { qty: next.minQty, price: formatPrice(unitPrice(product, image, size?.id, next.minQty)) })}</span>}
+    </>
   );
 }
 

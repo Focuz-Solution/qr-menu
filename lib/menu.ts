@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import type { Product, ShopCategory, Variant } from "@/lib/shop";
+import { cleanTiers, type Tiers } from "@/lib/wholesale";
 import { prisma } from "@/lib/db";
 
 const BADGE = { new: "new", best_seller: "best", sale: "sale" } as const;
@@ -24,6 +25,7 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
           include: {
             images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
             sizes: { orderBy: { size: { sortOrder: "asc" } }, select: { priceCents: true, size: { select: { id: true, name: true } } } },
+            wholesale: { select: { isActive: true, tiers: true } },
           },
         },
       },
@@ -34,6 +36,13 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
         // pick() falls back to it, so the text isn't sent to the browser twice
         const one = (s: string) => ({ km: s, en: "" });
         const [image = "", ...images] = i.images.map((x) => x.url);
+        // wholesale steps only when turned on; rows without steps are left out
+        const tiers = i.wholesale?.isActive
+          ? Object.entries((i.wholesale.tiers ?? {}) as Record<string, unknown>).flatMap(([k, v]) => {
+              const steps = cleanTiers(v);
+              return steps.length ? [[k, steps] as const] : [];
+            })
+          : [];
         const variants = (Array.isArray(i.variants) ? i.variants : []) as { label: string; hex?: string; image?: string; priceCents?: number }[];
         return {
           slug: i.slug,
@@ -50,6 +59,7 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
           description: one(i.description),
           badges: i.badge ? [BADGE[i.badge]] : [],
           inStock: i.isAvailable,
+          wholesale: tiers.length ? (Object.fromEntries(tiers) as Tiers) : undefined,
         };
       }),
     );
