@@ -1,10 +1,10 @@
 "use client";
 
 import { useShopPath, useShopSlug } from "@/lib/shop-path";
-import { Banknote, CheckCircle2, Landmark, Loader2, Minus, Plus, Send, Trash2, X } from "lucide-react";
+import { Banknote, CheckCircle2, Landmark, Loader2, LocateFixed, Minus, Plus, Send, Tag, Trash2, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Opt, Req } from "@/components/FieldMark";
 import { TelegramCircleIcon } from "@/components/icons";
@@ -16,7 +16,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { clearCart, setQty, useCart } from "@/lib/cart";
-import { feeFor, nextStep, optionsFor, type Zone } from "@/lib/orders";
+import { QtyInput } from "@/components/QtyInput";
+import { feeFor, mapCoords, MAX_QTY, nextStep, optionsFor, type Zone } from "@/lib/orders";
+import { provinceAt } from "@/lib/province-at";
 import { PROVINCES } from "@/lib/provinces";
 import type { ErrorCode } from "@/lib/result";
 import { formatPrice, type Lang, pick, thumbUrl, unitPrice, wholesaleSteps } from "@/lib/shop";
@@ -88,9 +90,19 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
     [v && (v.label || tp("optionN", { n: v.n })), size?.name].filter(Boolean).join(" · ");
   const lang = useLocale() as Lang;
   const { items, total } = useCart();
-  // every order starts with an empty form; only a connected Telegram is remembered on the phone (per shop, 30 days).
-  // Safe to read here: the form only renders in the browser (on the server the cart is empty).
-  const [d, setD] = useState<Details>(() => ({ ...EMPTY, telegram: savedTelegram(shopSlug) }));
+  // remembered on this device, per shop: the receiver's name + phone from the last order (savedReceiver) and a connected
+  // Telegram (30 days); everything else starts empty. Safe to read here: the form only renders in the browser
+  // (on the server the cart is empty).
+  const [d, setD] = useState<Details>(() => ({ ...EMPTY, ...savedReceiver(shopSlug), telegram: savedTelegram(shopSlug) }));
+  // the name / phone came from the last order: a "Not you? Clear" link under them (gone once cleared)
+  const [remembered, setRemembered] = useState(() => !!savedReceiver(shopSlug).name);
+  const forgetReceiver = () => {
+    try {
+      localStorage.removeItem(RECEIVER_KEY(shopSlug));
+    } catch {}
+    setD((x) => ({ ...x, name: "", phone: "" }));
+    setRemembered(false);
+  };
   // the province guessed from the customer's network (app/api/region): pre-selected only while they haven't picked one,
   // and only when a delivery zone covers it; no guess (or an error) → they pick it themselves
   useEffect(() => {
@@ -103,6 +115,49 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
       .catch(() => {});
     return () => ctrl.abort();
   }, [zones]);
+  // "Use my location" next to the province (the only GPS button): the phone's location (asks permission) → the province
+  // it's in (worked out on the phone, lib/province-at) is selected and the map pin goes there.
+  // Not covered by a delivery zone → the usual "we don't deliver there" message.
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState<"locationError" | "locationOutside">();
+  // the location found: the map below flies there and drops the pin (one button for both)
+  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
+  const pickProvince = (provinceCode: string) => {
+    setD((x) => (x.provinceCode === provinceCode ? x : { ...x, provinceCode, deliveryZoneId: "", payDriver: false }));
+    clear("province");
+    clear("deliveryZoneId");
+  };
+  function locateMe() {
+    setLocError(undefined);
+    if (!navigator.geolocation) return setLocError("locationError"); // old browser / not https
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const code = await provinceAt(lat, lng).catch(() => null);
+        setLocating(false);
+        if (code) {
+          pickProvince(code);
+          setHere({ lat, lng });
+        } else setLocError("locationOutside");
+      },
+      () => {
+        setLocating(false);
+        setLocError("locationError");
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
+    );
+  }
+  // a pin placed on the map by hand also picks the province — only while none is chosen yet
+  // (so dragging the map around afterwards does no work)
+  const provinceFromPin = (mapUrl: string) => {
+    if (d.provinceCode) return;
+    const [lat, lng] = (mapCoords(mapUrl) ?? "").split(",").map(Number);
+    if (!mapUrl || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    provinceAt(lat, lng)
+      .then((code) => code && setD((x) => (x.provinceCode ? x : { ...x, provinceCode: code, deliveryZoneId: "", payDriver: false })))
+      .catch(() => {});
+  };
   const setTelegram = (telegram: TelegramUser | null) => {
     setD((x) => ({ ...x, telegram }));
     try {
@@ -153,6 +208,8 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
       }
       try {
         localStorage.removeItem(SAVED);
+        // filled in for the next order on this device (they can change or clear it then)
+        localStorage.setItem(RECEIVER_KEY(shopSlug), JSON.stringify({ name: d.name.trim(), phone: d.phone.trim() }));
       } catch {}
       onDone({
         orderNo: r.data!.orderNo,
@@ -188,7 +245,18 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
       <div className="contents md:flex md:min-w-0 md:flex-col md:gap-5">
         {/* who receives it */}
         <section className="flex min-w-0 flex-col gap-4 rounded-2xl border p-4">
-          <h2 className="font-semibold">{t("receiver")}</h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 className="font-semibold">{t("receiver")}</h2>
+            {/* filled in from this device's last order: say so, and let someone else clear it */}
+            {remembered && (d.name || d.phone) && (
+              <p className="text-xs text-muted-foreground">
+                {t("receiverRemembered")}{" "}
+                <button type="button" onClick={forgetReceiver} className="inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-2">
+                  {t("receiverClear")}
+                </button>
+              </p>
+            )}
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="name">{t("name")} <Req /></Label>
@@ -209,17 +277,24 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
         <section className="flex min-w-0 flex-col gap-4 rounded-2xl border p-4">
           <h2 className="font-semibold">{t("deliverTo")}</h2>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="province">{t("province")} <Req /></Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="province">{t("province")} <Req /></Label>
+              {/* one tap: the phone's location picks the province (permission is asked only then) */}
+              <Button type="button" variant="ghost" size="sm" className="-mr-2 h-11 text-primary" disabled={locating} onClick={locateMe}>
+                {locating ? <Loader2 className="animate-spin" aria-hidden /> : <LocateFixed aria-hidden />}
+                {t(locating ? "locating" : "useMyLocation")}
+              </Button>
+            </div>
             <ProvincePicker
               id="province"
               value={d.provinceCode}
               onChange={(provinceCode) => {
-                setD((x) => ({ ...x, provinceCode, deliveryZoneId: "", payDriver: false }));
-                clear("province");
-                clear("deliveryZoneId");
+                setLocError(undefined);
+                pickProvince(provinceCode);
               }}
               invalid={!!fields.province || noDelivery}
             />
+            {locError && <p role="alert" className="text-xs text-destructive">{t(locError)}</p>}
             {noDelivery && !fields.province && <p className="text-xs text-destructive">{t("noDelivery")}</p>}
             {err("province")}
             {!!options.length && (
@@ -284,7 +359,14 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
             <Label asChild>
               <p>{t("mapUrl")} <Opt /></p>
             </Label>
-            <MapPicker value={d.mapUrl} onChange={(mapUrl) => set("mapUrl")({ target: { value: mapUrl } })} />
+            <MapPicker
+              value={d.mapUrl}
+              goTo={here}
+              onChange={(mapUrl) => {
+                set("mapUrl")({ target: { value: mapUrl } });
+                provinceFromPin(mapUrl);
+              }}
+            />
             {err("mapUrl")}
           </div>
           <div className="flex flex-col gap-1.5">
@@ -331,7 +413,8 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
         <h2 className="font-semibold">{t("summary")}</h2>
         <ul className="flex flex-col gap-3">
           {items.map((i) => (
-            <li key={i.key} className="flex gap-3">
+            <li key={i.key} className="flex flex-col gap-2">
+              <div className="flex gap-3">
               <Link href={path(`/products/${i.product.slug}`)} className="shrink-0">
                 <Img src={thumbUrl(i.image)} alt={pick(i.product.name, lang)} sizes="56px" className="size-14 rounded-lg" />
               </Link>
@@ -341,12 +424,19 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                     <span className="line-clamp-2 text-sm">{pick(i.product.name, lang)}</span>
                     {/* the picked variant: its own line, small, bold, in the shop colour */}
                     {vname(i) && <span className="text-xs font-semibold text-primary">{vname(i)}</span>}
-                    <WholesaleNote line={i} />
                   </span>
                   <span className="flex flex-col items-end">
                     {/* wholesale step reached: the normal total crossed out above the lower one */}
                     {i.price < i.fullPrice && <span className="text-xs text-muted-foreground line-through tabular-nums">{formatPrice(i.fullPrice * i.qty)}</span>}
                     <span className="text-sm font-medium tabular-nums">{formatPrice(i.price * i.qty)}</span>
+                    {/* the wholesale price this line gets: a small green tag under its total ("Wholesale price · …" for screen readers) */}
+                    {i.price < i.fullPrice && (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-ok px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-ok-foreground tabular-nums">
+                        <CheckCircle2 className="size-3" aria-hidden />
+                        <span aria-hidden>{t("wholesaleEach", { price: formatPrice(i.price) })}</span>
+                        <span className="sr-only">{t("wholesaleNow", { price: formatPrice(i.price) })}</span>
+                      </span>
+                    )}
                   </span>
                 </div>
                 {/* quantity: − stops at 1; the bin removes the line */}
@@ -355,8 +445,8 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                     <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label={tc("less")} disabled={i.qty <= 1} onClick={() => setQty(i.key, Math.max(1, i.qty - 1))}>
                       <Minus className="size-3.5" aria-hidden />
                     </Button>
-                    <span className="min-w-6 text-center text-sm font-medium tabular-nums">{i.qty}</span>
-                    <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label={tc("more")} disabled={i.qty >= 99} onClick={() => setQty(i.key, i.qty + 1)}>
+                    <QtyInput value={i.qty} onChange={(q) => setQty(i.key, q)} label={tc("quantity")} className="min-w-6 text-sm" />
+                    <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label={tc("more")} disabled={i.qty >= MAX_QTY} onClick={() => setQty(i.key, i.qty + 1)}>
                       <Plus className="size-3.5" aria-hidden />
                     </Button>
                   </div>
@@ -365,6 +455,9 @@ function CheckoutForm({ zones, minOrderCents, telegramBotId, onDone }: { zones: 
                   </Button>
                 </div>
               </div>
+              </div>
+              {/* wholesale: full width under the line (the name column is too narrow for it) */}
+              <WholesaleNote line={i} />
             </li>
           ))}
         </ul>
@@ -457,6 +550,16 @@ function ReceiptView({ receipt: r }: { receipt: Receipt }) {
       </Button>
     </div>
   );
+}
+
+// the receiver's name + phone from the last order on this device, per shop (filled in next time; "Clear" forgets it)
+const RECEIVER_KEY = (shop: string) => `receiver:${shop}`;
+function savedReceiver(shop: string): { name: string; phone: string } {
+  try {
+    const r = JSON.parse(localStorage.getItem(RECEIVER_KEY(shop)) ?? "null") as { name?: unknown; phone?: unknown } | null;
+    if (r && typeof r.name === "string" && typeof r.phone === "string") return { name: r.name.slice(0, 80), phone: r.phone.slice(0, 40) };
+  } catch {}
+  return { name: "", phone: "" };
 }
 
 // the connected Telegram, remembered per shop; same 30 days as the server accepts (verifyTelegramLogin in lib/telegram.ts).
@@ -583,17 +686,33 @@ function TelegramConnect({ botId, shop, user, onChange }: { botId: string; shop:
   );
 }
 
-/** under a cart line: "Wholesale price · $40.50 each" once a step is reached, and/or "Buy 30+ for $36.00 each" for the next one */
+/**
+ * under a cart line, full width: the next wholesale step — "Buy 3000+ for $10.00 each" with a "+2,900" button that
+ * raises the quantity to it in one tap (the price already reached is the green tag under the line's total)
+ */
 function WholesaleNote({ line }: { line: ReturnType<typeof useCart>["items"][number] }) {
   const t = useTranslations("checkout");
-  const { product, image, size, qty, price, fullPrice } = line;
+  const format = useFormatter();
+  const { key, product, image, size, qty } = line;
   const next = wholesaleSteps(product, image).find((s) => s.minQty > qty);
-  if (price >= fullPrice && !next) return null;
+  if (!next) return null;
   return (
-    <>
-      {price < fullPrice && <span className="text-xs font-medium text-ok-foreground">{t("wholesaleNow", { price: formatPrice(price) })}</span>}
-      {next && <span className="text-xs text-muted-foreground">{t("wholesaleNext", { qty: next.minQty, price: formatPrice(unitPrice(product, image, size?.id, next.minQty)) })}</span>}
-    </>
+        <div className="flex items-center gap-2 rounded-lg bg-muted/70 py-1 pr-1 pl-3 text-xs text-muted-foreground">
+          <Tag className="size-4 shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0 flex-1">
+            {t("wholesaleNext", { qty: format.number(next.minQty), price: formatPrice(unitPrice(product, image, size?.id, next.minQty)) })}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 rounded-full bg-background px-3 text-xs font-semibold tabular-nums"
+            aria-label={t("wholesaleAdd", { count: format.number(next.minQty - qty) })}
+            onClick={() => setQty(key, next.minQty)}
+          >
+            +{format.number(next.minQty - qty)}
+          </Button>
+        </div>
   );
 }
 
