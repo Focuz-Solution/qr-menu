@@ -1,5 +1,10 @@
 // Order rules shared by the checkout page (preview) and createOrder (the real numbers). Pure functions.
 
+/** most of one product (one cart line) an order can hold — wholesale steps (Admin → Wholesale) go up to it too */
+export const MAX_QTY = 1_000_000;
+/** the most one order (or one line of it) may cost, in cents: the database's money columns hold up to ~$21.4 million */
+export const MAX_ORDER_CENTS = 2_000_000_000;
+
 /** a price step: orders of `fromCents` or more pay `feeCents` delivery (0 = free) */
 export type FeeStep = { fromCents: number; feeCents: number };
 

@@ -2,9 +2,9 @@
 
 import "leaflet/dist/leaflet.css";
 import type { Map as LMap } from "leaflet";
-import { Loader2, LocateFixed, MapPin, X } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -15,15 +15,16 @@ const START: LatLng = { lat: 11.5564, lng: 104.9282 }; // Phnom Penh
 export const mapLink = (p: LatLng) => `https://www.google.com/maps?q=${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
 
 /**
- * OpenStreetMap with a pin fixed in the middle: the customer drags/zooms the map (or taps a spot, or "Use my location")
- * and the spot under the pin is the location. "" = nothing picked yet (grey pin).
+ * OpenStreetMap with a pin fixed in the middle: the customer drags/zooms the map (or taps a spot) and the spot under
+ * the pin is the location. "" = nothing picked yet (grey pin). `goTo`: the phone's location from checkout's
+ * "Use my location" button (next to the province) — the map flies there and that spot becomes the pin.
  */
-export function MapPicker({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+export function MapPicker({ value, onChange, goTo }: { value: string; onChange: (url: string) => void; goTo?: LatLng | null }) {
   const t = useTranslations("checkout");
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<LMap>(null);
-  const [locating, setLocating] = useState(false);
-  const [gpsError, setGpsError] = useState(false);
+  // a location that arrived before the map finished loading (applied once it has)
+  const pending = useRef<LatLng | null>(null);
   // latest onChange without re-creating the map
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -41,6 +42,7 @@ export function MapPicker({ value, onChange }: { value: string; onChange: (url: 
       m.on("moveend", () => onChangeRef.current(mapLink(m.getCenter())));
       m.on("click", (e) => m.panTo(e.latlng));
       map.current = m;
+      if (pending.current) m.setView(pending.current, 17);
     });
     return () => {
       off = true;
@@ -49,37 +51,21 @@ export function MapPicker({ value, onChange }: { value: string; onChange: (url: 
     };
   }, []);
 
-  function locate() {
-    setGpsError(false);
-    if (!navigator.geolocation) return setGpsError(true); // old browser / not https
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false);
-        map.current?.setView({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 17); // → moveend saves it
-      },
-      () => {
-        setLocating(false);
-        setGpsError(true);
-      },
-      { enableHighAccuracy: true, timeout: 15_000 },
-    );
-  }
+  // checkout found the phone's location: fly there (→ moveend saves it as the pin)
+  useEffect(() => {
+    if (!goTo) return;
+    pending.current = goTo;
+    map.current?.setView(goTo, 17);
+  }, [goTo]);
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={locate} disabled={locating}>
-          {locating ? <Loader2 className="animate-spin" aria-hidden /> : <LocateFixed aria-hidden />}
-          {t("useMyLocation")}
+      {value && (
+        <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => onChange("")}>
+          <X aria-hidden />
+          {t("removePin")}
         </Button>
-        {value && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")}>
-            <X aria-hidden />
-            {t("removePin")}
-          </Button>
-        )}
-      </div>
+      )}
       {/* isolate: Leaflet's own z-index stays under the header and popovers */}
       <div className="relative isolate h-64 overflow-hidden rounded-xl border bg-muted">
         <div ref={box} role="application" aria-label={t("mapUrl")} className="size-full" />
@@ -92,7 +78,7 @@ export function MapPicker({ value, onChange }: { value: string; onChange: (url: 
           )}
         />
       </div>
-      <p className="text-xs text-muted-foreground">{gpsError ? t("gpsError") : t("mapHint")}</p>
+      <p className="text-xs text-muted-foreground">{t("mapHint")}</p>
     </div>
   );
 }

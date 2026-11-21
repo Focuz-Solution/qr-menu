@@ -17,7 +17,7 @@ import { checkSteps, MAX_QTY, parseValue, type StepInput, stepPrice, type Wholes
 
 const MAX_STEPS = 5;
 // step table columns — phones: quantity · price · remove; sm+: quantity · range · price · result · remove
-const COLS = "grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.25rem] items-center gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1.3fr)_8.5rem_2.25rem]";
+const COLS = "grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_2.25rem] items-center gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(5.5rem,auto)_minmax(0,1.3fr)_8.5rem_2.25rem]";
 const money = (cents: number) => formatPrice(cents / 100);
 const toInput = (s: { minQty: number; percent?: number; priceCents?: number }): StepInput =>
   s.priceCents != null
@@ -44,7 +44,7 @@ export function StepsDialog({ item, keys, all, onClose }: { item: WholesaleItem;
   const [picked, setPicked] = useState(keys);
   // starts empty; only editing one variant (its pencil) loads that variant's own saved steps
   const own = all ? undefined : item.rows.find((r) => r.key === keys[0])?.steps;
-  const [steps, setSteps] = useState<StepInput[]>(own?.length ? own.map(toInput) : [{ minQty: "", mode: "percent", value: "" }]);
+  const [steps, setSteps] = useState<StepInput[]>(own?.length ? own.map(toInput) : [{ minQty: "", mode: "amount", value: "" }]);
   const [error, setError] = useState<ErrorCode>();
   // row problems show once the row is filled in, or for every row after Save was pressed
   const [tried, setTried] = useState(false);
@@ -107,9 +107,21 @@ export function StepsDialog({ item, keys, all, onClose }: { item: WholesaleItem;
           </DialogHeader>
 
           <div className="flex flex-col gap-4 px-6 py-5">
-            <div>
-              <h3 className="font-semibold">{t("steps")}</h3>
-              <p className="text-sm text-muted-foreground">{t("stepsHint")}</p>
+            {/* title + hint, and on the right the normal price of the ticked variants (what each step is cheaper than);
+                a range when their prices differ */}
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold">{t("steps")}</h3>
+                <p className="text-sm text-muted-foreground">{t("stepsHint")}</p>
+              </div>
+              {prices.length > 0 && (
+                <div className="shrink-0 rounded-xl border bg-muted/50 px-4 py-2 text-right">
+                  <p className="text-xs text-muted-foreground">{t("basePrice")}</p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {prices.length === 1 ? money(prices[0]) : `${money(lowest)} – ${money(Math.max(...prices))}`}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* bordered table: header · one row per step · "Add step" as the last row */}
@@ -206,7 +218,7 @@ export function StepsDialog({ item, keys, all, onClose }: { item: WholesaleItem;
               {steps.length < MAX_STEPS && (
                 <button
                   type="button"
-                  onClick={() => setSteps((list) => [...list, { minQty: "", mode: "percent", value: "" }])}
+                  onClick={() => setSteps((list) => [...list, { minQty: "", mode: "amount", value: "" }])}
                   className={cn(
                     "flex h-12 w-full items-center justify-center gap-1.5 text-sm font-medium text-primary outline-none hover:bg-primary/5 focus-visible:bg-primary/5",
                     steps.length > 0 && "border-t",
