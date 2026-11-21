@@ -50,7 +50,9 @@
     "optionN": "Option {n}",
     "video": "Video",
     "playVideo": "Play video",
-    "chooseOption": "Please choose an option"
+    "chooseOption": "Please choose an option",
+    "wholesaleNote": "Buy <b>{qty}+</b> for a lower price",
+    "wholesaleSave": "Buy <b>{qty}+</b> and save <b>{percent}%</b>"
   },
   "footer": {
     "address": "Address",
@@ -122,7 +124,8 @@
       "users": "Users",
       "roles": "Roles",
       "sizes": "Sizes",
-      "products": "Products"
+      "products": "Products",
+      "wholesale": "Wholesale"
     },
     "status": {
       "all": "All",
@@ -675,6 +678,55 @@
       "confirmDelete": "Delete size {name}? {count, plural, =0 {No product uses it.} one {It will be removed from # product.} other {It will be removed from # products.}}",
       "quickPick": "Quick pick",
       "suggestions": "S, M, L, XL, XXL, 30 ml, 50 ml, 100 ml, 200 ml, 500 ml"
+    },
+    "wholesale": {
+      "title": "Wholesale",
+      "intro": "Lower unit prices when customers buy more of a product",
+      "products": "Products",
+      "search": "Search products",
+      "filterAll": "All",
+      "filterSet": "Has price",
+      "filterUnset": "Not set",
+      "variantCount": "{count, plural, =0 {No variants} one {# variant} other {# variants}}",
+      "pick": "Choose a product on the left.",
+      "active": "Active",
+      "off": "This price rule is turned off — customers pay the normal price.",
+      "setAll": "Set for all variants",
+      "variant": "Variant",
+      "basePrice": "Base price",
+      "tiers": "Quantity price steps",
+      "actions": "Actions",
+      "noTiers": "No steps",
+      "edit": "Edit steps for {name}",
+      "clear": "Remove steps for {name}",
+      "dialogAll": "Set price for all variants",
+      "dialogOne": "Set price for {name}",
+      "minQty": "Minimum quantity",
+      "addStep": "Add step",
+      "removeStep": "Remove step",
+      "cancel": "Cancel",
+      "save": "Save",
+      "empty": "No products yet. Add products in Products first.",
+      "noMatch": "No products match.",
+      "remove": "Remove steps",
+      "confirmClear": "Remove all quantity price steps of {name}?",
+      "steps": "Price steps",
+      "stepsHint": "When a customer buys at least the minimum quantity, the unit price changes to the new price.",
+      "range": "Range",
+      "newPrice": "New price or % off",
+      "result": "Result",
+      "unit": "units",
+      "mode": "Price type",
+      "modePercent": "Percent off",
+      "modeAmount": "New price in dollars",
+      "applyTo": "Apply to variants",
+      "applyHint": "These steps replace the steps of the variants you choose.",
+      "pickAll": "Select all",
+      "hasSteps": "has steps",
+      "mixedPrices": "The chosen variants have different base prices, so a fixed step price must be less than {price}.",
+      "picked": "{count} of {total} selected",
+      "variantN": "Variant {n}",
+      "loadMore": "Load more ({count} left)"
     }
   },
   "lang": {
@@ -746,7 +798,9 @@
     "tgConnectHint": "Get order updates, and the shop can contact you",
     "tgConfirmed": "✅ Your order {no} is confirmed.",
     "tgCancelled": "❌ Your order {no} was cancelled.",
-    "itemsCount": "{count, plural, one {# item} other {# items}}"
+    "itemsCount": "{count, plural, one {# item} other {# items}}",
+    "wholesaleNow": "Wholesale price · {price} each",
+    "wholesaleNext": "Buy {qty}+ for {price} each"
   },
   "errors": {
     "badPhone": "Enter a valid Cambodian phone number (e.g. 012 345 678)",
@@ -791,7 +845,10 @@
     "roleInUse": "Some people still have this role. Move them to another role first.",
     "variantPhoto": "Each variant needs a photo",
     "sizeTaken": "This size already exists",
-    "badYoutube": "Paste a YouTube video link (e.g. https://youtu.be/…)"
+    "badYoutube": "Paste a YouTube video link (e.g. https://youtu.be/…)",
+    "badQty": "Enter a whole number from 2 to 99",
+    "stepNotCheaper": "Must be cheaper than the step before it",
+    "stepPriceHigh": "Must be lower than the normal price"
   },
   "form": {
     "optional": "optional"

@@ -1,3 +1,5 @@
+import { type Tiers, tierAt, tiersOf, tierUnitCents } from "@/lib/wholesale";
+
 /** UI languages (next-intl): Khmer default + English */
 export const LOCALES = ["km", "en"] as const;
 export type Lang = (typeof LOCALES)[number];
@@ -36,6 +38,8 @@ export type Product = {
   ingredients?: string;
   badges?: ("new" | "sale" | "best")[];
   inStock: boolean;
+  /** wholesale steps (Admin → Wholesale), only when turned on: per variant photo, "" = the product itself */
+  wholesale?: Tiers;
 };
 
 /** defaults until the owner saves Admin → Settings (name, logo) + fixed site config (url, currency) */
@@ -72,6 +76,16 @@ export function variantName(p: Product, image: string) {
 export const sizeOf = (p: Product, sizeId?: string) => p.sizes?.find((s) => s.id === sizeId) ?? p.sizes?.[0];
 /** what the customer pays for this photo + size: the size's own price, else the variant's, else the product price */
 export const priceFor = (p: Product, image: string, sizeId?: string) => sizeOf(p, sizeId)?.price ?? priceAt(p, image);
+
+/** the wholesale steps of this photo (its variant), or of the product when it has no variants */
+export const wholesaleSteps = (p: Product, image: string) =>
+  tiersOf(p.wholesale, !!p.variants?.some((v) => v.image), variantAt(p, image)?.image);
+/** one unit when buying `qty` of this photo + size: the wholesale step reached, on top of priceFor */
+export function unitPrice(p: Product, image: string, sizeId: string | undefined, qty: number) {
+  const base = priceFor(p, image, sizeId);
+  const tier = tierAt(wholesaleSteps(p, image), qty);
+  return tier ? tierUnitCents(Math.round(base * 100), tier) / 100 : base;
+}
 
 export function discountPercent(p: { price: number; oldPrice?: number }) {
   return p.oldPrice && p.oldPrice > p.price
