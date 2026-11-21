@@ -141,7 +141,8 @@
       "range": "Showing {from}–{to} of {total}",
       "pageOf": "Page {page} of {pages}",
       "prev": "Previous page",
-      "next": "Next page"
+      "next": "Next page",
+      "dropTo": "Move to page {page}"
     },
     "orders": {
       "reportPeriod": "Report period",
