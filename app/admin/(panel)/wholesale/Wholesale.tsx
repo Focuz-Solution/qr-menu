@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ChevronDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
@@ -20,7 +20,7 @@ import { type Step, stepPrice, type WholesaleItem, type WholesaleRow } from "./t
 type Filter = "all" | "set" | "unset";
 const money = (cents: number) => formatPrice(cents / 100);
 const PAGE_SIZE = 10; // variant table
-const MORE = 10; // product list: shown at first and added by "Load more"
+const LIST_SIZE = 10; // product list: products per page
 const setCount = (item: WholesaleItem) => item.rows.filter((r) => r.steps.length).length;
 
 /** "10+ → -10% ($40.50)" or "10+ → $40.00" */
@@ -46,8 +46,9 @@ export function Wholesale({ items }: { items: WholesaleItem[] }) {
   const shown = items.filter(
     (i) => (filter === "all" || (filter === "set") === setCount(i) > 0) && (!needle || i.name.toLowerCase().includes(needle)),
   );
-  const [limit, setLimit] = useState(MORE);
-  const listed = shown.slice(0, limit);
+  // product list pages; back to page 1 when the search or filter changes
+  const [listPage, setListPage] = useState(0);
+  const { pages: listPages, current: listCurrent, rows: listed } = paginate(shown, listPage, LIST_SIZE);
   // variant table pages; back to page 1 when another product is picked
   const [page, setPage] = useState(0);
   const { pages, current, rows: variantRows } = paginate(item?.rows ?? [], page, PAGE_SIZE);
@@ -68,7 +69,8 @@ export function Wholesale({ items }: { items: WholesaleItem[] }) {
       </div>
 
       <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(260px,340px)_1fr] md:items-start">
-        {/* left: products, 10 at a time + "Load more" */}
+        {/* left: products, 10 per page (pager under the card) */}
+        <div className="min-w-0">
         <Card className="gap-0 overflow-hidden py-0">
           <div className="flex flex-col gap-2.5 border-b p-3">
             <p className="px-1 text-sm font-semibold">
@@ -77,7 +79,7 @@ export function Wholesale({ items }: { items: WholesaleItem[] }) {
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
               {/* compact (36px) search so the product list gets the room */}
-              <Input type="search" value={q} onChange={(e) => { setQ(e.target.value); setLimit(MORE); }} placeholder={t("search")} aria-label={t("search")} className="h-9 pl-8 text-sm" />
+              <Input type="search" value={q} onChange={(e) => { setQ(e.target.value); setListPage(0); }} placeholder={t("search")} aria-label={t("search")} className="h-9 pl-8 text-sm" />
             </div>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("products")}>
               {filters.map(([f, label]) => (
@@ -85,7 +87,7 @@ export function Wholesale({ items }: { items: WholesaleItem[] }) {
                   key={f}
                   type="button"
                   aria-pressed={filter === f}
-                  onClick={() => { setFilter(f); setLimit(MORE); }}
+                  onClick={() => { setFilter(f); setListPage(0); }}
                   className={cn(
                     // 28px chip; the invisible after: edge keeps a 44px tap height
                     "relative flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none after:absolute after:-inset-y-2 after:inset-x-0 focus-visible:ring-3 focus-visible:ring-ring/50",
@@ -133,17 +135,9 @@ export function Wholesale({ items }: { items: WholesaleItem[] }) {
             })}
             {!shown.length && <li className="px-4 py-12 text-center text-sm text-muted-foreground">{items.length ? t("noMatch") : t("empty")}</li>}
           </ul>
-          {shown.length > limit && (
-            <button
-              type="button"
-              onClick={() => setLimit((n) => n + MORE)}
-              className="flex h-11 w-full items-center justify-center gap-1.5 border-t text-sm font-medium outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
-            >
-              <ChevronDown className="size-4" aria-hidden />
-              {t("loadMore", { count: shown.length - limit })}
-            </button>
-          )}
         </Card>
+        <Pager page={listCurrent} pages={listPages} size={LIST_SIZE} shown={listed.length} total={shown.length} onPage={setListPage} />
+        </div>
 
         {/* right: the chosen product's variants and their quantity steps (pager under the card) */}
         <div className="min-w-0">
