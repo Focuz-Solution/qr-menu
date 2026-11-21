@@ -725,8 +725,7 @@
       "hasSteps": "has steps",
       "mixedPrices": "The chosen variants have different base prices, so a fixed step price must be less than {price}.",
       "picked": "{count} of {total} selected",
-      "variantN": "Variant {n}",
-      "loadMore": "Load more ({count} left)"
+      "variantN": "Variant {n}"
     }
   },
   "lang": {
