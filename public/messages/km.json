@@ -125,7 +125,7 @@
       "roles": "តួនាទី",
       "sizes": "ទំហំ",
       "products": "ផលិតផល",
-      "wholesale": "លក់ដុំ"
+      "wholesale": "លក់បោះដុំ"
     },
     "status": {
       "all": "ទាំងអស់",
@@ -680,7 +680,7 @@
       "suggestions": "S, M, L, XL, XXL, 30 ml, 50 ml, 100 ml, 200 ml, 500 ml"
     },
     "wholesale": {
-      "title": "លក់ដុំ",
+      "title": "លក់បោះដុំ",
       "intro": "តម្លៃថោកជាងពេលអតិថិជនទិញផលិតផលច្រើន",
       "products": "ផលិតផល",
       "search": "ស្វែងរកផលិតផល",
@@ -725,8 +725,7 @@
       "hasSteps": "មានកម្រិតរួច",
       "mixedPrices": "ជម្រើសដែលបានជ្រើសមានតម្លៃដើមខុសគ្នា ដូច្នេះតម្លៃកម្រិតត្រូវតិចជាង {price}",
       "picked": "បានជ្រើស {count} / {total}",
-      "variantN": "ជម្រើស {n}",
-      "loadMore": "បង្ហាញបន្ថែម (នៅសល់ {count})"
+      "variantN": "ជម្រើស {n}"
     }
   },
   "lang": {
@@ -799,7 +798,7 @@
     "tgConfirmed": "✅ ការកុម្ម៉ង់ {no} របស់អ្នកត្រូវបានបញ្ជាក់ហើយ។",
     "tgCancelled": "❌ ការកុម្ម៉ង់ {no} របស់អ្នកត្រូវបានបោះបង់។",
     "itemsCount": "{count} មុខ",
-    "wholesaleNow": "តម្លៃលក់ដុំ · {price} មួយ",
+    "wholesaleNow": "តម្លៃលក់បោះដុំ · {price} មួយ",
     "wholesaleNext": "ទិញ {qty}+ តម្លៃ {price} មួយ"
   },
   "errors": {
