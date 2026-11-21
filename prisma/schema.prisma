@@ -18,6 +18,7 @@ model Shop {
   sessions    Session[]
   categories  Category[]
   sizes       Size[]
+  wholesale   WholesalePrice[]
   items       Item[]
   zones       DeliveryZone[]
   orders      Order[]
@@ -194,6 +195,7 @@ model Item {
   youtubeId      String?     @map("youtube_id")
   images         ItemImage[]
   sizes          ItemSize[]
+  wholesale      WholesalePrice?
   orderItems     OrderItem[]
   deletedAt      DateTime?   @map("deleted_at")
   createdAt      DateTime    @default(now()) @map("created_at")
@@ -221,6 +223,22 @@ model Size {
 }
 
 /// a size a product comes in, with its own price (null = the product price)
+/// Admin → Menu → Wholesale: quantity price steps of one product (admin only for now, the shop doesn't read it)
+model WholesalePrice {
+  itemId    String   @id @map("item_id") @db.Uuid
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  shopId    String   @map("shop_id") @db.Uuid
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  isActive  Boolean  @default(true) @map("is_active")
+  /// per variant, keyed by the variant's photo url ("" = the product itself when it has no variants):
+  /// { "<key>": [{ "minQty": 10, "percent": 10 }, …] }, steps sorted by minQty
+  tiers     Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([shopId])
+  @@map("wholesale_prices")
+}
+
 model ItemSize {
   itemId     String @map("item_id") @db.Uuid
   item       Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)

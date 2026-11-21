@@ -1,9 +1,10 @@
 "use client";
 
+import { Tag } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Img } from "@/components/Img";
-import { formatPrice, type Product, pick, sizeOf, thumbUrl, variantAt } from "@/lib/shop";
+import { formatPrice, priceFor, type Product, pick, sizeOf, thumbUrl, unitPrice, variantAt, wholesaleSteps } from "@/lib/shop";
 import { cn } from "@/lib/utils";
 import { Gallery, VideoThumb } from "./Gallery";
 
@@ -60,6 +61,14 @@ export function Variants({
   const size = sizeOf(p, sizeId);
   const current = variants.length ? variantAt(p, picked ?? "") : undefined;
   const own = size?.price ?? current?.price;
+  // wholesale steps of the variant picked (with variants: none until one is picked), else of the product
+  const steps = variants.length && !picked ? [] : wholesaleSteps(p, picked ?? p.image);
+  // each step's unit price and saving vs the normal price of this variant + size
+  const normal = priceFor(p, picked ?? p.image, size?.id);
+  const stepRows = steps.map((s) => {
+    const each = unitPrice(p, picked ?? p.image, size?.id, s.minQty);
+    return { qty: s.minQty, each, percent: Math.round((1 - each / normal) * 100) };
+  });
   // a variant without a name shows as "Option 2" (its place in the list)
   const nameOf = (v: { label: string; image?: string }) => v.label || t("optionN", { n: variants.findIndex((x) => x.image === v.image) + 1 });
   const stripRef = useRef<HTMLDivElement>(null);
@@ -128,6 +137,25 @@ export function Variants({
             </div>
           )}
         </div>
+
+        {/* wholesale (Admin → Wholesale): one line per step, each with its own tag icon — quantity, saving, unit price */}
+        {stepRows.length > 0 && (
+          <ul className="flex flex-col gap-1.5 text-sm">
+            {stepRows.map((r) => (
+              <li key={r.qty} className="flex items-center gap-2">
+                <Tag className="size-4 shrink-0 text-primary" aria-hidden />
+                <span>
+                  {t.rich(r.percent > 0 ? "wholesaleSave" : "wholesaleNote", {
+                    qty: r.qty,
+                    percent: r.percent,
+                    b: (chunks) => <b className="font-semibold">{chunks}</b>,
+                  })}
+                  <span className="text-muted-foreground tabular-nums"> · {formatPrice(r.each)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {/* variants: "Option" title + one name button per variant; tapping shows its photo and price */}
         {variants.length > 0 && (

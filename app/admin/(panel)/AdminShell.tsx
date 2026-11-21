@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Check, EllipsisVertical, Languages, LogOut, Package, Plus, ReceiptText, Ruler, Send, Settings, ShieldCheck, Truck, Users } from "lucide-react";
+import { ArrowLeftRight, Boxes, Check, EllipsisVertical, Languages, LogOut, Package, Plus, ReceiptText, Ruler, Send, Settings, ShieldCheck, Truck, Users } from "lucide-react";
 import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -46,8 +46,9 @@ export function AdminShell({
     // `perm`: shown only to people whose role has it (no perm = everyone in the shop); `owner`: the owner only
     { group: "sales" as const, href: "/admin/orders", match: "/admin/orders", label: t("nav.orders"), icon: ReceiptText, count: newOrders },
     // Menu = a title (desktop) with its pages under it; `sub`: indented under the title above
-    { group: "sales" as const, label: t("nav.menu"), icon: Package, perm: "menu.edit" as Permission, title: ["/admin/menu", "/admin/sizes"] },
+    { group: "sales" as const, label: t("nav.menu"), icon: Package, perm: "menu.edit" as Permission, title: ["/admin/menu", "/admin/wholesale", "/admin/sizes"] },
     { group: "sales" as const, href: "/admin/menu", match: "/admin/menu", label: t("nav.products"), icon: Package, perm: "menu.edit" as Permission, sub: true },
+    { group: "sales" as const, href: "/admin/wholesale", match: "/admin/wholesale", label: t("nav.wholesale"), icon: Boxes, perm: "menu.edit" as Permission, sub: true },
     { group: "sales" as const, href: "/admin/sizes", match: "/admin/sizes", label: t("nav.sizes"), icon: Ruler, perm: "menu.edit" as Permission, sub: true },
     { group: "setup" as const, href: "/admin/delivery", match: "/admin/delivery", label: t("nav.delivery"), icon: Truck, perm: "delivery.manage" as Permission },
     { group: "setup" as const, href: "/admin/telegram", match: "/admin/telegram", label: t("telegram.title"), icon: Send, perm: "telegram.manage" as Permission },
