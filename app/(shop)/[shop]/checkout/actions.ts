@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { clientIp } from "@/lib/auth";
+import { cleanTiers, tierAt, tierUnitCents } from "@/lib/wholesale";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { shopBySlug } from "@/lib/shops";
@@ -80,6 +81,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
         images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
         // its sizes in the shop's order (the first is used when none / an unknown one was sent, like the cart does)
         sizes: { orderBy: { size: { sortOrder: "asc" } }, select: { sizeId: true, priceCents: true, size: { select: { name: true } } } },
+        wholesale: { select: { isActive: true, tiers: true } },
       },
     }),
     deliveryZones(shopId, { activeOnly: true }),
@@ -103,7 +105,10 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
     const v = n < 0 ? undefined : withPhoto[n];
     const size = item.sizes.find((s) => s.sizeId === l.size) ?? item.sizes[0];
     // the size's own price, else the variant's (rule 8), else the product price — all from the database
-    const unit = size?.priceCents ?? (typeof v?.priceCents === "number" && v.priceCents >= 0 ? v.priceCents : item.priceCents);
+    const normal = size?.priceCents ?? (typeof v?.priceCents === "number" && v.priceCents >= 0 ? v.priceCents : item.priceCents);
+    // wholesale (Admin → Wholesale, when turned on): the step this line's quantity reaches lowers the unit price
+    const tiers = item.wholesale?.isActive ? (item.wholesale.tiers ?? {}) as Record<string, unknown> : {};
+    const unit = tierUnitCents(normal, tierAt(cleanTiers(tiers[withPhoto.length ? (v?.image ?? "\0") : ""]), l.qty));
     // saved as one text "Rose · 100 ml" (Admin → Orders, Telegram and receipts show it as is)
     const style = [v && (v.label || tp("optionN", { n: n + 1 })), size?.size.name].filter(Boolean).join(" · ") || null;
     return { itemId: item.id, name: item.name, variant: style, imageUrl: image, unitPriceCents: unit, quantity: l.qty, lineTotalCents: unit * l.qty };

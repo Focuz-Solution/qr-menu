@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useProducts } from "@/components/MenuProvider";
-import { priceFor, type Product, sizeOf, variantName } from "@/lib/shop";
+import { priceFor, type Product, sizeOf, unitPrice, variantName } from "@/lib/shop";
 
 // Cart = { "slug|photo|size": qty } in localStorage, shared by every component through useSyncExternalStore.
 // The photo is the gallery image picked when adding (each photo is a style) and the size its id (Admin → Sizes),
@@ -81,7 +81,8 @@ export function useCart() {
   // lines whose product no longer exists are skipped (they stay in storage, harmless)
   const items = Object.entries(cart).flatMap(([key, qty]) => {
     const line = parseKey(key, products);
-    return line ? [{ key, ...line, qty }] : [];
+    // `price` = one unit at this quantity (wholesale step reached), `fullPrice` = the normal unit price
+    return line ? [{ key, ...line, fullPrice: line.price, price: unitPrice(line.product, line.image, line.size?.id, qty), qty }] : [];
   });
   return {
     items,
