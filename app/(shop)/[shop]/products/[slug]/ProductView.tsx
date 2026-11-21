@@ -7,7 +7,9 @@ import { DiscountBadge } from "@/components/DiscountBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { discountPercent, type Lang, pick, type Product } from "@/lib/shop";
+import { QtyInput } from "@/components/QtyInput";
 import { addToCart, cartKey, setQty, useCart } from "@/lib/cart";
+import { MAX_QTY } from "@/lib/orders";
 import { parseRich, type RichBlock, type RichDoc, type RichInline } from "@/lib/rich-text";
 import { cn } from "@/lib/utils";
 import { BackButton } from "./BackButton";
@@ -86,8 +88,8 @@ function AddToCart({ slug, image, sizeId, disabled, askPick }: { slug: string; i
           <Button variant="ghost" size="icon" className="h-11 w-10 rounded-full" aria-label={t("less")} onClick={() => setQty(key, qty - 1)}>
             <Minus className="size-4" aria-hidden />
           </Button>
-          <span className="min-w-5 text-center font-medium tabular-nums">{qty}</span>
-          <Button variant="ghost" size="icon" className="h-11 w-10 rounded-full" aria-label={t("more")} onClick={() => setQty(key, qty + 1)}>
+          <QtyInput value={qty} onChange={(q) => setQty(key, q)} label={t("quantity")} className="min-w-5" />
+          <Button variant="ghost" size="icon" className="h-11 w-10 rounded-full" aria-label={t("more")} disabled={qty >= MAX_QTY} onClick={() => setQty(key, qty + 1)}>
             <Plus className="size-4" aria-hidden />
           </Button>
         </div>
