@@ -2,7 +2,7 @@
 
 import { GripVertical, ImageOff, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Img } from "@/components/Img";
 import { Pager, paginate } from "@/components/Pager";
 import { type Sort, SortHead } from "@/components/SortHead";
@@ -67,6 +67,16 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
     setDragOrder(null);
   };
   const { pages, current, rows } = paginate(sorted, page, PAGE_SIZE);
+  // dragging across pages: hold the row over ‹ / › and it goes to the end of the page before / the start of the page
+  // after, and the table turns to that page (moving a little while still over it goes one more page, at most every 0.6 s)
+  const lastFlip = useRef(0);
+  const flipPage = (id: string, order: string[], dir: -1 | 1, now: number) => {
+    const to = dir < 0 ? current * PAGE_SIZE - 1 : (current + 1) * PAGE_SIZE;
+    if (to < 0 || to >= order.length || now - lastFlip.current < 600) return;
+    lastFlip.current = now;
+    setDragOrder(move(order, id, to));
+    setPage(current + dir);
+  };
   // the other rows slide to their new place while one is dragged
   const body = useFlip<HTMLTableSectionElement>("data-item", rows.map((i) => i.id).join(), dragId);
   const onSort = (key: SortKey) => {
@@ -114,7 +124,13 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
                     }}
                     onPointerMove={(e) => {
                       if (dragId !== item.id || !dragOrder) return;
-                      const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-item]")?.dataset.item;
+                      const under = document.elementFromPoint(e.clientX, e.clientY);
+                      const pager = under?.closest<HTMLButtonElement>("[data-pager]");
+                      if (pager) {
+                        if (!pager.disabled) flipPage(item.id, dragOrder, pager.dataset.pager === "prev" ? -1 : 1, e.timeStamp);
+                        return;
+                      }
+                      const over = under?.closest<HTMLElement>("[data-item]")?.dataset.item;
                       if (over && over !== item.id) setDragOrder(move(dragOrder, item.id, dragOrder.indexOf(over)));
                     }}
                     onPointerUp={() => endDrag(true)}
@@ -124,7 +140,10 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
                       if (!d) return;
                       e.preventDefault();
                       const order = move(ids, item.id, ids.indexOf(item.id) + d);
-                      if (order !== ids) onReorder(order);
+                      if (order === ids) return;
+                      onReorder(order);
+                      // ↑ on a page's first row / ↓ on its last: the table follows the row to the next page
+                      setPage(Math.floor(order.indexOf(item.id) / PAGE_SIZE));
                     }}
                   >
                     <GripVertical className="size-4" aria-hidden />
@@ -191,7 +210,7 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
         </TableBody>
       </Table>
       <div className="border-t px-4 pb-3">
-        <Pager page={current} pages={pages} size={PAGE_SIZE} shown={rows.length} total={sorted.length} onPage={setPage} />
+        <Pager page={current} pages={pages} size={PAGE_SIZE} shown={rows.length} total={sorted.length} onPage={setPage} dropTarget={!!dragId && pages > 1} />
       </div>
     </>
   );
