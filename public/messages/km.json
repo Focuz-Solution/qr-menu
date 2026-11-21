@@ -141,7 +141,8 @@
       "range": "បង្ហាញ {from}–{to} នៃ {total}",
       "pageOf": "ទំព័រ {page} នៃ {pages}",
       "prev": "ទំព័រមុន",
-      "next": "ទំព័របន្ទាប់"
+      "next": "ទំព័របន្ទាប់",
+      "dropTo": "ផ្លាស់ទីទៅទំព័រ {page}"
     },
     "orders": {
       "reportPeriod": "រយៈពេលរបាយការណ៍",

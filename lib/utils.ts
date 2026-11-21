@@ -5,5 +5,7 @@ export const latinDigits = (s: string) => s.replace(/[០-៩]/g, (d) => String(
 
 /** a row that can be dragged to reorder: animates into / out of the lifted look */
 export const dragRow = "transition-[scale,box-shadow] duration-150 ease-out"
-/** the row being dragged: pops out a little (bigger, deep shadow, thin outline) above the others */
-export const dragLifted = "relative z-10 scale-[1.02] rounded-lg bg-background shadow-xl ring-1 ring-border"
+/** a table row being dragged: deep shadow + thin outline above the others (not bigger: a wider row made the table scroll sideways) */
+export const dragLiftedRow = "relative z-10 bg-background shadow-xl ring-1 ring-border"
+/** a list row being dragged: like a table row, and a little bigger */
+export const dragLifted = `${dragLiftedRow} scale-[1.02] rounded-lg`

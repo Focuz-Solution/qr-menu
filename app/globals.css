@@ -192,3 +192,16 @@ html:lang(en) {
 @media (prefers-reduced-motion: reduce) {
   [aria-invalid="true"] { animation: none; }
 }
+
+/* admin page bar while a product is dragged: the ‹ › arrows nudge toward their side ("drop me here");
+   --nudge = how far and which way (‹ goes left: negative); faster while the row is held over it */
+@keyframes nudge {
+  0%, 100% { translate: 0 0; }
+  50% { translate: var(--nudge, 3px) 0; }
+}
+.animate-nudge {
+  animation: nudge 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-nudge { animation: none; }
+}

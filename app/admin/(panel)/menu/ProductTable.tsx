@@ -2,7 +2,7 @@
 
 import { GripVertical, ImageOff, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Img } from "@/components/Img";
 import { Pager, paginate } from "@/components/Pager";
 import { type Sort, SortHead } from "@/components/SortHead";
@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatPrice, thumbUrl } from "@/lib/shop";
+import { moveTo, useDragSort } from "@/lib/use-drag-sort";
 import { useFlip } from "@/lib/use-flip";
-import { cn, dragLifted, dragRow } from "@/lib/utils";
+import { cn, dragLiftedRow, dragRow } from "@/lib/utils";
 import type { AdminItem } from "./types";
 
 const money = (cents: number) => formatPrice(cents / 100);
@@ -49,36 +50,60 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
   const [sort, setSort] = useState<Sort<SortKey>>({ key: "order", desc: false });
   const [page, setPage] = useState(0);
   const shopOrder = sort.key === "order";
-  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
+  // drag ⠿ to reorder (saved on release); held over the pager's ‹ › it moves to the page before / after (flipPage)
+  const { dragId, dragOrder, start: startDrag } = useDragSort({
+    attr: "data-item",
+    onDrop: (order) => onReorder(order),
+    onOther: (under, id, order) => {
+      const side = pagerSide(under);
+      return side ? flipPage(id, order, side) : null;
+    },
+    // the ‹ / › the dragged row is held over lights up (until the page has turned); the drag's end (null) resets it
+    onMove: (under) => {
+      if (!under) {
+        turnedRef.current = false;
+        setTurned(false);
+      }
+      setArmed(turnedRef.current ? null : pagerSide(under));
+    },
+  });
+  const [armed, setArmed] = useState<"prev" | "next" | null>(null);
   const ordered = dragOrder ? dragOrder.map((id) => items.find((i) => i.id === id)!).filter(Boolean) : items;
   const sorted = ordered.toSorted((a, b) => (sort.desc ? -1 : 1) * compare[sort.key](a, b));
   const ids = items.map((i) => i.id);
-  const move = (order: string[], id: string, to: number) => {
-    const from = order.indexOf(id);
-    if (from < 0 || to < 0 || to >= order.length || from === to) return order;
-    const next = [...order];
-    next.splice(to, 0, ...next.splice(from, 1));
-    return next;
-  };
-  const endDrag = (save: boolean) => {
-    if (save && dragOrder && dragOrder.join() !== ids.join()) onReorder(dragOrder);
-    setDragId(null);
-    setDragOrder(null);
-  };
   const { pages, current, rows } = paginate(sorted, page, PAGE_SIZE);
   // dragging across pages: hold the row over ‹ / › and it goes to the end of the page before / the start of the page
-  // after, and the table turns to that page (moving a little while still over it goes one more page, at most every 0.6 s)
-  const lastFlip = useRef(0);
-  const flipPage = (id: string, order: string[], dir: -1 | 1, now: number) => {
+  // after, and the table turns to that page — one page per drag (to go further, grab it again on the new page)
+  const pagerSide = (under: Element | null) => (under?.closest<HTMLElement>("[data-pager]:enabled")?.dataset.pager as "prev" | "next" | undefined) ?? null;
+  // this drag already turned a page: the ref stops a second turn at once, the state turns the arrows' highlight off
+  const turnedRef = useRef(false);
+  const [turned, setTurned] = useState(false);
+  // the way the last drag page-turn went (for the slide-in below), 0 = none waiting
+  const flipDir = useRef<-1 | 0 | 1>(0);
+  const flipPage = (id: string, order: string[], side: "prev" | "next") => {
+    if (turnedRef.current) return null;
+    const dir = side === "prev" ? -1 : 1;
     const to = dir < 0 ? current * PAGE_SIZE - 1 : (current + 1) * PAGE_SIZE;
-    if (to < 0 || to >= order.length || now - lastFlip.current < 600) return;
-    lastFlip.current = now;
-    setDragOrder(move(order, id, to));
+    if (to < 0 || to >= order.length) return null;
+    turnedRef.current = true;
+    setTurned(true);
+    setArmed(null);
+    flipDir.current = dir;
     setPage(current + dir);
+    return moveTo(order, id, to);
   };
   // the other rows slide to their new place while one is dragged
   const body = useFlip<HTMLTableSectionElement>("data-item", rows.map((i) => i.id).join(), dragId);
+  // a page turned while dragging: the new page slides in from the side it came from (› = from the right)
+  useLayoutEffect(() => {
+    const dir = flipDir.current;
+    flipDir.current = 0;
+    if (!dir || !body.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    body.current.animate([{ transform: `translateX(${dir * 40}px)`, opacity: 0.2 }, { transform: "translateX(0)", opacity: 1 }], {
+      duration: 280,
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
+    });
+  }, [current, body]);
   const onSort = (key: SortKey) => {
     setSort((s) => (s.key !== key ? { key, desc: true } : s.desc ? { key, desc: false } : { key: "order", desc: false }));
     setPage(0);
@@ -106,7 +131,7 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
                 "h-16 hover:bg-transparent",
                 dragRow,
                 (!item.isAvailable || !item.isVisible) && dragId !== item.id && "opacity-60",
-                dragId === item.id && dragLifted,
+                dragId === item.id && dragLiftedRow,
               )}
             >
               {/* drag handle (shop order only): mouse + touch via pointer events (saved on release), keyboard via ↑/↓ */}
@@ -117,29 +142,12 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
                     aria-label={t("reorder", { name: item.name })}
                     disabled={pending}
                     className="flex size-10 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
-                    onPointerDown={(e) => {
-                      e.currentTarget.setPointerCapture(e.pointerId);
-                      setDragId(item.id);
-                      setDragOrder(ids);
-                    }}
-                    onPointerMove={(e) => {
-                      if (dragId !== item.id || !dragOrder) return;
-                      const under = document.elementFromPoint(e.clientX, e.clientY);
-                      const pager = under?.closest<HTMLButtonElement>("[data-pager]");
-                      if (pager) {
-                        if (!pager.disabled) flipPage(item.id, dragOrder, pager.dataset.pager === "prev" ? -1 : 1, e.timeStamp);
-                        return;
-                      }
-                      const over = under?.closest<HTMLElement>("[data-item]")?.dataset.item;
-                      if (over && over !== item.id) setDragOrder(move(dragOrder, item.id, dragOrder.indexOf(over)));
-                    }}
-                    onPointerUp={() => endDrag(true)}
-                    onPointerCancel={() => endDrag(false)}
+                    onPointerDown={(e) => startDrag(e, item.id, ids)}
                     onKeyDown={(e) => {
                       const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
                       if (!d) return;
                       e.preventDefault();
-                      const order = move(ids, item.id, ids.indexOf(item.id) + d);
+                      const order = moveTo(ids, item.id, ids.indexOf(item.id) + d);
                       if (order === ids) return;
                       onReorder(order);
                       // ↑ on a page's first row / ↓ on its last: the table follows the row to the next page
@@ -210,7 +218,7 @@ export function ProductTable({ items, pending, onEdit, onFlag, onDelete, onReord
         </TableBody>
       </Table>
       <div className="border-t px-4 pb-3">
-        <Pager page={current} pages={pages} size={PAGE_SIZE} shown={rows.length} total={sorted.length} onPage={setPage} dropTarget={!!dragId && pages > 1} />
+        <Pager page={current} pages={pages} size={PAGE_SIZE} shown={rows.length} total={sorted.length} onPage={setPage} dropTarget={!!dragId && pages > 1 && !turned} armed={dragId ? armed : null} popPage={!!dragId} />
       </div>
     </>
   );

@@ -17,6 +17,7 @@ import { formatPrice, thumbUrl } from "@/lib/shop";
 import type { ErrorCode } from "@/lib/result";
 import { formatBytes } from "@/lib/compress-image";
 import { uploadImage } from "@/lib/upload-image";
+import { moveTo, useDragSort } from "@/lib/use-drag-sort";
 import { useFlip } from "@/lib/use-flip";
 import { cn, dragLifted, dragRow, latinDigits } from "@/lib/utils";
 import { saveItem } from "./actions";
@@ -126,17 +127,12 @@ export function ItemForm({
     setVariants((all) => all.map((v) => (v.key === key ? { ...v, ...patch } : v)));
   // drag ⠿ to reorder the variants (same handle as categories / products); the new order is saved with the product,
   // and the shop shows the variants in this order
-  const [dragKey, setDragKey] = useState<string | null>(null);
+  const putInOrder = (order: string[]) => setVariants((all) => order.map((k) => all.find((v) => v.key === k)!).filter(Boolean));
+  const { dragId: dragKey, dragOrder, start: startDrag } = useDragSort({ attr: "data-variant", onDrop: putInOrder });
+  // while dragging: the rows in the dragged order (the form keeps its order until release)
+  const shownVariants = dragOrder ? dragOrder.map((k) => variants.find((v) => v.key === k)!).filter(Boolean) : variants;
   // the other variants slide to their new place while one is dragged
-  const variantList = useFlip<HTMLUListElement>("data-variant", variants.map((v) => v.key).join(), dragKey);
-  const moveVariant = (key: string, to: number) =>
-    setVariants((all) => {
-      const from = all.findIndex((v) => v.key === key);
-      if (from < 0 || to < 0 || to >= all.length || from === to) return all;
-      const next = [...all];
-      next.splice(to, 0, ...next.splice(from, 1));
-      return next;
-    });
+  const variantList = useFlip<HTMLUListElement>("data-variant", shownVariants.map((v) => v.key).join(), dragKey);
   // last upload's message under its own box ("main" or a variant): an error, or "4.2 MB → 210 KB" after shrinking
   const [upMsg, setUpMsg] = useState<{ key: string; error?: ErrorCode; size?: string }>();
   const upload = (key: string, file: File | undefined, done: (url: string) => void) => {
@@ -401,7 +397,7 @@ export function ItemForm({
                   <span className="w-11 shrink-0" />
                 </div>
                 <ul ref={variantList} className="divide-y">
-                  {variants.map((v, i) => (
+                  {shownVariants.map((v, i) => (
                     <li
                       key={v.key}
                       data-variant={v.key}
@@ -414,22 +410,12 @@ export function ItemForm({
                             type="button"
                             aria-label={t("reorder", { name: v.label.trim() || `${t("variants")} ${i + 1}` })}
                             className="-mr-1 flex h-11 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
-                            onPointerDown={(e) => {
-                              e.currentTarget.setPointerCapture(e.pointerId);
-                              setDragKey(v.key);
-                            }}
-                            onPointerMove={(e) => {
-                              if (dragKey !== v.key) return;
-                              const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-variant]")?.dataset.variant;
-                              if (over && over !== v.key) moveVariant(v.key, variants.findIndex((x) => x.key === over));
-                            }}
-                            onPointerUp={() => setDragKey(null)}
-                            onPointerCancel={() => setDragKey(null)}
+                            onPointerDown={(e) => startDrag(e, v.key, variants.map((x) => x.key))}
                             onKeyDown={(e) => {
                               const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
                               if (!d) return;
                               e.preventDefault();
-                              moveVariant(v.key, i + d);
+                              putInOrder(moveTo(variants.map((x) => x.key), v.key, i + d));
                             }}
                           >
                             <GripVertical className="size-4" aria-hidden />
