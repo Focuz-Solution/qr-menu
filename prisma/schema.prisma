@@ -222,8 +222,7 @@ model Size {
   @@map("sizes")
 }
 
-/// a size a product comes in, with its own price (null = the product price)
-/// Admin → Menu → Wholesale: quantity price steps of one product (admin only for now, the shop doesn't read it)
+/// Admin → Menu → Wholesale: quantity price steps of one product (shown on the product page + checkout, applied by createOrder)
 model WholesalePrice {
   itemId    String   @id @map("item_id") @db.Uuid
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -239,6 +238,7 @@ model WholesalePrice {
   @@map("wholesale_prices")
 }
 
+/// a size a product comes in, with its own price (null = the product price)
 model ItemSize {
   itemId     String @map("item_id") @db.Uuid
   item       Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
