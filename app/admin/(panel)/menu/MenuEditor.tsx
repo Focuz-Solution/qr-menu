@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import type { ErrorCode, Result } from "@/lib/result";
+import { moveTo, useDragSort } from "@/lib/use-drag-sort";
 import { useFlip } from "@/lib/use-flip";
 import { cn, dragLifted, dragRow } from "@/lib/utils";
 import { createCategory, deleteCategory, deleteItem, reorderCategories, reorderItems, setItemFlags, updateCategory } from "./actions";
@@ -47,8 +48,8 @@ export function MenuEditor({ categories, items, sizes }: { categories: AdminCate
   const [deletingProduct, setDeletingProduct] = useState<AdminItem | null>(null);
   const [productDeleteError, setProductDeleteError] = useState<ErrorCode>();
   const [deleting, setDeleting] = useState<AdminCategory | null>(null);
-  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
+  // drag ⠿ to reorder the categories (saved on release)
+  const { dragId, dragOrder, start: startDrag } = useDragSort({ attr: "data-cat", onDrop: (order) => saveOrder(order) });
   const panel = useRef<HTMLDivElement>(null);
 
   const shownCats = dragOrder ? dragOrder.map((id) => cats.find((c) => c.id === id)!) : cats;
@@ -73,14 +74,6 @@ export function MenuEditor({ categories, items, sizes }: { categories: AdminCate
     setRenamingId(null); // picking another category closes an open rename
     // phone: the list is above the products, so jump down to them
     if (window.matchMedia("(max-width: 767px)").matches) panel.current?.scrollIntoView({ behavior: "smooth" });
-  }
-
-  function moved(order: string[], id: string, to: number) {
-    const from = order.indexOf(id);
-    if (from < 0 || to < 0 || to >= order.length || from === to) return order;
-    const next = [...order];
-    next.splice(to, 0, ...next.splice(from, 1));
-    return next;
   }
 
   /** creates "New category" right away, selects it and opens its name field (optional) */
@@ -156,32 +149,13 @@ export function MenuEditor({ categories, items, sizes }: { categories: AdminCate
                       aria-label={t("reorder", { name: c.name })}
                       disabled={pending}
                       className="flex w-10 shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
-                      onPointerDown={(e) => {
-                        e.currentTarget.setPointerCapture(e.pointerId);
-                        setDragId(c.id);
-                        setDragOrder(cats.map((x) => x.id));
-                      }}
-                      onPointerMove={(e) => {
-                        if (dragId !== c.id || !dragOrder) return;
-                        const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-cat]")?.dataset.cat;
-                        if (over && over !== c.id) setDragOrder(moved(dragOrder, c.id, dragOrder.indexOf(over)));
-                      }}
-                      onPointerUp={() => {
-                        const order = dragOrder;
-                        setDragId(null);
-                        setDragOrder(null);
-                        if (order && order.join() !== cats.map((x) => x.id).join()) saveOrder(order);
-                      }}
-                      onPointerCancel={() => {
-                        setDragId(null);
-                        setDragOrder(null);
-                      }}
+                      onPointerDown={(e) => startDrag(e, c.id, cats.map((x) => x.id))}
                       onKeyDown={(e) => {
                         const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
                         if (!d) return;
                         e.preventDefault();
                         const ids = cats.map((x) => x.id);
-                        const order = moved(ids, c.id, i + d);
+                        const order = moveTo(ids, c.id, i + d);
                         if (order !== ids) saveOrder(order);
                       }}
                     >
