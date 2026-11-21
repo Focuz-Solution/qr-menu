@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useProducts } from "@/components/MenuProvider";
+import { MAX_QTY } from "@/lib/orders";
 import { priceFor, type Product, sizeOf, unitPrice, variantName } from "@/lib/shop";
 
 // Cart = { "slug|photo|size": qty } in localStorage, shared by every component through useSyncExternalStore.
@@ -46,7 +47,8 @@ function read(): Cart {
 
 export function setQty(key: string, qty: number) {
   const next = { ...read() };
-  if (qty > 0) next[key] = qty;
+  // whole units, at most MAX_QTY (the checkout refuses more)
+  if (qty > 0) next[key] = Math.min(Math.floor(qty), MAX_QTY);
   else delete next[key];
   try {
     localStorage.setItem(storageKey(), JSON.stringify(next));

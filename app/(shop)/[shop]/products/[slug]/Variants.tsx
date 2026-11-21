@@ -1,7 +1,7 @@
 "use client";
 
 import { Tag } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Img } from "@/components/Img";
 import { formatPrice, priceFor, type Product, pick, sizeOf, thumbUrl, unitPrice, variantAt, wholesaleSteps } from "@/lib/shop";
@@ -69,6 +69,9 @@ export function Variants({
     const each = unitPrice(p, picked ?? p.image, size?.id, s.minQty);
     return { qty: s.minQty, each, percent: Math.round((1 - each / normal) * 100) };
   });
+  // quantities with thousands separators (3,000), like the cart
+  const format = useFormatter();
+  const num = (n: number) => format.number(n);
   // a variant without a name shows as "Option 2" (its place in the list)
   const nameOf = (v: { label: string; image?: string }) => v.label || t("optionN", { n: variants.findIndex((x) => x.image === v.image) + 1 });
   const stripRef = useRef<HTMLDivElement>(null);
@@ -138,23 +141,49 @@ export function Variants({
           )}
         </div>
 
-        {/* wholesale (Admin → Wholesale): one line per step, each with its own tag icon — quantity, saving, unit price */}
-        {stepRows.length > 0 && (
-          <ul className="flex flex-col gap-1.5 text-sm">
-            {stepRows.map((r) => (
-              <li key={r.qty} className="flex items-center gap-2">
-                <Tag className="size-4 shrink-0 text-primary" aria-hidden />
-                <span>
-                  {t.rich(r.percent > 0 ? "wholesaleSave" : "wholesaleNote", {
-                    qty: r.qty,
-                    percent: r.percent,
-                    b: (chunks) => <b className="font-semibold">{chunks}</b>,
-                  })}
-                  <span className="text-muted-foreground tabular-nums"> · {formatPrice(r.each)}</span>
-                </span>
+        {/* wholesale (Admin → Wholesale): "Buy more, save more" — the normal price for small quantities, then one row per
+            step (quantity range · price each · saving). With variants: the picked one's steps; none picked yet → a hint */}
+        {stepRows.length > 0 ? (
+          <section aria-label={t("wholesaleTitle")} className="rounded-2xl border border-primary/25 bg-primary/5 p-3">
+            <p className="mb-2 flex items-center gap-1.5 px-1 text-sm font-semibold text-primary">
+              <Tag className="size-4" aria-hidden />
+              {t("wholesaleTitle")}
+            </p>
+            <div className="mb-1 flex justify-between px-3 text-xs text-muted-foreground" aria-hidden>
+              <span>{t("wholesaleQty")}</span>
+              <span>{t("wholesaleEach")}</span>
+            </div>
+            <ul className="flex flex-col gap-1.5">
+              {/* below the first step: the normal price */}
+              <li className="flex items-center justify-between gap-3 rounded-xl px-3 py-1.5 text-sm text-muted-foreground">
+                <span className="tabular-nums">{stepRows[0].qty > 2 ? `1 – ${num(stepRows[0].qty - 1)}` : "1"}</span>
+                <span className="tabular-nums">{formatPrice(normal)}</span>
               </li>
-            ))}
-          </ul>
+              {stepRows.map((r, i) => {
+                const next = stepRows[i + 1]?.qty;
+                return (
+                  <li key={r.qty} className="flex items-center justify-between gap-3 rounded-xl bg-background px-3 py-2 text-sm shadow-xs">
+                    <span className="font-medium tabular-nums">{next ? (next - 1 > r.qty ? `${num(r.qty)} – ${num(next - 1)}` : num(r.qty)) : `${num(r.qty)}+`}</span>
+                    <span className="flex items-center gap-2">
+                      {r.percent > 0 && (
+                        <span className="rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold text-primary-foreground tabular-nums">−{r.percent}%</span>
+                      )}
+                      <span className="font-semibold tabular-nums">{formatPrice(r.each)}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ) : (
+          variants.length > 0 &&
+          !picked &&
+          variants.some((v) => wholesaleSteps(p, v.image!).length) && (
+            <p className="flex items-center gap-1.5 text-sm text-primary">
+              <Tag className="size-4 shrink-0" aria-hidden />
+              {t("wholesalePick")}
+            </p>
+          )
         )}
 
         {/* variants: "Option" title + one name button per variant; tapping shows its photo and price */}

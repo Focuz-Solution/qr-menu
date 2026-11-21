@@ -51,8 +51,11 @@
     "video": "Video",
     "playVideo": "Play video",
     "chooseOption": "Please choose an option",
-    "wholesaleNote": "Buy <b>{qty}+</b> for a lower price",
-    "wholesaleSave": "Buy <b>{qty}+</b> and save <b>{percent}%</b>"
+    "quantity": "Quantity",
+    "wholesaleTitle": "Buy more, save more",
+    "wholesaleQty": "Quantity",
+    "wholesaleEach": "Price each",
+    "wholesalePick": "Wholesale prices available — pick an option to see them"
   },
   "footer": {
     "address": "Address",
@@ -86,7 +89,8 @@
   "cart": {
     "less": "Decrease quantity",
     "more": "Increase quantity",
-    "remove": "Remove"
+    "remove": "Remove",
+    "quantity": "Quantity"
   },
   "admin": {
     "title": "Admin",
@@ -765,7 +769,6 @@
     "useMyLocation": "Use my current location",
     "removePin": "Remove pin",
     "mapHint": "Drag the map so the pin sits on your exact spot, or tap the place",
-    "gpsError": "Couldn't get your location. Tap the map to place the pin instead.",
     "note": "Note",
     "notePlaceholder": "e.g. best time to deliver",
     "payment": "Payment",
@@ -800,7 +803,14 @@
     "tgCancelled": "❌ Your order {no} was cancelled.",
     "itemsCount": "{count, plural, one {# item} other {# items}}",
     "wholesaleNow": "Wholesale price · {price} each",
-    "wholesaleNext": "Buy {qty}+ for {price} each"
+    "wholesaleNext": "Buy {qty}+ for {price} each",
+    "wholesaleAdd": "Add {count} more to get this price",
+    "wholesaleEach": "{price} each",
+    "receiverRemembered": "Filled in from your last order on this device.",
+    "receiverClear": "Not you? Clear",
+    "locating": "Finding you…",
+    "locationError": "Couldn't get your location. Please choose the province.",
+    "locationOutside": "Your location isn't in Cambodia. Please choose the province."
   },
   "errors": {
     "badPhone": "Enter a valid Cambodian phone number (e.g. 012 345 678)",
@@ -846,9 +856,10 @@
     "variantPhoto": "Each variant needs a photo",
     "sizeTaken": "This size already exists",
     "badYoutube": "Paste a YouTube video link (e.g. https://youtu.be/…)",
-    "badQty": "Enter a whole number from 2 to 99",
+    "badQty": "Enter a whole number from 2 to 1,000,000",
     "stepNotCheaper": "Must be cheaper than the step before it",
-    "stepPriceHigh": "Must be lower than the normal price"
+    "stepPriceHigh": "Must be lower than the normal price",
+    "orderTooLarge": "This order is too large to send at once. Please split it into smaller orders."
   },
   "form": {
     "optional": "optional"

@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { shopBySlug } from "@/lib/shops";
 import { deliveryZones } from "@/lib/delivery";
-import { cambodiaDay, feeFor, normalizePhone, optionsFor, orderNumber } from "@/lib/orders";
+import { cambodiaDay, feeFor, MAX_ORDER_CENTS, MAX_QTY, normalizePhone, optionsFor, orderNumber } from "@/lib/orders";
 import { isProvinceCode, PROVINCES } from "@/lib/provinces";
 import type { ErrorCode, Result } from "@/lib/result";
 import { formatPrice } from "@/lib/shop";
@@ -53,7 +53,7 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
 
   const lines = (Array.isArray(input.lines) ? input.lines : []).slice(0, MAX_LINES + 1);
   if (!lines.length) return { ok: false, error: "emptyCart" };
-  if (lines.length > MAX_LINES || lines.some((l) => !Number.isInteger(l?.qty) || l.qty < 1 || l.qty > 99)) return { ok: false, error: "invalid" };
+  if (lines.length > MAX_LINES || lines.some((l) => !Number.isInteger(l?.qty) || l.qty < 1 || l.qty > MAX_QTY)) return { ok: false, error: "invalid" };
 
   // ---- which shop: every lookup and the new order below stay inside it ----
   // the shop is the one in the page's address (sent with the order); unknown → closed
@@ -127,6 +127,8 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
   const deliveryPayDriver = zone.isCourier && zone.payDriver && fullFeeCents > 0 && input.payDriver === true;
   const deliveryFeeCents = deliveryPayDriver ? 0 : fullFeeCents;
   const totalCents = subtotalCents + deliveryFeeCents;
+  // too big for the database's money columns (only huge wholesale quantities get here): ask the customer to split it
+  if (totalCents > MAX_ORDER_CENTS || orderLines.some((l) => l.lineTotalCents > MAX_ORDER_CENTS)) return { ok: false, error: "orderTooLarge" };
   const province = PROVINCES.find((p) => p.code === provinceCode)!;
 
   // ---- save: order number from the day's counter, in one transaction ----
