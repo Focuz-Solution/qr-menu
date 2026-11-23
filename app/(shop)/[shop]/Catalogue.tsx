@@ -96,8 +96,8 @@ export function Catalogue({ categories, products, layout }: { categories: ShopCa
       return {
         cat,
         sel,
-        // sizes the category's products come in, each once
-        sizes: [...new Map(all.flatMap((p) => p.sizes ?? []).map((z): [string, Size] => [z.id, z])).values()],
+        // sizes the category's products come in, each once, in the shop's order (Admin → Sizes)
+        sizes: [...new Map(all.flatMap((p) => p.sizes ?? []).map((z): [string, Size] => [z.id, z])).values()].sort((a, b) => a.order - b.order),
         items: sel.length ? all.filter((p) => p.sizes?.some((z) => sel.includes(z.id))) : all,
       };
     })
