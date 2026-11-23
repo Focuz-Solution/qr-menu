@@ -35,6 +35,23 @@ export async function renameSize(id: string, input: string): Promise<Result> {
   return { ok: true };
 }
 
+/** full new order of the shop's sizes (= the order on the product page) */
+export async function reorderSizes(ids: string[]): Promise<Result> {
+  const { shop } = await requireUser("menu.edit");
+  // every id must be one of this shop's sizes (so the updates below can't touch another shop)
+  const all = await prisma.size.findMany({ where: { shopId: shop.id }, select: { id: true } });
+  if (!Array.isArray(ids) || ids.length !== all.length || new Set(ids).size !== ids.length || !all.every((s) => ids.includes(s.id))) {
+    return { ok: false, error: "listChanged" }; // someone added / deleted a size meanwhile (or a forged list)
+  }
+  try {
+    await prisma.$transaction(ids.map((id, i) => prisma.size.update({ where: { id }, data: { sortOrder: i } })));
+  } catch {
+    return { ok: false, error: "listChanged" }; // a size was deleted while saving: nothing is changed (one transaction)
+  }
+  await revalidateShop(shop.id);
+  return { ok: true };
+}
+
 /** delete: products lose this size (their other sizes stay); old orders keep their own copy of the name */
 export async function deleteSize(id: string): Promise<Result> {
   const { shop } = await requireUser("menu.edit");
