@@ -682,7 +682,9 @@
       "save": "Save",
       "confirmDelete": "Delete size {name}? {count, plural, =0 {No product uses it.} one {It will be removed from # product.} other {It will be removed from # products.}}",
       "quickPick": "Quick pick",
-      "suggestions": "S, M, L, XL, XXL, 30 ml, 50 ml, 100 ml, 200 ml, 500 ml"
+      "suggestions": "S, M, L, XL, XXL, 30 ml, 50 ml, 100 ml, 200 ml, 500 ml",
+      "reorder": "Move {name} (arrow up/down keys)",
+      "dragHint": "Drag ⠿ to reorder. Customers see sizes in this order on the product page."
     },
     "wholesale": {
       "title": "Wholesale",
@@ -859,6 +861,7 @@
     "badQty": "Enter a whole number from 2 to 1,000,000",
     "stepNotCheaper": "Must be cheaper than the step before it",
     "stepPriceHigh": "Must be lower than the normal price",
+    "listChanged": "The list was changed somewhere else. It has been reloaded — please try again.",
     "orderTooLarge": "This order is too large to send at once. Please split it into smaller orders."
   },
   "form": {
