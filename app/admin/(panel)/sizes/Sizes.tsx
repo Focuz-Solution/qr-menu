@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { Req } from "@/components/FieldMark";
 import { Pager, paginate } from "@/components/Pager";
@@ -13,19 +14,93 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ErrorCode } from "@/lib/result";
-import { cn } from "@/lib/utils";
-import { createSize, deleteSize, renameSize } from "./actions";
+import { moveTo, useDragSort } from "@/lib/use-drag-sort";
+import { useFlip } from "@/lib/use-flip";
+import { cn, dragLiftedRow, dragRow } from "@/lib/utils";
+import { createSize, deleteSize, renameSize, reorderSizes } from "./actions";
 
 type AdminSize = { id: string; name: string; products: number };
 const PAGE_SIZE = 20;
 
-// ponytail: list in the order sizes were added (= order on the product page); add reordering if shops ask for it
-export function Sizes({ sizes }: { sizes: AdminSize[] }) {
+/** the shop's sizes in their order (= order on the product page); drag ⠿ to reorder, like products in Admin → Menu */
+export function Sizes({ sizes: saved }: { sizes: AdminSize[] }) {
   const t = useTranslations("admin.sizes");
   const te = useTranslations("errors");
   const [pending, start] = useTransition();
+  const router = useRouter();
   const [page, setPage] = useState(0);
-  const { pages, current, rows } = paginate(sizes, page, PAGE_SIZE);
+  // a new order shows at once, until the page comes back from the server with it (or the save fails)
+  const [moved, setMoved] = useState<string[] | null>(null);
+  const [base, setBase] = useState(saved);
+  if (base !== saved) {
+    setBase(saved);
+    setMoved(null);
+  }
+  const [orderError, setOrderError] = useState<ErrorCode>();
+  const sizes = moved ? moved.map((id) => saved.find((s) => s.id === id)!).filter(Boolean) : saved;
+  const ids = sizes.map((s) => s.id);
+  function reorder(order: string[]) {
+    setOrderError(undefined);
+    setMoved(order);
+    start(async () => {
+      const r = await reorderSizes(order);
+      if (!r.ok) {
+        setMoved(null);
+        setOrderError(r.error);
+        router.refresh(); // show the list as it is now
+      }
+    });
+  }
+
+  // drag ⠿ to reorder (saved on release); held over the pager's ‹ › it moves to the page before / after (flipPage)
+  const { dragId, dragOrder, start: startDrag } = useDragSort({
+    attr: "data-size",
+    onDrop: reorder,
+    onOther: (under, id, order) => {
+      const side = pagerSide(under);
+      return side ? flipPage(id, order, side) : null;
+    },
+    // the ‹ / › the dragged row is held over lights up (until the page has turned); the drag's end (null) resets it
+    onMove: (under) => {
+      if (!under) {
+        turnedRef.current = false;
+        setTurned(false);
+      }
+      setArmed(turnedRef.current ? null : pagerSide(under));
+    },
+  });
+  const [armed, setArmed] = useState<"prev" | "next" | null>(null);
+  const shown = dragOrder ? dragOrder.map((id) => sizes.find((s) => s.id === id)!).filter(Boolean) : sizes;
+  const { pages, current, rows } = paginate(shown, page, PAGE_SIZE);
+  // dragging across pages, same as products: one page turn per drag
+  const pagerSide = (under: Element | null) => (under?.closest<HTMLElement>("[data-pager]:enabled")?.dataset.pager as "prev" | "next" | undefined) ?? null;
+  const turnedRef = useRef(false);
+  const [turned, setTurned] = useState(false);
+  const flipDir = useRef<-1 | 0 | 1>(0);
+  const flipPage = (id: string, order: string[], side: "prev" | "next") => {
+    if (turnedRef.current) return null;
+    const dir = side === "prev" ? -1 : 1;
+    const to = dir < 0 ? current * PAGE_SIZE - 1 : (current + 1) * PAGE_SIZE;
+    if (to < 0 || to >= order.length) return null;
+    turnedRef.current = true;
+    setTurned(true);
+    setArmed(null);
+    flipDir.current = dir;
+    setPage(current + dir);
+    return moveTo(order, id, to);
+  };
+  // the other rows slide to their new place while one is dragged
+  const body = useFlip<HTMLTableSectionElement>("data-size", rows.map((s) => s.id).join(), dragId);
+  // a page turned while dragging: the new page slides in from the side it came from
+  useLayoutEffect(() => {
+    const dir = flipDir.current;
+    flipDir.current = 0;
+    if (!dir || !body.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    body.current.animate([{ transform: `translateX(${dir * 40}px)`, opacity: 0.2 }, { transform: "translateX(0)", opacity: 1 }], {
+      duration: 280,
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
+    });
+  }, [current, body]);
   // the add / rename dialog: "new" or the size being renamed
   const [editing, setEditing] = useState<AdminSize | "new" | null>(null);
   const [name, setName] = useState("");
@@ -67,15 +142,40 @@ export function Sizes({ sizes }: { sizes: AdminSize[] }) {
         <Table>
           <TableHeader className="bg-muted/50 [&_th]:h-11 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
             <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-4">{t("name")}</TableHead>
+              <TableHead className="w-10 pr-0 pl-2" />
+              <TableHead className="pl-1">{t("name")}</TableHead>
               <TableHead className="text-right">{t("products")}</TableHead>
               <TableHead className="w-28 pr-4 text-right">{t("actions")}</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody ref={body}>
             {rows.map((s) => (
-              <TableRow key={s.id} className="h-14">
-                <TableCell className="max-w-40 truncate pl-4 font-medium">{s.name}</TableCell>
+              <TableRow key={s.id} data-size={s.id} className={cn("h-14 hover:bg-transparent", dragRow, dragId === s.id && dragLiftedRow)}>
+                {/* drag handle: mouse + touch via pointer events (saved on release), keyboard via ↑/↓ */}
+                <TableCell className="w-10 pr-0 pl-2">
+                  {sizes.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label={t("reorder", { name: s.name })}
+                      disabled={pending}
+                      className="flex size-10 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
+                      onPointerDown={(e) => startDrag(e, s.id, ids)}
+                      onKeyDown={(e) => {
+                        const d = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+                        if (!d) return;
+                        e.preventDefault();
+                        const order = moveTo(ids, s.id, ids.indexOf(s.id) + d);
+                        if (order === ids) return;
+                        reorder(order);
+                        // ↑ on a page's first row / ↓ on its last: the table follows the row to the next page
+                        setPage(Math.floor(order.indexOf(s.id) / PAGE_SIZE));
+                      }}
+                    >
+                      <GripVertical className="size-4" aria-hidden />
+                    </button>
+                  )}
+                </TableCell>
+                <TableCell className="max-w-40 truncate pl-1 font-medium">{s.name}</TableCell>
                 <TableCell className="text-right text-muted-foreground tabular-nums">{s.products}</TableCell>
                 <TableCell className="pr-4">
                   <div className="flex items-center justify-end gap-0.5">
@@ -108,15 +208,17 @@ export function Sizes({ sizes }: { sizes: AdminSize[] }) {
             ))}
             {!rows.length && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={3} className="py-12 text-center text-sm whitespace-normal text-muted-foreground">
+                <TableCell colSpan={4} className="py-12 text-center text-sm whitespace-normal text-muted-foreground">
                   {t("empty")}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+        {sizes.length > 1 && <p className="border-t px-4 py-3 text-xs text-muted-foreground">{t("dragHint")}</p>}
       </Card>
-      <Pager page={current} pages={pages} size={PAGE_SIZE} shown={rows.length} total={sizes.length} onPage={setPage} />
+      {orderError && <p role="alert" className="mt-2 text-xs text-destructive">{te(orderError)}</p>}
+      <Pager page={current} pages={pages} size={PAGE_SIZE} shown={rows.length} total={sizes.length} onPage={setPage} dropTarget={!!dragId && pages > 1 && !turned} armed={dragId ? armed : null} popPage={!!dragId} />
 
       <Dialog open={!!editing} onOpenChange={(next) => !next && !pending && setEditing(null)}>
         <DialogContent className="sm:max-w-md" overlayClassName="bg-black/30 supports-backdrop-filter:backdrop-blur-none">
