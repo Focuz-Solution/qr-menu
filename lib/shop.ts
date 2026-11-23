@@ -11,7 +11,8 @@ export const pick = (t: T, lang: string) => t[lang as Lang] || t.km;
 // size ("100 ml") or shade (hex)
 export type Variant = { label: string; hex?: string; price?: number; image?: string; };
 
-export type Size = { id: string; name: string; price?: number };
+/** `order`: the size's place in Admin → Sizes (so lists merged from several products keep that order) */
+export type Size = { id: string; name: string; price?: number; order: number };
 
 /** a category on the shop (from Admin → Menu): its slug is the anchor id, the name is shown as is */
 export type ShopCategory = { slug: string; name: string };

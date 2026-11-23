@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { MenuProvider } from "@/components/MenuProvider";
 import { getMenuList } from "@/lib/menu";
 import { ShakeOnSubmit } from "@/components/ShakeOnSubmit";
@@ -69,6 +70,8 @@ export async function ShopShell({ slug, base, children }: { slug: string; base: 
           </ShopPathProvider>
         </NextIntlClientProvider>
         <ShakeOnSubmit />
+        {/* only a real shop's address as the content group (an unknown address is a 404 page, typed by anyone) */}
+        <GoogleAnalytics shop={shopId ? slug : null} />
       </body>
     </html>
   );
