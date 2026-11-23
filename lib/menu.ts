@@ -24,7 +24,7 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
           orderBy: { sortOrder: "asc" },
           include: {
             images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
-            sizes: { orderBy: { size: { sortOrder: "asc" } }, select: { priceCents: true, size: { select: { id: true, name: true } } } },
+            sizes: { orderBy: { size: { sortOrder: "asc" } }, select: { priceCents: true, size: { select: { id: true, name: true, sortOrder: true } } } },
             wholesale: { select: { isActive: true, tiers: true } },
           },
         },
@@ -54,7 +54,7 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
           image,
           images,
           variants: variants.map((v): Variant => ({ label: v.label, hex: v.hex, image: v.image, price: v.priceCents != null ? v.priceCents / 100 : undefined })),
-          sizes: i.sizes.map((s) => ({ id: s.size.id, name: s.size.name, price: s.priceCents != null ? s.priceCents / 100 : undefined })),
+          sizes: i.sizes.map((s) => ({ id: s.size.id, name: s.size.name, order: s.size.sortOrder, price: s.priceCents != null ? s.priceCents / 100 : undefined })),
           youtube: i.youtubeId ?? undefined,
           description: one(i.description),
           badges: i.badge ? [BADGE[i.badge]] : [],
