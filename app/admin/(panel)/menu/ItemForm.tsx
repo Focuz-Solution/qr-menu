@@ -110,7 +110,7 @@ export function ItemForm({
   const [gallery, setGallery] = useState(() => (item?.images ?? []).filter((u) => u !== photo && !isVariantPhoto(u)));
   const [variants, setVariants] = useState(() =>
     // key = the row's own id (two variants may share a photo, so not the photo): drag, upload messages and React rows use it
-    (item?.variants ?? []).map((v, i) => ({ key: `saved-${i}`, image: v.image, label: v.label, code: v.code ?? "", price: dollars(v.priceCents) })),
+    (item?.variants ?? []).map((v, i) => ({ key: `saved-${i}`, id: v.id, image: v.image, label: v.label, code: v.code ?? "", price: dollars(v.priceCents) })),
   );
   const [sizePrices, setSizePrices] = useState<Record<string, string>>(() =>
     Object.fromEntries((item?.sizes ?? []).map((x) => [x.sizeId, dollars(x.priceCents)])),
@@ -179,7 +179,7 @@ export function ItemForm({
       youtube: str("youtube"),
       image: photo,
       gallery,
-      variants: variants.map(({ label, image, price, code }) => ({ label, image, price, code })),
+      variants: variants.map(({ id, label, image, price, code }) => ({ id, label, image, price, code })),
       sizes: picked.map((x) => ({ sizeId: x.id, price: sizePrices[x.id] })),
     };
     start(async () => {
@@ -477,7 +477,7 @@ export function ItemForm({
                 "flex h-12 w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground outline-none hover:bg-muted/50 hover:text-foreground focus-visible:bg-muted/50",
                 variants.length > 0 && "border-t",
               )}
-              onClick={() => setVariants((all) => [...all, { key: crypto.randomUUID(), image: "", label: "", code: "", price: "" }])}
+              onClick={() => setVariants((all) => [...all, { key: crypto.randomUUID(), id: "", image: "", label: "", code: "", price: "" }])}
             >
               <Plus className="size-4" aria-hidden /> {t("addVariant")}
             </button>

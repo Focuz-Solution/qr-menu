@@ -1,5 +1,6 @@
 "use server";
 
+import { tiersByPhoto } from "@/lib/variants";
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { after } from "next/server";
@@ -107,7 +108,8 @@ export async function createOrder(input: CheckoutInput): Promise<Result<Placed>>
     // the size's own price, else the variant's (rule 8), else the product price — all from the database
     const normal = size?.priceCents ?? (typeof v?.priceCents === "number" && v.priceCents >= 0 ? v.priceCents : item.priceCents);
     // wholesale (Admin → Wholesale, when turned on): the step this line's quantity reaches lowers the unit price
-    const tiers = item.wholesale?.isActive ? (item.wholesale.tiers ?? {}) as Record<string, unknown> : {};
+    // (steps are saved per variant id; read here by photo, the same way the shop shows them — lib/variants.ts)
+    const tiers = item.wholesale?.isActive ? tiersByPhoto(item.wholesale.tiers, Array.isArray(item.variants) ? (item.variants as { id?: string; image?: string }[]) : []) : {};
     const unit = tierUnitCents(normal, tierAt(cleanTiers(tiers[withPhoto.length ? (v?.image ?? "\0") : ""]), l.qty));
     // saved as one text "Rose · 100 ml" (Admin → Orders, Telegram and receipts show it as is)
     const style = [v && (v.label || tp("optionN", { n: n + 1 })), size?.size.name].filter(Boolean).join(" · ") || null;

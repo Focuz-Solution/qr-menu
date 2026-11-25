@@ -17,8 +17,8 @@ export type AdminItem = {
   isVisible: boolean;
   image: string | null;
   images: string[];
-  /** as saved: price in cents, none = the product price */
-  variants: { label: string; image: string; priceCents?: number; code?: string }[];
+  /** as saved: price in cents, none = the product price; `id` = its own id (lib/variants.ts, always set here) */
+  variants: { id: string; label: string; image: string; priceCents?: number; code?: string }[];
   /** YouTube video id, null = none */
   youtubeId: string | null;
   /** sizes it comes in (Admin → Sizes): own price in cents, null = the product price */
@@ -30,6 +30,8 @@ export type AdminSize = { id: string; name: string };
 
 /** a style of the product (shade, size…): its own photo + name; the photo is also one of the product's image rows */
 export type VariantInput = {
+  /** its id as loaded (kept on save, so its wholesale steps follow it), "" = a new variant */
+  id: string;
   label: string;
   image: string;
   /** own price in dollars as typed, "" = the product price */
