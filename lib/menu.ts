@@ -3,6 +3,7 @@ import { cache } from "react";
 import type { Product, ShopCategory, Variant } from "@/lib/shop";
 import { cleanTiers, type Tiers } from "@/lib/wholesale";
 import { prisma } from "@/lib/db";
+import { tiersByPhoto } from "@/lib/variants";
 
 const BADGE = { new: "new", best_seller: "best", sale: "sale" } as const;
 
@@ -38,7 +39,7 @@ export const getMenu = cache(async (shopId: string | null): Promise<{ categories
         const [image = "", ...images] = i.images.map((x) => x.url);
         // wholesale steps only when turned on; rows without steps are left out
         const tiers = i.wholesale?.isActive
-          ? Object.entries((i.wholesale.tiers ?? {}) as Record<string, unknown>).flatMap(([k, v]) => {
+          ? Object.entries(tiersByPhoto(i.wholesale.tiers, (Array.isArray(i.variants) ? i.variants : []) as { id?: string; image?: string }[])).flatMap(([k, v]) => {
               const steps = cleanTiers(v);
               return steps.length ? [[k, steps] as const] : [];
             })

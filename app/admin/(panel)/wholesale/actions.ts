@@ -2,6 +2,7 @@
 
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { tiersById, variantIdAt } from "@/lib/variants";
 import { revalidateShop } from "@/lib/revalidate-shop";
 import type { Result } from "@/lib/result";
 import { checkSteps, rowKeys, type StepInput, type Tiers } from "./types";
@@ -18,11 +19,12 @@ async function load(shopId: string, itemId: string) {
     select: { priceCents: true, variants: true, wholesale: { select: { tiers: true } } },
   });
   if (!item) return null;
-  const variants = (Array.isArray(item.variants) ? item.variants : []) as { image: string; priceCents?: number }[];
+  const variants = (Array.isArray(item.variants) ? item.variants : []) as { id?: string; image: string; priceCents?: number }[];
   const prices: Record<string, number> = variants.length
-    ? Object.fromEntries(variants.map((v) => [v.image, v.priceCents ?? item.priceCents]))
+    ? Object.fromEntries(variants.map((v, i) => [variantIdAt(v, i), v.priceCents ?? item.priceCents]))
     : { "": item.priceCents };
-  return { keys: rowKeys(variants), prices, tiers: (item.wholesale?.tiers ?? {}) as Tiers };
+  // saved steps per variant id: older ones (under a photo) are moved onto every variant with that photo
+  return { keys: rowKeys(variants), prices, tiers: tiersById(item.wholesale?.tiers, variants) as Tiers };
 }
 
 /** set the steps of some rows of a product ([] = remove them); other rows keep theirs */
@@ -38,8 +40,8 @@ export async function saveSteps(itemId: string, keys: string[], input: StepInput
   const bad = errors.find(Boolean);
   if (bad) return { ok: false, error: bad };
 
-  // keep only rows the product still has (a removed variant's steps go with it)
-  const tiers: Tiers = Object.fromEntries(Object.entries(item.tiers).filter(([k]) => item.keys.includes(k)));
+  // the product's other rows keep theirs (tiersById already left out rows it no longer has)
+  const tiers: Tiers = { ...item.tiers };
   for (const k of keys) {
     if (steps.length) tiers[k] = steps;
     else delete tiers[k];

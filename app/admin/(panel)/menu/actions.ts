@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/lib/auth";
 import { revalidateShop } from "@/lib/revalidate-shop";
@@ -9,6 +10,7 @@ import { Badge } from "@/lib/generated/prisma/enums";
 import type { ErrorCode, Result } from "@/lib/result";
 import { deleteImageIfUnused, imageKey } from "@/lib/r2";
 import { cleanRichInput } from "@/lib/rich-text";
+import { variantIdAt, tiersById } from "@/lib/variants";
 import { youtubeId } from "@/lib/youtube";
 import type { ItemInput } from "./types";
 
@@ -105,7 +107,9 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   // "sale" is no longer a badge choice — the discount itself shows the Sale pill
   const badge = Object.hasOwn(Badge, input.badge) && input.badge !== "sale" ? (input.badge as Badge) : null;
   // up to 30 variants; own price optional, else the product price applies (rule 8). The product discount is not applied to it.
-  const variants = (Array.isArray(input.variants) ? input.variants : []).slice(0, 30).map((v) => ({
+  // `asked`: the id the form loaded it with (checked against the saved variants below, else it gets a new one)
+  const asked = (Array.isArray(input.variants) ? input.variants : []).slice(0, 30).map((v) => String(v?.id ?? "").slice(0, 64));
+  const typed = (Array.isArray(input.variants) ? input.variants : []).slice(0, 30).map((v) => ({
     label: String(v?.label ?? "").trim().slice(0, 80),
     image: String(v?.image ?? "").trim(),
     priceCents: toCents(String(v?.price ?? "")) ?? undefined,
@@ -119,10 +123,10 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   if (sizes.some((x) => Number.isNaN(x.priceCents))) fields.sizes = "badPrice";
   // more photos (not tied to a variant): up to 10, kept with or without variants
   const gallery = (Array.isArray(input.gallery) ? input.gallery : []).slice(0, 10).map((u) => String(u ?? "").trim());
-  if (variants.some((v) => !v.image)) fields.variants = "variantPhoto";
-  else if (variants.some((v) => Number.isNaN(v.priceCents))) fields.variants = "badPrice";
+  if (typed.some((v) => !v.image)) fields.variants = "variantPhoto";
+  else if (typed.some((v) => Number.isNaN(v.priceCents))) fields.variants = "badPrice";
   // image rows: main photo first, then the variant photos, then the more photos last (cart, checkout and photo clean-up read these rows)
-  const images = [...new Set([String(input.image ?? "").trim(), ...variants.map((v) => v.image), ...gallery].filter(Boolean))];
+  const images = [...new Set([String(input.image ?? "").trim(), ...typed.map((v) => v.image), ...gallery].filter(Boolean))];
 
   if (!name || name.length > 200) fields.name = "required";
   // description: the editor's JSON, cleaned to what the shop can show (lib/rich-text.ts); plain text is kept as is
@@ -137,7 +141,7 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   const [current, category, okSizes] = await Promise.all([
     id ? prisma.item.findFirst({
       where: { id, shopId: shop.id, deletedAt: null },
-      select: { categoryId: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
+      select: { categoryId: true, variants: true, images: { orderBy: { sortOrder: "asc" }, select: { url: true } } },
     }) : null,
     // not a uuid (e.g. no category picked) → "required", not a database error
     uuid.test(input.categoryId)
@@ -148,6 +152,17 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
   // each ticked size once, and every one is this shop's
   if (new Set(sizes.map((x) => x.sizeId)).size !== sizes.length || okSizes !== sizes.length) fields.sizes = "invalid";
   if (id && !current) return { ok: false, error: "notFound" };
+  // each variant keeps the id it was loaded with when that is one of this product's saved variants (once);
+  // new variants (and anything else) get a new id — wholesale steps follow the id (lib/variants.ts)
+  const oldVariants = (Array.isArray(current?.variants) ? current.variants : []) as { id?: string; image?: string }[];
+  const oldIds = new Set(oldVariants.map(variantIdAt));
+  const used = new Set<string>();
+  const variants = typed.map((v, i) => {
+    const keep = oldIds.has(asked[i]) && !used.has(asked[i]);
+    const vid = keep ? asked[i] : randomUUID();
+    used.add(vid);
+    return { id: vid, ...v };
+  });
   const oldImages = current?.images.map((i) => i.url) ?? [];
   if (images.some((u) => !oldImages.includes(u) && !imageKey(u))) fields.images = "badImage";
   if (originalCents === null || Number.isNaN(originalCents)) fields.price = "badPrice";
@@ -200,6 +215,17 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<Res
       sizes: { deleteMany: {}, create: sizes },
     },
   });
+  // wholesale steps follow the variants by id (a changed photo keeps them; a removed variant's go with it).
+  // Older steps saved under a photo are moved onto the variant ids here (lib/variants.ts → tiersById).
+  // (the steps are read again just now, so a Wholesale save made while this form was open isn't undone)
+  const wholesale = await prisma.wholesalePrice.findUnique({ where: { itemId: id }, select: { tiers: true } });
+  if (wholesale) {
+    const old = tiersById(wholesale.tiers, oldVariants);
+    const tiers = variants.length
+      ? Object.fromEntries(variants.flatMap((v) => (Object.hasOwn(old, v.id) ? [[v.id, old[v.id]]] : [])))
+      : oldVariants.length ? {} : old; // variants added / all removed: the old steps no longer fit
+    await prisma.wholesalePrice.update({ where: { itemId: id }, data: { tiers: tiers as object } });
+  }
   // removed photos: delete the files, unless another product / logo (any shop) or an old order still shows one
   await Promise.all(oldImages.filter((u) => !images.includes(u)).map(deleteImageIfUnused));
   await changed();
