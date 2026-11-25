@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { variantIdAt } from "@/lib/variants";
 import { prisma } from "@/lib/db";
 import { MenuEditor } from "./MenuEditor";
 import type { AdminItem } from "./types";
@@ -31,7 +32,8 @@ export default async function AdminMenuPage() {
         ...item,
         image: images[0]?.url ?? null,
         images: images.map((i) => i.url),
-        variants: (Array.isArray(variants) ? variants : []) as AdminItem["variants"],
+        // every variant with its id (older products: its place, saved as its id on the next save)
+        variants: ((Array.isArray(variants) ? variants : []) as AdminItem["variants"]).map((v, i) => ({ ...v, id: variantIdAt(v, i) })),
       }))}
     />
   );
