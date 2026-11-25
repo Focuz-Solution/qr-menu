@@ -2,6 +2,7 @@ import { toCents } from "@/lib/money";
 import type { ErrorCode } from "@/lib/result";
 import { MAX_QTY } from "@/lib/orders";
 import { tierUnitCents } from "@/lib/wholesale";
+import { variantIdAt } from "@/lib/variants";
 
 // Wholesale page data (prices in cents). A "row" is one variant, or the product itself when it has no variants.
 
@@ -13,11 +14,11 @@ export type StepInput = { minQty: string; mode: "percent" | "amount"; value: str
 export type WholesaleRow = { key: string; label: string; code: string; image: string | null; priceCents: number; steps: Step[] };
 export type WholesaleItem = { id: string; name: string; image: string | null; priceCents: number; variantCount: number; isActive: boolean; rows: WholesaleRow[] };
 
-/** saved steps per row key (variant photo url, "" = the product) */
+/** saved steps per row key (variant id from lib/variants.ts, "" = the product) */
 export type Tiers = Record<string, Step[]>;
 
-/** keys a product's rows use: one per variant (its photo), else "" for the product itself */
-export const rowKeys = (variants: { image: string }[]) => (variants.length ? variants.map((v) => v.image) : [""]);
+/** keys a product's rows use: one per variant (its id), else "" for the product itself */
+export const rowKeys = (variants: { id?: string }[]) => (variants.length ? variants.map(variantIdAt) : [""]);
 
 /** unit price of a row with this step — the same rule the shop and checkout use (never above the normal price) */
 export const stepPrice = (cents: number, step: Pick<Step, "percent" | "priceCents">) => tierUnitCents(cents, { minQty: 0, ...step });
